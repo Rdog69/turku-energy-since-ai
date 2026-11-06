@@ -1,12 +1,12 @@
 # Implementation plan
 
-> Working plan for the Turku Energia imbalance price challenge. It's a living document, revised after looking at the starter package (6 Nov). Every claim here is either **checked against the data** (✔ data), **from the official README** (✔ README), or marked as an **assumption** (☐).
+> Working plan for the Turku Energia imbalance price challenge. It's a living document, revised after looking at the starter package (6 Nov) and re-checked against the challenge brief and the training data the same evening. Every claim here is either **checked against the data** (✔ data), **from the official README** (✔ README), or marked as an **assumption** (☐).
 
 ## 1. What we are actually forecasting
 
 The target is the **Finnish imbalance price per 15-minute period, 1–40 steps (10 h) ahead**, from every full-hour origin. It works like this (✔ README, ✔ data):
 
-- **Up-regulation:** the price is above spot. In training, the median gap to spot is +25 €/MWh (P10 −0, P90 +94).
+- **Up-regulation:** the price is above spot. In training, the median gap to spot is +25 €/MWh (P10 0, P90 +91).
 - **Down-regulation:** the price is below spot. The median gap is −17 €/MWh (P10 −52, P90 −3).
 - **No dominating direction:** the price is exactly spot. This happens in only **0.17 %** of training quarter-hours.
 
@@ -19,14 +19,16 @@ My first pass accidentally included October and November input rows in some mont
 | # | Finding | Evidence | Consequence |
 |---|---|---|---|
 | 1 | **Spot alone beats the baseline by about 33 %.** | Validation MAE: p50 = spot gives 46.5; spot − 7.7 (median gap) gives **44.2**; persistence (≈ baseline) gives 64.8 (official baseline 66.2). | The baseline is weak because it ignores spot. Predicting **the gap to spot** is the right framing, and other teams will probably find this too, so the real competition is beyond it. |
-| 2 | **Recent imbalance data is stale, and persistence fades fast.** | The imbalance price becomes usable ~60 min after its quarter ends, so the newest value is 5 quarters before step 1. At that delay "spot + last gap" (MAE 50.8) is already *worse* than spot + constant (44.2). Direction agreement drops from 0.70 at 5 quarters to 0.58 at 44, close to chance (0.55). | Recent state helps only in the first few steps, through features the model can down-weight. **Information known a day ahead dominates.** Fresher real-time data (§4) is a real edge if its delays are honest. |
+| 2 | **Recent imbalance data is stale, and persistence fades fast.** | The imbalance price becomes usable ~60 min after its quarter ends, so the newest value is 5 quarters before step 1. Even at step 1, the raw "spot + last gap" (MAE 50.8) is *worse* than spot + constant (44.2); averaged over all 40 steps it is 61.8. A **shrunk** version, spot + ½ × last gap + ½ × constant, gets **43.0 at step 1**, so the recent state does help when it's down-weighted. (The ½ weight was picked by looking at validation, so treat 43.0 as slightly optimistic; the model learns its own weight from training data.) Direction agreement drops from 0.70 at 5 quarters to 0.57 at 44, close to chance (0.54). | Recent state helps only in the first few steps, through features the model can down-weight. **Information known a day ahead dominates.** Fresher real-time data (§4) is a real edge if its delays are honest. |
 | 3 | **The day-ahead wind forecast level is the strongest single signal.** | Top wind quintile vs. bottom: mean \|gap\| 13.6 vs 40.0; low-spike share 1 % vs 10 %; up-regulation share 21 % vs 43 %. | The briefing claim that wind matters most is ✔ confirmed, but by **wind level** (known day-ahead), not only by sudden changes. |
 | 4 | **Spot ramps drive the gap.** | \|gap\| rises from 18.5 to 50.4 between the lowest and highest quintile of quarter-to-quarter spot change. | Features: spot change across the hour boundary, daily spot shape, spot level. |
 | 5 | **Time of day matters.** | Evening peak around 20:00 local (\|gap\| 52.6 vs ~23 at night); morning ramp 06–09. | Hour-of-day features, possibly interacting with wind. |
-| 6 | **Neighbours carry some signal.** | SE1 imbalance price at the 8-quarter delay correlates 0.39 with the FI imbalance price; SE3 0.28; EE 0.21. | Useful, but secondary. |
-| 7 | **The consumption error is weak.** | corr(actual − day-ahead consumption, gap) = −0.09. | Low priority. |
+| 6 | **Neighbours carry little signal about the gap.** | ENTSO-E rows become usable 2.25–3 h after the quarter starts, so the newest value is **9 quarters** before step 1. At an 8-quarter shift, SE1 correlates 0.35 with the FI imbalance *price* (SE3 0.27, EE 0.23), but only **0.10 with the gap** (SE3 0.07, EE 0.06). The price correlation mostly reflects a shared spot level. | Marginal. Include as cheap features and keep only if the ablation shows a gain. |
+| 7 | **The consumption error is weak.** | Same-quarter corr(actual − day-ahead consumption, gap) = −0.09, but that isn't known at the origin. At usable delays (≥ 3 quarters) it is −0.03 to −0.06. | Low priority. |
 | 8 | **"None" almost never happens.** | 0.17 % of quarter-hours. | `p_none` ≈ a small constant; direction is essentially up vs. down. Drop the mixture-model idea. |
-| 9 | **The season shifts.** | September was the most volatile training month (imbalance price std 141). Solar falls ~5× from June to October. | Weight recent data more and favour features that don't depend on the season (wind level, spot shape). |
+| 9 | **The season shifts.** | September was the most volatile training month (imbalance price std 141). Solar falls ~5× from June to October. Base rates drift too: spike shares are 9.0 % high / 7.3 % low across training but 12.1 % / 13.0 % in validation, and the up-regulation share falls from 35 % overall to 25 % on 1–4 Oct. | Weight recent data more and favour features that don't depend on the season (wind level, spot shape). Calibrate the probabilities on recent data, since the spike and direction scores (30 points) depend on them. |
+| 10 | **Spot and the day-ahead forecasts cover the whole horizon.** | Checked at every hourly origin from 2 Jun to 1 Nov: spot and `fi_wind_fc_da` are usable for all 40 steps, with no exceptions. | The "gap to spot" framing never lacks its anchor. No fallback is needed. |
+| 11 | **Spikes almost only happen in the matching direction.** | Of ~12,000 training quarters, only 7 high spikes fall outside up-regulation and 18 low spikes outside down-regulation. | Model spikes as P(up) × P(gap > 50 \| up) and P(down) × P(gap < −50 \| down). The probabilities then stay consistent with the direction forecast, and the two spikes automatically sum to ≤ 1. |
 
 **Not in the package:** realised wind production (the package has only *total* production), outages, weather, and Fingrid's hourly-updated forecasts (only the latest version is stored, so using their history would leak).
 
@@ -87,7 +89,7 @@ Every Nordic wind farm, nuclear and fossil plant, the gas price and the headline
 ### Features per (origin `t`, step `k`)
 
 - **Known day-ahead:** spot at the delivery quarter, spot change across the hour boundary and daily shape; day-ahead wind, consumption and solar at delivery (plus wind as a share of consumption); FI–EE capacity; hour, weekday, holiday, DST; step `k`.
-- **Recent state (decays with `k`):** the last usable gap, direction and mFRR volumes, with lags and rolling statistics; last neighbour imbalance prices (SE1, SE3, EE); last flows.
+- **Recent state (decays with `k`):** the last usable gap (5 quarters before step 1), direction and mFRR volumes, with lags and rolling statistics; last neighbour imbalance prices (SE1, SE3, EE; 9 quarters before step 1); last flows and consumption error (3 quarters before step 1). All lags come from `available_at()`, never from fixed shifts.
 - **External:**
   - Wind revision: latest available Open-Meteo run minus the earlier run the day-ahead forecast was based on, at weighted west-coast points.
   - Current wind error: Fingrid realised wind minus day-ahead wind.
@@ -97,11 +99,18 @@ Every Nordic wind farm, nuclear and fossil plant, the gas price and the headline
 
 ### Models
 
-- **Price:** LightGBM quantile regression on `y = imbalance − spot` for q = 0.1, 0.5 and 0.9, with step as a feature. Add spot back, then sort the quantiles. Simple anchor to beat: spot − 7.7 (MAE 44.2).
+- **Price:** LightGBM quantile regression on `y = imbalance − spot` for q = 0.1, 0.5 and 0.9, with step as a feature. Add spot back, then sort the quantiles. Simple anchors to beat: spot − 7.7 (MAE 44.2), and at short steps the shrunk last gap (43.0 at step 1).
 - **Direction:** binary LightGBM for up vs. down, then calibration; `p_none` = the small training share (~0.002).
-- **Spikes:** binary models for gap > +50 and gap < −50, calibrated; clip so the two sum to ≤ 1.
+- **Spikes:** conditional tail models, P(gap > 50 \| up) and P(gap < −50 \| down), multiplied by the direction probabilities (finding 11). This keeps the outputs consistent and the spike sum ≤ 1. Compare against two independent binary spike models and keep whichever scores the better Brier.
 - **Calibration:** conformal or quantile adjustment of P10 and P90 per step band to reach ~80 % coverage.
 - **Season shift:** recency weights; retrain on everything up to 4 Oct for the test run.
+
+### Optional output columns
+
+They aren't scored, but the brief lists both as Level 1 outputs and they cost little:
+
+- `data_cutoff_utc`: the latest quarter-hour of **measured** data actually used at the origin (e.g. the newest usable `fi_imbalance_price` or `fi_consumption` row), which is always before the origin. ⚠ Don't take the max `timestamp_utc` over *all* used rows: spot, day-ahead forecasts and calendar rows have future delivery timestamps (at origin 15 Sep 08:00 that max is 2 Nov), and the validator rejects `data_cutoff_utc > forecast_origin_utc`. Clip to the origin as a safety net.
+- `top_drivers`: the top 3 feature names by |SHAP| for the row, semicolon-separated as the schema shows (e.g. `wind_fc_da;spot_ramp;last_gap`). This comes straight from SHAP. The LLM never writes this column.
 
 ### Evaluation
 
@@ -122,10 +131,13 @@ All forecasts are precomputed, so the time-travel slider just moves over forecas
 2. **What changed:** difference from the previous origin, plus alerts when spike risk or P50 shifts.
 3. **Drivers ("why"):** SHAP per quarter-hour, explained in plain language by an LLM, e.g. "wind on the west coast revised −400 MW since the day-ahead forecast; evening spot ramp".
 4. **Track record:** MAE vs. the baseline by day and week, coverage, calibration chart.
-5. **Recommendations:** based on the levers the company named (produce more at Naantali, consume more with electric boilers or heat pumps, buy or sell, offer mFRR), with the expected gap to spot and the model's confidence.
-6. **Outage feed:** UMM events on the timeline.
+5. **Suggestions to review:** "check this situation" prompts tied to the levers the company named (the Naantali production plan, electric boilers or heat pumps, the trading position, mFRR offers), with the expected gap to spot and the model's confidence. The brief asks for **suggestions to review, not instructions**: open data can't tell us the available capacity, marginal costs, ramp rates, heat or contract constraints, or capacity already committed elsewhere. So the wording is "check the Naantali plan for 16–18", never "produce more". Real capacity recommendations are the natural next step once internal plant data is available, which is a good point for the pitch.
+6. **Conflicting signals:** a flag when sources or models disagree, one of the brief's example situations. Examples: the direction model says up but P50 is below spot; the Open-Meteo wind revision points the other way from the Fingrid day-ahead wind; P10–P90 is unusually wide for the hour. Each flag says "worth an expert look".
+7. **Outage feed:** UMM events on the timeline.
 
-**Stack:** a **Lovable** frontend that reads precomputed forecast files, with Streamlit + Plotly as the quick fallback and for internal checks.
+**API:** the brief asks for "an API from which this information can be retrieved for display" (challenge brief p. 3). A small FastAPI app (or static JSON per origin) serves the forecast, alerts and drivers for a given origin, and the dashboard reads from it.
+
+**Stack:** a **Lovable** frontend that reads from the API, run locally against our precomputed forecasts. Streamlit + Plotly is the quick fallback and our tool for internal checks.
 
 ⚠ **Licence:** Lovable apps are hosted publicly, and Nord Pool spot data must not be published. Options:
 
@@ -140,8 +152,8 @@ Source: [Since AI resources page](https://sinceai.ai/hackathon-2026/guide/resour
 
 | Tool | What we get | Use | Priority |
 |---|---|---|---|
-| **Featherless.ai** (OpenAI-compatible, open-weight models) | **$25 per participant**, no card; claims capped at 1,200 in total, so **everyone claims early** (≈ $75–100 for the team) | LLM for explanations, `top_drivers` text, dashboard chat, and n8n alert text. Generate in advance and cache the outputs. | High |
-| **Lovable** | Pro for 1 month, 100 credits per participant (redeem before the event ends; cancel after activating) | Situation-room frontend that reads precomputed forecasts; run locally because of the spot licence (§6). Draft the layout before prompting, to save credits. | High |
+| **Featherless.ai** (OpenAI-compatible, open-weight models) | **$25 per participant**, no card; claims capped at 1,200 in total, so **everyone claims early** (≈ $75–100 for the team) | LLM for the plain-language explanations in the dashboard, the dashboard chat ("what should I check now?") and the n8n alert text. **Not** for the `top_drivers` column, which comes from SHAP. Generate in advance and cache the outputs. | High |
+| **Lovable** | Pro for 1 month, 100 credits per participant (redeem before the event ends; cancel after activating) | Situation-room frontend that reads from the API (§6); run locally because of the spot licence. Draft the layout before prompting, to save credits. | High |
 | **n8n Cloud Pro** | 1 licence per team, 1 month (redeem by 22 Nov) | **Alerts layer only, not the forecast pipeline** (Python stays the single, reviewable source of forecasts). See below. | Medium |
 | **ElevenLabs** | Creator plan for 1 month via an MLH promo code | Spoken 20-second shift briefing from the LLM text, triggered by n8n; used in the demo video. Qualifies for the MLH prize. | Low–medium |
 | **Gemini API** | Free tier | Backup LLM if Featherless fails or runs out. Qualifies for the MLH prize. | Low |
@@ -189,7 +201,8 @@ src/
   models/      train / predict / calibrate
   backtest/    loop over origins → forecast_backtest.csv, validation file
   explain/     SHAP + LLM text
-app/           Lovable frontend export + Streamlit fallback
+api/           FastAPI (or static JSON): forecast, alerts and drivers per origin
+app/           Lovable frontend export (reads from api/) + Streamlit fallback
 automation/    n8n workflow export
 tests/         leakage test, format test
 reports/       evaluation report, slides
@@ -201,10 +214,10 @@ starter_package/  (git-ignored)
 | When | Goal | Done when |
 |---|---|---|
 | Fri night | `available_at()` + leakage test; reproduce the baseline; spot-anchor model; **Fingrid key**; start the Open-Meteo download | Validation MAE ≈ 44 with `score.py` |
-| Sat morning | LightGBM v1 (package features), calibration | Beats the baseline on all 4 metrics |
+| Sat morning | LightGBM v1 (package features), calibration, SHAP-based `top_drivers` and `data_cutoff_utc` | Beats the baseline on all 4 metrics |
 | Sat midday | External features (Open-Meteo, Fingrid, UMM) + ablations | Ablation table |
-| Sat afternoon (parallel) | Dashboard on validation forecasts | Panels 1–5 with time travel |
-| Sat evening | LLM explanations (Featherless), n8n alert, report draft | `top_drivers` filled in |
+| Sat afternoon (parallel) | API + dashboard on validation forecasts | Panels 1–7 with time travel |
+| Sat evening | LLM explanations (Featherless), n8n alert, report draft | Plain-language "why" text in the dashboard |
 | Sun 06–09 | Final retrain, test backtest, validator, slides, video | `VALIDATION PASSED` |
 | **Sun 10:00** | **Submit** | |
 
@@ -221,6 +234,7 @@ starter_package/  (git-ignored)
 
 - [ ] Ask in `#turku-energia`: are Fingrid real-time 3-min series acceptable with our own documented publication delay?
 - [ ] Ask in `#turku-energia`: is the Nord Pool UMM API allowed? (It's public, but it's Nord Pool.)
+- [ ] Ask in `#turku-energia`: during the test backtest, may we correct bias or recalibrate using test-period imbalance prices that are already usable at the origin (`first_usable_origin_utc ≤ t`)? The data rule allows it, but "train only on data up to 4 Oct" may not. This could be a real gain given the drift in finding 9, so ask before relying on it.
 - [ ] Confirm the Fingrid dataset IDs once we have the key.
 - [ ] Open-Meteo: decide publication delays per model; confirm the archive covers 1 Jun – 2 Nov for the chosen models.
 - [ ] Featherless: everyone claims their $25 credit early (the cap is 1,200 claims); check which models the credit covers.
