@@ -8,6 +8,8 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 
 🧒 **Short version:** [`docs/TLDR.md`](docs/TLDR.md) explains the whole thing in two minutes.
 
+💡 **Brainstorm and plan review:** [`brainstorm/00 Brainstorm Hub.md`](brainstorm/00%20Brainstorm%20Hub.md) has feedback on the plan, risks, and ideas per role (draft, not yet in the plan).
+
 ---
 
 ## Contents
