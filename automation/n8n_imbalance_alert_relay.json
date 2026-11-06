@@ -1,0 +1,91 @@
+{
+  "name": "Imbalance alert relay",
+  "nodes": [
+    {
+      "name": "Forecast update",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 0],
+      "parameters": { "httpMethod": "POST", "path": "imbalance-alert", "responseMode": "onReceived", "options": {} }
+    },
+    {
+      "name": "Alert in next 3 h?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [224, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [{ "leftValue": "={{ $json.body.status }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "alert" }],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "name": "Format alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [448, 0],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            { "id": "origin", "name": "origin", "value": "={{ $json.body.origin }}", "type": "string" },
+            { "id": "origin_local", "name": "origin_local", "value": "={{ $json.body.origin_local }}", "type": "string" },
+            { "id": "status", "name": "status", "value": "={{ $json.body.status }}", "type": "string" },
+            { "id": "severity", "name": "severity", "value": "={{ ($json.body.alerts || [])[0]?.severity ?? \"\" }}", "type": "string" },
+            { "id": "headline", "name": "headline", "value": "={{ ($json.body.alerts || [])[0]?.message ?? \"\" }}", "type": "string" },
+            { "id": "briefing", "name": "briefing", "value": "={{ $json.body.explanation ?? \"\" }}", "type": "string" },
+            { "id": "suggestion", "name": "suggestion", "value": "={{ ($json.body.suggestions || [])[0]?.text ?? \"\" }}", "type": "string" },
+            { "id": "n_alerts", "name": "n_alerts", "value": "={{ ($json.body.alerts || []).length }}", "type": "number" },
+            { "id": "message", "name": "message", "value": "=🔴 Imbalance alert ({{ $json.body.origin_local }} Finnish time)\n{{ ($json.body.alerts || [])[0]?.message ?? \"\" }}\n{{ $json.body.explanation ?? \"\" }}\nWorth checking: {{ ($json.body.suggestions || [])[0]?.text ?? \"-\" }}", "type": "string" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Log alert",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [672, 0],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": { "__rl": true, "mode": "name", "value": "imbalance_alerts" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "origin": "={{ $json.origin }}",
+            "origin_local": "={{ $json.origin_local }}",
+            "status": "={{ $json.status }}",
+            "severity": "={{ $json.severity }}",
+            "headline": "={{ $json.headline }}",
+            "briefing": "={{ $json.briefing }}",
+            "suggestion": "={{ $json.suggestion }}",
+            "n_alerts": "={{ $json.n_alerts }}",
+            "received_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [272, 192],
+      "parameters": {
+        "content": "## Imbalance alert relay\nsrc/automation/replay.py POSTs each hourly forecast update here (spot-free: status, alert texts, suggestions, briefing). Only updates with a high-severity situation in the next 3 h pass; they're logged to the `imbalance_alerts` data table.\n\nTo post to Discord or Teams: add an HTTP Request node after **Format alert** that POSTs `{ \"content\": {{ $json.message }} }` to your channel webhook URL.",
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Forecast update": { "main": [[{ "node": "Alert in next 3 h?", "type": "main", "index": 0 }]] },
+    "Alert in next 3 h?": { "main": [[{ "node": "Format alert", "type": "main", "index": 0 }]] },
+    "Format alert": { "main": [[{ "node": "Log alert", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "_comment": "Exported from n8n Cloud for the repo. No credentials. Import via n8n > Workflows > Import from file; create a data table named imbalance_alerts with columns origin, origin_local, status, severity, headline, briefing, suggestion (string), n_alerts (number), received_at (date)."
+}

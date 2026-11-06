@@ -6,10 +6,17 @@
 starter_package_v1/
 TurkuEnergia_SinceAI2026/
 *.zip
-data/
-# our code lives in src/data/; the rule above is meant for data folders only
-!src/data/
+# root-level data folder only (a bare "data/" would also hide the code in src/data/)
+/data/
+# raw API response caches (the tidy parquet tables next to them are committed)
+external_data/**/raw/
+# full demo export is ~20 MB; a small sample goes into the dashboard app instead
+app_demo_data/
 *.parquet
+# open external data tables (CC BY 4.0, see SOURCES.md) are committed despite *.parquet above
+# (exceptions must come after the rule they override)
+!external_data/fingrid/fingrid_rt.parquet
+!external_data/open_meteo/ecmwf_ifs025.parquet
 spot_nordpool*.csv
 actuals_*.csv
 forecast_backtest*.csv
@@ -49,3 +56,6 @@ external_data/_log_*.txt
 # lab caches (features, predictions)
 experiments/lab/_cache/
 submissions/score_*/
+
+# Claude Code agent worktrees and local settings
+.claude/

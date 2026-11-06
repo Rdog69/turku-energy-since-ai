@@ -37,6 +37,16 @@ Why don't gas or headlines matter? Because they're **already inside spot**. We o
    - the chance of a crazy spike (more than 50 €/MWh away from spot)
 2. **The dashboard (20 %):** a "situation room" for Turku Energia's traders. It shows what's coming in the next 10 hours, warns about spikes, explains *why* in plain words, and lets you rewind time to see how good the forecast was.
 
+## How we beat the other teams
+
+Everyone will find "spot + jump". Our extras:
+
+- **Last winter's data:** the test is in October, and the package only starts in June. (We have to ask if it's allowed.)
+- **Grid frequency:** it shows *right now* whether the grid is short. The package data is an hour old.
+- **Price splits with Sweden and Estonia:** they tell us a day ahead when Finland will be on its own.
+- **Honest probabilities**, because 40 of the points reward *calibrated* guesses, not confident ones.
+- **A simple model that doesn't overfit**, and a report that explains every step.
+
 ## How we use AI
 
 - **The forecast itself:** machine learning (LightGBM). That's the real AI part.

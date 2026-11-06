@@ -122,3 +122,41 @@ Kimi K3.1 Pro's suggestions for further sources: [`docs/data_sources/kimi_sugges
 ## Components (software)
 
 Python, pandas, NumPy, pyarrow, scikit-learn / LightGBM (MIT / BSD / Apache 2.0). LLM text in the dashboard: Featherless.ai (open-weight models), downstream of the forecast only.
+
+---
+
+## From `brainstorming-frank` (to be consolidated into the sections above)
+
+### Data sources, services and components
+
+Required deliverable: every data source, external service, ready-made model and software component we use, with its licence. For each data source we also say **when it counts as available** in the backtest (its `first_usable_origin_utc`). That's the rule the organisers check: data used before it was available scores 0.
+
+#### Data
+
+| Source | What we use | Licence | Availability rule in the backtest |
+|---|---|---|---|
+| **Starter package: Fingrid Open Data** | Imbalance price (319), mFRR/aFRR prices and volumes, direction (369), consumption and production, cross-border flows, day-ahead consumption/wind/solar forecasts (165, 246, 247) | CC BY 4.0 | The package's `first_usable_origin_utc` per row (binding) |
+| **Starter package: ENTSO-E Transparency Platform** | SE1/SE3/EE imbalance prices, load forecasts, FI–EE capacity | CC BY 4.0 | The package's `first_usable_origin_utc` per row |
+| **Starter package: Nord Pool** | Finnish day-ahead spot price | Licensed to Turku Energia for hackathon use only; not redistributed, not in this repo; deleted after the event | The package's `first_usable_origin_utc` per row |
+| **Starter package: calendar** | Local hour, weekday, holidays, DST | – | Known in advance |
+| **Fingrid Open Data API** (downloaded by us, not in the package) | Real-time wind production (181), nuclear production (188), grid frequency (177), consumption (193); 1–3 min data averaged to quarter-hours | CC BY 4.0 | The organisers' rule for measured Fingrid data (availability.csv): 30 min after the end of the quarter, rounded up to the next full hour. Fingrid publishes these every 1–3 min, so this is conservative. |
+| **Open-Meteo Single Runs API**: ECMWF IFS 0.25° (`ecmwf_ifs025`) | Wind speed at 100 m, 2 m temperature, relative humidity at 8 points across Finland's wind clusters; runs 00/06/12/18 UTC, 72 h each. Weather data by [Open-Meteo.com](https://open-meteo.com/), based on ECMWF open data. | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 | **Our assumption:** run initialisation + 8 h, rounded up to the next full hour. Open-Meteo states a 00 UTC run is generally accessible from about 04–06 UTC, so 8 h is conservative. Each forecast uses the newest run usable at its origin. We do **not** use the Historical Forecast API, which stitches runs together and leaks future information. |
+
+#### Software
+
+| Component | Use | Licence |
+|---|---|---|
+| Python 3.12 | Runtime | PSF |
+| pandas, NumPy, PyArrow | Data handling | BSD-3 / BSD-3 / Apache-2.0 |
+| LightGBM | Gradient-boosted models, TreeSHAP drivers | MIT |
+| scikit-learn | Platt calibration | BSD-3 |
+| pytest | Leakage tests | MIT |
+| Organisers' `validate_submission.py`, `score.py`, `make_templates.py`, `baseline.ipynb` | Validation and scoring | Provided by the organisers |
+
+#### Services
+
+| Service | Use | Notes |
+|---|---|---|
+| Featherless.ai, model `Qwen/Qwen2.5-32B-Instruct` (Apache-2.0) | 2–3 sentence briefings per forecast hour | Text only, downstream of the forecast; never a model input. Prompts contain no spot or absolute prices (checked in code). Every number in an answer must appear in the facts, or a template is used instead. |
+| Lovable | Dashboard frontend ("Imbalance Situation Room") | The hosted preview only gets demo data with a synthetic spot curve; real data stays local. |
+| n8n Cloud | "Imbalance alert relay" workflow: webhook → filter → format → data table | Receives spot-free payloads only. Export in `automation/`. |
