@@ -136,16 +136,38 @@ Confirm with the organisers whether our forecasts count as spot-derived data.
 
 ## 7. Event tools and how we use them
 
-| Tool | Use | Priority |
-|---|---|---|
-| **Featherless.ai** (OpenAI-compatible API, open-weight models; **$25 budget**) | LLM for explanations, the `top_drivers` text and dashboard chat ("what should I check now?"). Explanations are generated in advance per origin or per block: a few hundred to a couple of thousand calls. ☐ Check whether the plan has unlimited tokens with a concurrency cap or charges per token; if per token, use a mid-sized model and cache the outputs. | High |
-| **LUMI AI Factory / Aitta** (CSC) | Backup LLM inference (needs pre-registration); GPU compute isn't needed, since LightGBM trains in seconds | Low |
-| **n8n** | Alert workflow: when a new forecast shows a spike-risk jump, post to Discord or Teams. Good demo of "alerts". | Medium |
-| **ElevenLabs** | Spoken 20-second shift briefing generated from the LLM text, for the demo video | Low (nice to have) |
-| **Lovable** | Situation-room frontend that reads precomputed forecasts; run locally because of the spot licence (§6) | High |
-| **Red Hat OpenShift AI award** | Optional extra prize; only if it's cheap to enter | Low |
+Source: [Since AI resources page](https://sinceai.ai/hackathon-2026/guide/resources). Claim codes only through official Since AI channels, and never commit keys.
+
+| Tool | What we get | Use | Priority |
+|---|---|---|---|
+| **Featherless.ai** (OpenAI-compatible, open-weight models) | **$25 per participant**, no card; claims capped at 1,200 in total, so **everyone claims early** (≈ $75–100 for the team) | LLM for explanations, `top_drivers` text, dashboard chat, and n8n alert text. Generate in advance and cache the outputs. | High |
+| **Lovable** | Pro for 1 month, 100 credits per participant (redeem before the event ends; cancel after activating) | Situation-room frontend that reads precomputed forecasts; run locally because of the spot licence (§6). Draft the layout before prompting, to save credits. | High |
+| **n8n Cloud Pro** | 1 licence per team, 1 month (redeem by 22 Nov) | **Alerts layer only, not the forecast pipeline** (Python stays the single, reviewable source of forecasts). See below. | Medium |
+| **ElevenLabs** | Creator plan for 1 month via an MLH promo code | Spoken 20-second shift briefing from the LLM text, triggered by n8n; used in the demo video. Qualifies for the MLH prize. | Low–medium |
+| **Gemini API** | Free tier | Backup LLM if Featherless fails or runs out. Qualifies for the MLH prize. | Low |
+| **Red Hat OpenShift Developer Sandbox** | Free for 30 days | Only for the €1,000 Red Hat OpenShift AI award, and only if someone has spare time to host part of the app there | Low |
+| **LUMI / Aitta** (CSC) | Registration closed on 30 Oct | Not needed: LightGBM trains in seconds | – |
+| **Claude Code** | No event credits | Our own plans | – |
 
 LLM output stays **downstream** of the forecast (text only), so it can't leak data or change the scores.
+
+### n8n alert workflow (about 2 h)
+
+1. **Trigger:** each new origin in the replay. The dashboard or the replay script calls an n8n webhook with that origin's forecast summary.
+2. **Check:** compared with the previous origin, did spike-risk probability or P50 change beyond set thresholds in any block of the next 10 h?
+3. **Explain:** call Featherless with the drivers (SHAP) and the change, and get 2–3 sentences in the style of the brief's example.
+4. **Notify:** post to a Discord or Teams channel; optionally, ElevenLabs makes a voice clip.
+5. **Export** the workflow JSON to `automation/` (without credentials) so it's part of the source code.
+
+### Side prizes we could qualify for
+
+| Prize | What it takes | Effort |
+|---|---|---|
+| MLH: Use of ElevenLabs | Voice briefing (step 4 above) | Low, once the n8n workflow exists |
+| MLH: Use of Gemini API | Gemini as the LLM for one visible feature, e.g. dashboard chat | Low |
+| Red Hat OpenShift AI Technology Award (€1,000) | Deploy part of the solution on OpenShift (the Developer Sandbox) | Medium–high: only if time allows |
+
+Side prizes never take priority over Level 1. We decide on Saturday evening, once the model is done.
 
 ## 8. Deliverables (Sun 8 Nov, 10:00, via the Since AI app)
 
@@ -201,7 +223,8 @@ starter_package/  (git-ignored)
 - [ ] Ask in `#turku-energia`: is the Nord Pool UMM API allowed? (It's public, but it's Nord Pool.)
 - [ ] Confirm the Fingrid dataset IDs once we have the key.
 - [ ] Open-Meteo: decide publication delays per model; confirm the archive covers 1 Jun – 2 Nov for the chosen models.
-- [ ] Featherless ($25): unlimited-token plan or per-token billing?
+- [ ] Featherless: everyone claims their $25 credit early (the cap is 1,200 claims); check which models the credit covers.
+- [ ] Claim the team's n8n Cloud Pro licence and everyone's Lovable Pro.
 - [ ] Ask in `#turku-energia`: may a public dashboard show our forecasts (derived from spot), or must it stay local?
 - [ ] Statnett API: does it serve history for Jun–Nov 2026?
 - [ ] The package README suggests a short path on Windows (OneDrive paths can exceed 260 characters). Move the checkout if scripts fail.
