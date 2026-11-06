@@ -56,10 +56,27 @@ Every external source needs an **honest publication delay**, which becomes its `
 | **Fingrid Open Data API** | ✔ Needs a **free API key** (instant sign-up at data.fingrid.fi); rate limits apply | Real-time **wind**, **nuclear** and **hydro** production and frequency (3-min data; dataset IDs ☐ to confirm, e.g. 181 wind, 188 nuclear, 191 hydro) | ☐ 15–30 min (the package itself uses 30 min for measured data) | **High**: realised wind gives the *current wind forecast error*, and a nuclear drop reveals an outage within minutes. Both are fresher than the package's 60-min imbalance delay. | **Use** (priority 1). ⚠ Never use dataset 245/hourly-updated forecasts: only the latest version is stored. |
 | **Nord Pool UMM API** | ✔ Public, no key; historical Finnish messages with `publicationDate` and versions | Planned and unplanned outages: production units (e.g. OL3, wind farms) and transmission (e.g. Fenno-Skan) with MW unavailable | `publicationDate` of each **version** (use the version valid at the origin) | **Medium**: big outages are rare but explain spikes, which is good for the dashboard's "why" view | **Use** (priority 2) |
 | **FMI open data** | ✔ WFS, no key | Weather station observations (wind, temperature), e.g. Vaasa | ☐ ~10–20 min | Low–medium: overlaps with Fingrid realised wind | Optional |
+| **Elering** (Estonian TSO) | ✔ No key, history available | Estonian real-time system balance, production, consumption | ☐ 15–30 min | Medium: a neighbour signal fresher than ENTSO-E's ~2 h delay | **Use** (priority 3) |
+| **Statnett** (Norwegian TSO) | ✔ Live Nordic production and consumption per country; ☐ history not yet confirmed | Nordic real-time balance | ☐ | Medium, *if* history is available | Check history; otherwise skip |
+| **Energinet** (Danish TSO) | ✔ No key, history available | Danish power system data | ☐ | Low: far from the Finnish balance | Skip |
+| **eSett** (Nordic imbalance settlement) | ✔ Responds, but the test query returned nothing | Nordic imbalance data | ☐ | Low: mostly duplicates Fingrid | Skip |
+| **Svenska kraftnät Mimer** | ✔ Website responds; data export not tested | Swedish balancing data | ☐ | Low–medium | Optional |
+| **Nord Pool intraday prices** | ✘ Licensed, not in the package | – | – | – | Skip |
 | **ENTSO-E API** | ✘ The token takes "several working days" | Outages 10.1, more areas | – | Covered by UMM | **Skip** |
 | **News, gas or oil prices, sentiment** | – | Price level effects over days to weeks | – | Spot already covers it; leak risk | **Skip** (as concluded earlier) |
 
 **Fallbacks:** if Open-Meteo or Fingrid fail or eat too much time, the model still works on the package alone (finding 1 already beats the baseline).
+
+### Scope principle: we don't model the whole Nordic market
+
+Every Nordic wind farm, nuclear and fossil plant, the gas price and the headlines all feed into the **day-ahead spot price**, which we know at the origin. The imbalance price is spot plus a gap, and the gap comes only from **what the day-ahead plan missed in Finland** in the next hours. So:
+
+- **Add a source only if it measures a deviation from the plan, and only if it improves the validation score.** The step-by-step comparison (§5) is the test, and it also becomes our reasoning chain for the jury.
+- **Nuclear shutdowns:** planned ones are in the UMM feed. Unplanned trips can't be predicted from news; we see them within minutes in Fingrid's real-time nuclear output.
+- **Gas, oil and CO₂ prices; sentiment; headlines:** they move spot over days to weeks, which spot already includes. They add leakage risk. **Skip.**
+- **Max output per farm from local weather:** worth doing only for wind on the west coast of Finland. Other countries' farms reach us through spot and neighbour prices.
+
+**Order of work:** package → Open-Meteo wind → Fingrid real-time → UMM → Elering.
 
 ## 5. Level 1: model
 
@@ -97,6 +114,10 @@ Every external source needs an **honest publication delay**, which becomes its `
 
 All forecasts are precomputed, so the time-travel slider just moves over forecast origins.
 
+**Design: a "situation room".** One screen shows the 10 h forecast, spike alerts, the outage feed, current wind vs. the day-ahead forecast, and plain-language "why" notes. It is fed by the model, not by a news scraper.
+
+**No live mode, a replay instead.** There's no live spot price (it's licensed, and we only have the package), so a truly live forecast isn't possible. A **replay** of the test period, playing origin by origin as if live, looks the same in the demo and is what the brief asks for ("move the viewing time into the past").
+
 1. **Next 10 h:** fan chart (P10–P90, P50, spot), up/down probability strip, spike-risk heatmap.
 2. **What changed:** difference from the previous origin, plus alerts when spike risk or P50 shifts.
 3. **Drivers ("why"):** SHAP per quarter-hour, explained in plain language by an LLM, e.g. "wind on the west coast revised −400 MW since the day-ahead forecast; evening spot ramp".
@@ -104,22 +125,40 @@ All forecasts are precomputed, so the time-travel slider just moves over forecas
 5. **Recommendations:** based on the levers the company named (produce more at Naantali, consume more with electric boilers or heat pumps, buy or sell, offer mFRR), with the expected gap to spot and the model's confidence.
 6. **Outage feed:** UMM events on the timeline.
 
-**Stack:** Streamlit + Plotly, running locally. The Nord Pool data must not be deployed publicly.
+**Stack:** a **Lovable** frontend that reads precomputed forecast files, with Streamlit + Plotly as the quick fallback and for internal checks.
+
+⚠ **Licence:** Lovable apps are hosted publicly, and Nord Pool spot data must not be published. Options:
+
+1. Export the Lovable code and run it **locally** for the demo and video (preferred).
+2. Deploy publicly **without** spot and spot-derived numbers.
+
+Confirm with the organisers whether our forecasts count as spot-derived data.
 
 ## 7. Event tools and how we use them
 
 | Tool | Use | Priority |
 |---|---|---|
-| **Featherless.ai** (OpenAI-compatible API, open-weight models) | LLM for explanations, the `top_drivers` text and dashboard chat ("what should I check now?") | High |
+| **Featherless.ai** (OpenAI-compatible API, open-weight models; **$25 budget**) | LLM for explanations, the `top_drivers` text and dashboard chat ("what should I check now?"). Explanations are generated in advance per origin or per block: a few hundred to a couple of thousand calls. ☐ Check whether the plan has unlimited tokens with a concurrency cap or charges per token; if per token, use a mid-sized model and cache the outputs. | High |
 | **LUMI AI Factory / Aitta** (CSC) | Backup LLM inference (needs pre-registration); GPU compute isn't needed, since LightGBM trains in seconds | Low |
 | **n8n** | Alert workflow: when a new forecast shows a spike-risk jump, post to Discord or Teams. Good demo of "alerts". | Medium |
 | **ElevenLabs** | Spoken 20-second shift briefing generated from the LLM text, for the demo video | Low (nice to have) |
-| **Lovable** | Not needed if Streamlit does the job; keep as an option for a polished frontend | Low |
+| **Lovable** | Situation-room frontend that reads precomputed forecasts; run locally because of the spot licence (§6) | High |
 | **Red Hat OpenShift AI award** | Optional extra prize; only if it's cheap to enter | Low |
 
 LLM output stays **downstream** of the forecast (text only), so it can't leak data or change the scores.
 
-## 8. Repository structure
+## 8. Deliverables (Sun 8 Nov, 10:00, via the Since AI app)
+
+| # | Deliverable | Scored by | Produced by |
+|---|---|---|---|
+| 1 | `forecast_backtest.csv`, passing the validator | `score.py`: 80 of the 100 Level 1 points (L1 = 80 % of the total) | ML model |
+| 2 | Source code + start-up instructions | Code review (leakage check) | This repo |
+| 3 | Evaluation report: reasoning chain, factors, validation metrics, step-by-step comparison | Jury: the other 20 Level 1 points | Report |
+| 4 | Data sources and components with licences | Required | `SOURCES.md` |
+| 5 | 5–8 slides | Jury (reasoning chain) | Slides |
+| 6 | Demo video, ≤ 5 min | Jury (reasoning chain + Level 2 = 20 % of the total) | Dashboard replay |
+
+## 9. Repository structure
 
 ```
 src/
@@ -128,14 +167,14 @@ src/
   models/      train / predict / calibrate
   backtest/    loop over origins → forecast_backtest.csv, validation file
   explain/     SHAP + LLM text
-app/           Streamlit dashboard
+app/           Lovable frontend export + Streamlit fallback
 automation/    n8n workflow export
 tests/         leakage test, format test
 reports/       evaluation report, slides
 starter_package/  (git-ignored)
 ```
 
-## 9. Timeline
+## 10. Timeline
 
 | When | Goal | Done when |
 |---|---|---|
@@ -147,7 +186,7 @@ starter_package/  (git-ignored)
 | Sun 06–09 | Final retrain, test backtest, validator, slides, video | `VALIDATION PASSED` |
 | **Sun 10:00** | **Submit** | |
 
-## 10. Roles
+## 11. Roles
 
 | Area | Owner |
 |---|---|
@@ -156,11 +195,13 @@ starter_package/  (git-ignored)
 | Dashboard + n8n | TBD |
 | LLM, report, slides, video | TBD |
 
-## 11. Open questions
+## 12. Open questions
 
 - [ ] Ask in `#turku-energia`: are Fingrid real-time 3-min series acceptable with our own documented publication delay?
 - [ ] Ask in `#turku-energia`: is the Nord Pool UMM API allowed? (It's public, but it's Nord Pool.)
 - [ ] Confirm the Fingrid dataset IDs once we have the key.
 - [ ] Open-Meteo: decide publication delays per model; confirm the archive covers 1 Jun – 2 Nov for the chosen models.
-- [ ] Featherless API key: does the event provide one?
+- [ ] Featherless ($25): unlimited-token plan or per-token billing?
+- [ ] Ask in `#turku-energia`: may a public dashboard show our forecasts (derived from spot), or must it stay local?
+- [ ] Statnett API: does it serve history for Jun–Nov 2026?
 - [ ] The package README suggests a short path on Windows (OneDrive paths can exceed 260 characters). Move the checkout if scripts fail.
