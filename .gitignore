@@ -7,6 +7,8 @@ starter_package_v1/
 TurkuEnergia_SinceAI2026/
 *.zip
 data/
+# our code lives in src/data/; the rule above is meant for data folders only
+!src/data/
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv
@@ -39,3 +41,7 @@ desktop.ini
 
 # experiment outputs
 *.npz
+
+# external data: raw API cache and logs stay local; processed csv.gz files are committed
+external_data/_cache/
+external_data/_log_*.txt

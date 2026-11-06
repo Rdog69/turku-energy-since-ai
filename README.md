@@ -254,7 +254,7 @@ Questions go to the **`#turku-energia`** channel in the Since AI Discord. Ask th
 - ❌ **Sharing Nord Pool spot data.** It's for hackathon use only. Don't put it in this repo, and delete it after the event.
 - ❌ **Using data before its `first_usable_origin_utc`**, which scores 0
 
-All data sources and third-party components we use will be listed in [`SOURCES.md`](SOURCES.md) *(to be added)*.
+All data sources, their licences and their publication delays are listed in [`SOURCES.md`](SOURCES.md); the fetchers are in [`src/data/external/`](src/data/external/).
 
 ## Team
 
