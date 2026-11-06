@@ -42,7 +42,8 @@ SYSTEM = (
     "Finnish energy company. You get facts from a forecasting system for the Finnish imbalance price "
     "over the next 10 hours. Write 2-3 plain sentences: what to look at first, why (the main drivers), "
     "and how certain it is. Use local times as given. Use ONLY numbers that appear in the facts; never "
-    "invent numbers, plants or events. Don't give orders: phrase actions as things worth checking. "
+    "invent numbers, plants or events. Copy directions (above/below, higher/lower) exactly as the "
+    "grid_now statements give them. Don't give orders: phrase actions as things worth checking. "
     "No greeting, no bullet points, no markdown."
 )
 
@@ -79,11 +80,63 @@ def fact_sheet(doc: dict) -> dict:
         "forecast_changes": [a["message"] for a in doc["alerts"] if a["type"] == "forecast_change"][:2],
         "conflicting_signals": [c["message"] for c in doc["conflicts"]],
         "main_drivers": [d["label"] for d in doc["drivers"][:4]],
-        "grid_now": {k: v for k, v in doc["context"].items()
-                     if k in ("wind_fc_mw", "wind_now_vs_forecast_mw", "frequency_deviation_hz",
-                              "nuclear_change_6h_mw", "weather_wind_revision_mw")},
+        # Signed numbers get misread by the LLM ("+1299" became "lower wind"), so state directions.
+        "grid_now": grid_statements(doc["context"]),
         "suggestions_to_review": [s["text"] for s in doc["suggestions"][:3]],
     }
+
+
+def _dir(value, unit, above, below, threshold):
+    if value is None:
+        return None
+    if abs(value) < threshold:
+        return f"close to the forecast (within {threshold:g} {unit})"
+    return f"{abs(value):.0f} {unit} {above if value > 0 else below}"
+
+
+def grid_statements(ctx: dict) -> list[str]:
+    out = []
+    w = ctx.get("wind_now_vs_forecast_mw")
+    if w is not None:
+        out.append("Measured wind power is " + _dir(w, "MW", "ABOVE the day-ahead forecast",
+                                                   "BELOW the day-ahead forecast", 150) + ".")
+    r = ctx.get("weather_wind_revision_mw")
+    if r is not None:
+        out.append("The latest weather run has wind " + _dir(r, "MW", "HIGHER than when the day-ahead "
+                   "forecast was made", "LOWER than when the day-ahead forecast was made", 150) + ".")
+    f = ctx.get("frequency_deviation_hz")
+    if f is not None:
+        mhz = f * 1000
+        if abs(mhz) < 15:
+            out.append("Grid frequency is normal.")
+        else:
+            out.append(f"Grid frequency is {abs(mhz):.0f} mHz {'ABOVE' if mhz > 0 else 'BELOW'} 50 Hz "
+                       f"(the system is {'long, i.e. surplus' if mhz > 0 else 'short, i.e. deficit'}).")
+    n = ctx.get("nuclear_change_6h_mw")
+    if n is not None and abs(n) >= 200:
+        out.append(f"Nuclear output is {abs(n):.0f} MW {'higher' if n > 0 else 'lower'} than 6 hours ago.")
+    return out
+
+
+_LOWER = r"(lower|below|less|weaker|reduc|drop|declin|decreas)"
+_HIGHER = r"(higher|above|more|stronger|increas|rise|rising)"
+
+
+def wind_direction_ok(text: str, ctx: dict) -> bool:
+    """Reject a briefing that states the wind error in the wrong direction."""
+    w = ctx.get("wind_now_vs_forecast_mw")
+    if w is None or abs(w) < 150:
+        return True
+    wrong = _LOWER if w > 0 else _HIGHER
+    t = text.lower()
+    pattern = rf"(wind[^.]{{0,40}}{wrong})|({wrong}[^.]{{0,30}}wind)"
+    # "lower-than-expected wind" but also catch "wind ... lower than forecast"
+    for m in re.finditer(pattern, t):
+        span = t[max(0, m.start() - 20): m.end() + 20]
+        if "weather run" in span or "revision" in span:
+            continue   # talking about the weather-model revision, checked separately
+        return False
+    return True
 
 
 SPOT_LEAK = re.compile(r"\bnow -?\d+ ?€/MWh|spot (price )?(is|of|at) -?\d", re.I)
@@ -158,9 +211,12 @@ def ask(facts: dict, key: str) -> str:
     }).encode()
     req = urllib.request.Request(API, data=body, headers={"Authorization": "Bearer " + key,
                                                           "Content-Type": "application/json"})
-    for attempt in range(5):
+    for attempt in range(6):
         try:
             r = json.load(urllib.request.urlopen(req, timeout=120))
+            if "choices" not in r:   # e.g. a concurrency-limit reply with HTTP 200
+                time.sleep(8 * (attempt + 1))
+                continue
             return r["choices"][0]["message"]["content"].strip(), r.get("usage", {})
         except urllib.error.HTTPError as e:
             if e.code in (429, 503) or e.code >= 500:
@@ -182,13 +238,14 @@ def explain_file(path: Path, period: str, key: str) -> dict:
     else:
         try:
             text, usage = ask(facts, key)
-            ok = looks_clean(text) and numbers_ok(text, facts)
+            ok = looks_clean(text) and numbers_ok(text, facts) and wind_direction_ok(text, doc["context"])
             result = {"text": text if ok else template(facts), "source": "llm" if ok else "template_fallback",
                       "llm_text": text, "model": MODEL, "usage": usage}
         except Exception as e:  # network trouble: never block the dashboard
             result = {"text": template(facts), "source": "template_error", "error": str(e)[:200]}
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+        if result["source"] != "template_error":   # failures are retried on the next run
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
     doc["explanation"] = {"text": result["text"], "source": result["source"],
                           "model": result.get("model")}
     path.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
