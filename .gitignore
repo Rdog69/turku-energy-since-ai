@@ -1,0 +1,31 @@
+# --- Licensed / organiser data: NEVER commit (Nord Pool spot data is licensed) ---
+starter_package/
+data/
+*.parquet
+spot_nordpool*.csv
+actuals_*.csv
+forecast_backtest*.csv
+results/
+baseline_output/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Node (dashboard) ---
+node_modules/
+dist/
+build/
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
