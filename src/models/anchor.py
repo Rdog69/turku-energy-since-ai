@@ -25,7 +25,7 @@ class SpotAnchor:
 
     name = "spot_anchor"
 
-    def fit(self, train: pd.DataFrame) -> "SpotAnchor":
+    def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp | None = None) -> "SpotAnchor":
         # one row per delivery quarter: each quarter appears up to 40 times (once per origin)
         rows = train.drop_duplicates("delivery").dropna(subset=["y_gap", "y_dir"])
         gap = rows["y_gap"].to_numpy()

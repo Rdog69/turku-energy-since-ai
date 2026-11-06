@@ -24,8 +24,19 @@ from src.data.availability import build_index
 from src.data.load import load_long
 from src.features.build import build_features
 from src.models.anchor import SpotAnchor
+from src.models.gbm import GBMModel
 
-MODELS = {"spot_anchor": SpotAnchor}
+# Each entry builds a fresh, unfitted model. Names are used for the results folder.
+MODELS = {
+    "spot_anchor": SpotAnchor,
+    "gbm": lambda: GBMModel(name="gbm"),
+    "gbm_recency": lambda: GBMModel(name="gbm_recency", tau_days=30),
+    "gbm_cal": lambda: GBMModel(name="gbm_cal", tau_days=30, calibrate=True),
+    "gbm_cal_product": lambda: GBMModel(name="gbm_cal_product", tau_days=30, calibrate=True,
+                                        spike_mode="product"),
+    "gbm_cal_product_norecency": lambda: GBMModel(name="gbm_cal_product_norecency", calibrate=True,
+                                                  spike_mode="product"),
+}
 SUBMISSION_TS = ("forecast_origin_utc", "delivery_start_utc", "data_cutoff_utc")
 
 
@@ -108,7 +119,7 @@ def main(argv=None) -> int:
     assert cutoff <= config.TRAIN_CUTOFF
 
     train = training_table(long, index, cutoff)
-    model = MODELS[args.model]().fit(train)
+    model = MODELS[args.model]().fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
