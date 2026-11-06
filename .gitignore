@@ -17,6 +17,7 @@ __pycache__/
 .venv/
 venv/
 .env
+.kimi/
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
