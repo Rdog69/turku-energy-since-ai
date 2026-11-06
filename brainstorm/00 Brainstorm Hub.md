@@ -8,6 +8,7 @@ status: draft
 # Brainstorm Hub
 
 Brainstorm and review of the current plan ([[PLAN]], [[TLDR]], [[README]]). **[[PLAN]] is still the source of truth.** These notes suggest changes. Nothing in them is decided until it moves into the plan.
+meow
 
 Legend: ⚠ issue in the current plan · 💡 new idea · ☐ unverified, check before relying on it · ✔ checked.
 
@@ -34,20 +35,20 @@ Legend: ⚠ issue in the current plan · 💡 new idea · ☐ unverified, check 
 
 Impact is a rough guess at Level 1 points or jury value. Effort is in person-hours.
 
-| Idea | Impact | Effort | Owner | Note |
-|---|---|---|---|---|
-| Safe spot-anchor submission | Insurance | 1 h | Pavel | [[Risks and checks]] |
-| Local-hour features (DST) | Medium | 0.5 h | Pavlo | [[Risks and checks]] |
-| Hour × wind lookup anchor | Medium | 1 h | Pavel | [[Model ideas]] |
-| Recent-conditions features (rolling spike share, rolling \|gap\|) | Medium–high (drift) | 2 h | Pavlo | [[Model ideas]] |
-| Fingrid realised-wind error | High for steps 1–8 | 3 h | Pavlo | [[Data layer ideas]] |
-| Open-Meteo revision through a power curve | Medium–high | 4 h | Pavlo | [[Data layer ideas]] |
-| ECMWF vs ICON disagreement → wider band | Medium (pinball) | 1 h once both are downloaded | Pavlo | [[Data layer ideas]] |
-| Calibrate the spike product directly | Medium (20 pts) | 1 h | Pavel | [[Model ideas]] |
-| "€ at stake" panel | High (jury) | 2 h | Frank / Abdo | [[Dashboard and story ideas]] |
-| Template-first explanation text, LLM second | Lower risk | 1 h | Jim | [[Dashboard and story ideas]] |
-| Pre-June Fingrid history (Frank E1), direction model first | High, **if the organisers allow it** | 3 h | Pavlo / Pavel | [[Model ideas]] |
-| FI–SE day-ahead price spread (Frank E3) | Medium, all 40 steps | 2 h | Pavlo | [[Data layer ideas]] |
-| Grid frequency (Frank E2) | Low–medium, steps 1–8 | 1 h after the Fingrid fetcher | Pavlo | [[Data layer ideas]] |
-| Pretrained time-series model (Frank E6) | Low | 1–3 h | – | Stretch only |
-| Elering / FMI / Statnett | Low | 3+ h each | – | Cut |
+| Idea                                                              | Impact                               | Effort                        | Owner         | Note                          |     |
+| ----------------------------------------------------------------- | ------------------------------------ | ----------------------------- | ------------- | ----------------------------- | --- |
+| Safe spot-anchor submission                                       | Insurance                            | 1 h                           | Pavel         | [[Risks and checks]]          |     |
+| Local-hour features (DST)                                         | Medium                               | 0.5 h                         | Pavlo         | [[Risks and checks]]          |     |
+| Hour × wind lookup anchor                                         | Medium                               | 1 h                           | Pavel         | [[Model ideas]]               |     |
+| Recent-conditions features (rolling spike share, rolling \|gap\|) | Medium–high (drift)                  | 2 h                           | Pavlo         | [[Model ideas]]               |     |
+| Fingrid realised-wind error                                       | High for steps 1–8                   | 3 h                           | Pavlo         | [[Data layer ideas]]          |     |
+| Open-Meteo revision through a power curve                         | Medium–high                          | 4 h                           | Pavlo         | [[Data layer ideas]]          |     |
+| ECMWF vs ICON disagreement → wider band                           | Medium (pinball)                     | 1 h once both are downloaded  | Pavlo         | [[Data layer ideas]]          |     |
+| Calibrate the spike product directly                              | Medium (20 pts)                      | 1 h                           | Pavel         | [[Model ideas]]               |     |
+| "€ at stake" panel                                                | High (jury)                          | 2 h                           | Frank / Abdo  | [[Dashboard and story ideas]] |     |
+| Template-first explanation text, LLM second                       | Lower risk                           | 1 h                           | Jim           | [[Dashboard and story ideas]] |     |
+| Pre-June Fingrid history (Frank E1), direction model first        | High, **if the organisers allow it** | 3 h                           | Pavlo / Pavel | [[Model ideas]]               |     |
+| FI–SE day-ahead price spread (Frank E3)                           | Medium, all 40 steps                 | 2 h                           | Pavlo         | [[Data layer ideas]]          |     |
+| Grid frequency (Frank E2)                                         | Low–medium, steps 1–8                | 1 h after the Fingrid fetcher | Pavlo         | [[Data layer ideas]]          |     |
+| Pretrained time-series model (Frank E6)                           | Low                                  | 1–3 h                         | –             | Stretch only                  |     |
+| Elering / FMI / Statnett                                          | Low                                  | 3+ h each                     | –             | Cut                           |     |

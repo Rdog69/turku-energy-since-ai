@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "brainstorm/Dashboard and story ideas.md",
+                "file": "brainstorm/00 Brainstorm Hub.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Dashboard and story ideas"
+              "title": "00 Brainstorm Hub"
             }
           }
         ]
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "brainstorm/Dashboard and story ideas.md",
+                "file": "brainstorm/Comparison with Frank's branch.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "brainstorm/Dashboard and story ideas.md",
+                "file": "brainstorm/Comparison with Frank's branch.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "brainstorm/Dashboard and story ideas.md",
+                "file": "brainstorm/00 Brainstorm Hub.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -201,6 +201,13 @@
   },
   "active": "570a9347112cc62d",
   "lastOpenFiles": [
+    "brainstorm/Data layer ideas.md",
+    "docs/TLDR.md",
+    "docs/PLAN.md",
+    "brainstorm/Model ideas.md",
+    "brainstorm/Feedback on the plan.md",
+    "brainstorm/Comparison with Frank's branch.md",
+    "brainstorm/Dashboard and story ideas.md",
     "brainstorm/00 Brainstorm Hub.md.tmp.3846.0cada8a0d079",
     "brainstorm/00 Brainstorm Hub.md.tmp.3846.536ebdca87e1",
     "brainstorm/00 Brainstorm Hub.md.tmp.3846.f9debb96c126",
@@ -209,17 +216,10 @@
     "brainstorm/Data layer ideas.md.tmp.3846.a7a7809a9bb3",
     "brainstorm/Model ideas.md.tmp.3846.10e176a3aefe",
     "brainstorm/Feedback on the plan.md.tmp.3846.4c6bac305257",
-    "brainstorm/Comparison with Frank's branch.md",
     "brainstorm/Comparison with Frank's branch.md.tmp.3846.c169ee3029c5",
     "brainstorm/00 Brainstorm Hub.md",
-    "brainstorm/Dashboard and story ideas.md",
-    "brainstorm/Data layer ideas.md",
     "brainstorm/Risks and checks.md",
     "README.md",
-    "README.md.tmp.3846.369b2e2e9fc2",
-    "brainstorm/Dashboard and story ideas.md.tmp.3846.3ec4f357467a",
-    "brainstorm/Model ideas.md",
-    "brainstorm/Feedback on the plan.md",
-    "docs/TLDR.md"
+    "README.md.tmp.3846.369b2e2e9fc2"
   ]
 }
