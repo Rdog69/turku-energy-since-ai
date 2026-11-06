@@ -152,7 +152,7 @@ Source: [Since AI resources page](https://sinceai.ai/hackathon-2026/guide/resour
 
 | Tool | What we get | Use | Priority |
 |---|---|---|---|
-| **Featherless.ai** (OpenAI-compatible, open-weight models) | **$25 per participant**, no card; claims capped at 1,200 in total, so **everyone claims early** (≈ $75–100 for the team) | LLM for the plain-language explanations in the dashboard, the dashboard chat ("what should I check now?") and the n8n alert text. **Not** for the `top_drivers` column, which comes from SHAP. Generate in advance and cache the outputs. | High |
+| **Featherless.ai** (OpenAI-compatible, open-weight models) | **$25 per participant**, no card; claims capped at 1,200 in total, so **everyone claims early** (≈ $125 for the five of us) | LLM for the plain-language explanations in the dashboard, the dashboard chat ("what should I check now?") and the n8n alert text. **Not** for the `top_drivers` column, which comes from SHAP. Generate in advance and cache the outputs. | High |
 | **Lovable** | Pro for 1 month, 100 credits per participant (redeem before the event ends; cancel after activating) | Situation-room frontend that reads from the API (§6); run locally because of the spot licence. Draft the layout before prompting, to save credits. | High |
 | **n8n Cloud Pro** | 1 licence per team, 1 month (redeem by 22 Nov) | **Alerts layer only, not the forecast pipeline** (Python stays the single, reviewable source of forecasts). See below. | Medium |
 | **ElevenLabs** | Creator plan for 1 month via an MLH promo code | Spoken 20-second shift briefing from the LLM text, triggered by n8n; used in the demo video. Qualifies for the MLH prize. | Low–medium |
@@ -223,12 +223,21 @@ starter_package/  (git-ignored)
 
 ## 11. Roles
 
-| Area | Owner |
-|---|---|
-| Data, availability layer, external fetchers | TBD |
-| Models, calibration, backtest | TBD |
-| Dashboard + n8n | TBD |
-| LLM, report, slides, video | TBD |
+Five people. Each role has a clear output, and the hand-offs are files, so people can work in parallel from Friday night.
+
+| # | Role | Owns | Delivers | Hands off to | Owner |
+|---|---|---|---|---|---|
+| 1 | **Data** | `available_at()` + leakage test, feature table, external fetchers (Open-Meteo, Fingrid, UMM, Elering), publication delays | `features.parquet` per (origin, step); delays documented for `SOURCES.md` | 2, 5 | Pavlo |
+| 2 | **Models** | Spot anchor, LightGBM quantiles, direction and spike models, calibration, ablations, validation and test backtests | `forecast_validation.csv`, `forecast_backtest.csv` passing the validator; ablation table; SHAP values | 3, 4, 5 | Pavel |
+| 3 | **Dashboard** | API (FastAPI or static JSON per origin), Lovable situation-room frontend, time travel, panels 1–7; Streamlit fallback | Working local dashboard on validation forecasts by Sat afternoon, test forecasts by Sun morning | 5 (video) | Frank |
+| 4 | **Explanations & alerts** | SHAP → `top_drivers` and `data_cutoff_utc`; Featherless text for "why", suggestions and chat; conflicting-signal rules; n8n alert workflow; ElevenLabs briefing | Cached explanation JSON per origin; n8n workflow export in `automation/` | 3, 5 | Jim |
+| 5 | **Story & quality** | Questions in `#turku-energia`; evaluation report; `SOURCES.md` with licences; slides; demo video; final checklist (validator run, leakage review, no data in git, start-up instructions) | Report, slides, video, submission on Sun by 10:00 | – | Abdo |
+
+**Until real outputs exist** (Fri night to Sat morning):
+- **Roles 3 and 4** build against the **baseline forecast** from `baseline.ipynb` (same CSV format), so they aren't blocked.
+- **Role 5** asks the organisers' questions on Friday night; the answers decide whether Fingrid real-time data, UMM and recalibration are in.
+
+**Sunday 06–09:** everyone supports role 2's final run and role 5's submission checklist. **Nobody** changes the model after the final validator pass.
 
 ## 12. Open questions
 

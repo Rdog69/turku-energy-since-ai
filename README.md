@@ -258,4 +258,10 @@ All data sources and third-party components we use will be listed in [`SOURCES.m
 
 | Name | Role |
 |---|---|
-| *TBD* | |
+| Pavlo | Data: availability layer, features, external sources |
+| Pavel | Models: forecasts, calibration, backtest |
+| Frank | Dashboard: API and Lovable situation room |
+| Jim | Explanations & alerts: drivers, LLM text, n8n |
+| Abdo | Story & quality: report, slides, video, submission |
+
+Details of each role are in [`docs/PLAN.md` §11](docs/PLAN.md#11-roles).
