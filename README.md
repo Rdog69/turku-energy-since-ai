@@ -186,13 +186,37 @@ git clone https://github.com/Rdog69/turku-energy-since-ai.git
 cd turku-energy-since-ai
 python -m venv .venv
 # Windows: .venv\Scripts\activate   |   macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt   # coming soon
+pip install -r requirements.txt
 ```
 
-Then place the organisers' **starter package** in `starter_package/`. **It must never be committed**: it contains licensed Nord Pool data.
+Then unzip the organisers' **starter package** so that `starter_package_v1/` sits inside `starter_package/` (e.g. `starter_package/starter_package_v1/data/inputs.parquet`). Other locations work if you set `TE_PACKAGE_DIR` to the `starter_package_v1` folder. **It must never be committed**: it contains licensed Nord Pool data, and `.gitignore` excludes it.
+
+### Run it
+
+```bash
+python -m pytest
+```
+
+Runs the leakage tests. **If any of them fail, fix that first:** using data before it was published scores 0.
+
+```bash
+python -m src.backtest.run --period validation --model spot_anchor
+```
+
+Trains on data published before 7 Sep, forecasts 7 Sep – 4 Oct, then runs the organisers' validator and `score.py` against the baseline. Results go to `results/<model>/validation/` (git-ignored).
+
+```bash
+python -m src.backtest.run --period test --model spot_anchor
+```
+
+Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
+
+To get the baseline's own score for comparison, run the organisers' `baseline.ipynb` once in the package folder. It writes `baseline_output/validation/score/score_summary.csv`, which the runner picks up automatically.
+
+Scores so far are logged in [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ```
-starter_package/
+starter_package/starter_package_v1/
 ├─ README.md               # organisers' quick start, rules, glossary
 ├─ baseline.ipynb          # data loading, rows_available_at(), baseline, scoring
 ├─ data/
@@ -210,21 +234,25 @@ starter_package/
 
 ## Repository layout
 
-*Planned; it will be updated as the code lands.*
-
 ```
 .
 ├─ README.md
+├─ requirements.txt
 ├─ src/
-│  ├─ data/        # loading + availability-safe feature lookups
-│  ├─ features/    # feature engineering per forecast origin
-│  ├─ models/      # quantile price model, direction & spike classifiers
-│  └─ backtest/    # origin loop → forecast_backtest.csv
-├─ app/            # Level 2 situational view (dashboard)
-├─ notebooks/      # exploration
-├─ reports/        # evaluation report, slides
-└─ starter_package/  # organisers' data, git-ignored
+│  ├─ config.py           # paths, periods, constants
+│  ├─ data/
+│  │  ├─ load.py          # load the package's long-format data
+│  │  └─ availability.py  # THE availability rule: available_at(), fast SeriesIndex lookups
+│  ├─ features/build.py   # leakage-safe feature table, one row per (origin, step)
+│  ├─ models/anchor.py    # spot-anchor model (the floor to beat)
+│  └─ backtest/run.py     # train → forecast → write → validate → score
+├─ tests/                 # leakage tests (run with pytest)
+├─ docs/                  # plan, TL;DR, results log
+├─ results/               # model outputs, git-ignored
+└─ starter_package/       # organisers' data, git-ignored
 ```
+
+Planned additions: `src/models/` (quantile and probability models), `src/explain/`, `api/`, `app/`, `automation/`, `reports/`.
 
 ## Deliverables checklist
 

@@ -3,7 +3,8 @@ starter_package/
 starter_package_v1/
 TurkuEnergia_SinceAI2026/
 *.zip
-data/
+# root-level data folder only (a bare "data/" would also hide the code in src/data/)
+/data/
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv
