@@ -1,6 +1,6 @@
 # Brainstorm: five proposals compared
 
-📋 **Short version:** [TLDR.md](TLDR.md)
+📋 **Short version:** [TLDR.md](TLDR.md) · 🆕 **Round 2 (measured):** [COMPARISON_1.1.md](COMPARISON_1.1.md)
 
 > Branch `brainstorming-abdo`, Fri 6 Nov evening. We asked the top open-weight models on the leaderboard (via Featherless) and Claude for "the solution you'd bet on to finish first", beyond a plain LightGBM-on-gap model. ✔ means checked on training data (≤ 4 Oct); everything else is a judgement call.
 

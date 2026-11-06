@@ -78,9 +78,21 @@ DATA_ROW = re.compile(r"^\S*\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?Z?\S*[,;\t]
 
 
 def guard(text: str, allow_data: bool) -> None:
-    """Refuse to send licensed spot data; by default refuse raw data rows."""
-    rows = len(DATA_ROW.findall(text))
-    if SPOT_MARKERS.search(text) and rows:
+    """Refuse to send licensed spot data; by default refuse raw data rows.
+
+    Spot is detected per line: a data row that names a spot series, or a CSV
+    header with a spot column that is followed by data rows. Prose or schema
+    tables that merely mention `fi_spot_price` are fine.
+    """
+    lines = text.splitlines()
+    is_row = [bool(DATA_ROW.match(l)) for l in lines]
+    rows = sum(is_row)
+    spot_row = any(r and SPOT_MARKERS.search(l) for l, r in zip(lines, is_row))
+    spot_header = any(
+        SPOT_MARKERS.search(l) and l.count(",") >= 2 and i + 1 < len(lines) and is_row[i + 1]
+        for i, l in enumerate(lines)
+    )
+    if spot_row or spot_header:
         raise SystemExit("REFUSED: prompt looks like it contains Nord Pool spot data rows.")
     if rows >= 3 and not allow_data:
         raise SystemExit(

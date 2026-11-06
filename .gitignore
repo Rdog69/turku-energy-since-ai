@@ -36,3 +36,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# experiment outputs
+*.npz

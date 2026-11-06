@@ -1,6 +1,6 @@
 # Brainstorm TL;DR
 
-> Short version of [COMPARISON.md](COMPARISON.md). Five models were each asked how to beat a plain LightGBM-on-gap model: Kimi K3.1 Pro, Kimi K3, DeepSeek V4.1 Flash, GLM-5.3 and Claude Opus 5.5. ✔ = checked on training data.
+> 🆕 Round 2 with measured results: [COMPARISON_1.1.md](COMPARISON_1.1.md). This page is the short version of round 1, [COMPARISON.md](COMPARISON.md). Five models were each asked how to beat a plain LightGBM-on-gap model: Kimi K3.1 Pro, Kimi K3, DeepSeek V4.1 Flash, GLM-5.3 and Claude Opus 5.5. ✔ = checked on training data.
 
 ## The answer all five gave
 
