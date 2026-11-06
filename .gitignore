@@ -1,9 +1,14 @@
-# --- Licensed / organiser data: NEVER commit (Nord Pool spot data is licensed) ---
-starter_package/
+# --- Organiser data ---
+# starter_package/ IS committed on purpose (team decision, 6 Nov): this repo is PRIVATE.
+# Nord Pool spot data is licensed: never make this repo public or push it elsewhere
+# without first purging starter_package/data/ from the git history. Delete after the event.
+# starter_package/.gitignore ignores data/, so its files were added once with `git add -f`.
 starter_package_v1/
 TurkuEnergia_SinceAI2026/
 *.zip
 data/
+# our code lives in src/data/; the rule above is meant for data folders only
+!src/data/
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv
@@ -17,6 +22,7 @@ __pycache__/
 .venv/
 venv/
 .env
+.kimi/
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
@@ -32,3 +38,14 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# experiment outputs
+*.npz
+
+# external data: raw API cache and logs stay local; processed csv.gz files are committed
+external_data/_cache/
+external_data/_log_*.txt
+
+# lab caches (features, predictions)
+experiments/lab/_cache/
+submissions/score_*/

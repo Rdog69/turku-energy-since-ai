@@ -1,0 +1,7 @@
+time,agent,name,fold,model,target,calibrate,n_features,MAE,pinball,coverage,brier_spike,brier_dir,MAE_s1_4,MAE_s5_12,MAE_s13_40,secs,notes
+2026-11-07 00:53,reference,REF package direct,A,direct,gap,True,35,43.94198,12.64254,0.79955,0.09865,0.43691,41.98667,43.25769,44.42066,31,"crowd proxy: direct quantiles + 3 classifiers, package features incl. spike thresholds"
+2026-11-07 00:53,reference,REF package direct,B,direct,gap,True,35,29.30754,7.18064,0.78286,0.07651,0.45278,28.39215,29.00812,29.52545,51,"crowd proxy: direct quantiles + 3 classifiers, package features incl. spike thresholds"
+2026-11-07 00:55,reference,REF package mixture,A,mixture,gap,True,35,43.57587,12.46348,0.79404,0.09485,0.43691,41.81431,43.0886,43.96995,97,"direction mixture, package features incl. spike thresholds"
+2026-11-07 00:56,reference,REF package mixture,B,mixture,gap,True,35,29.40231,7.01441,0.80595,0.07879,0.45278,28.48806,29.07442,29.62823,181,"direction mixture, package features incl. spike thresholds"
+2026-11-07 01:04,history,runs direct,A,direct,gap,True,49,43.68711,12.88828,0.79461,0.09872,0.41982,41.97007,43.03594,44.12191,73,"direction run length/switches/up shares, spike-regime shares, same-quarter-yesterday dir"
+2026-11-07 01:04,history,runs direct,B,direct,gap,True,49,29.11581,7.15092,0.79807,0.0748,0.45485,28.02242,28.6657,29.40267,116,"direction run length/switches/up shares, spike-regime shares, same-quarter-yesterday dir"
