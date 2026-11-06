@@ -6,6 +6,8 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 
 📋 **Implementation plan:** [`docs/PLAN.md`](docs/PLAN.md) covers which factors matter, the data inputs, the model, the dashboard and the timeline.
 
+🧒 **Short version:** [`docs/TLDR.md`](docs/TLDR.md) explains the whole thing in two minutes.
+
 ---
 
 ## Contents
