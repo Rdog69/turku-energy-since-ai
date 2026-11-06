@@ -135,3 +135,48 @@ def test_training_rows_known_before_cutoff():
     assert (train["y_first_usable"] <= VALIDATION_FIRST_ORIGIN).all()
     assert (train["delivery"] < VALIDATION_FIRST_ORIGIN).all()
     assert VALIDATION_FIRST_ORIGIN < TEST_FIRST_ORIGIN
+
+
+# --- every series of the table, including the downloaded external ones ---------------------------
+
+def _external_series():
+    from src.data.load import load_long
+    return sorted(set(LONG["series_id"]) - set(load_long()["series_id"]))
+
+
+def test_latest_equals_newest_reference_row_for_all_series():
+    """latest(origin) == newest row of the reference-filtered frame, for every external series."""
+    from src.data.availability import SeriesIndex, available_at
+    origins = _origins(n_random=3, seed=3)[::2]
+    for sid in _external_series() + [IMBALANCE]:
+        rows = LONG.loc[LONG["series_id"] == sid]
+        ts, val = SeriesIndex(rows).latest(origins)
+        for k, t in enumerate(origins):
+            usable = available_at(rows, t)
+            if usable.empty:
+                assert ts[k] == -1, (sid, t)
+                continue
+            newest = usable.loc[usable["timestamp_utc"].idxmax()]
+            assert ts[k] == newest["timestamp_utc"].as_unit("ns").value, (sid, t)
+            assert val[k] == pytest.approx(newest["value"], nan_ok=True), (sid, t)
+
+
+def test_external_series_ignore_unpublished_rows():
+    """Lookups on external series from the full table == lookups after deleting unpublished rows."""
+    from src.data.availability import SeriesIndex
+    ext = _external_series()
+    if not ext:
+        pytest.skip("no external series in the table")
+    rows = LONG.loc[LONG["series_id"].isin(ext)]
+    full = {sid: SeriesIndex(g) for sid, g in rows.groupby("series_id")}
+    for t in _origins(n_random=4, seed=4):
+        part = {sid: SeriesIndex(g) for sid, g in
+                rows.loc[rows["first_usable_origin_utc"] <= t].groupby("series_id")}
+        times = pd.date_range(t - pd.Timedelta(hours=12), t + pd.Timedelta(hours=10), freq="15min")
+        for sid, idx in full.items():
+            if sid not in part:
+                assert np.isnan(idx.value_at(times, t)).all(), (sid, t)
+                continue
+            np.testing.assert_array_equal(idx.latest(t)[0], part[sid].latest(t)[0], err_msg=f"{sid} {t}")
+            np.testing.assert_allclose(idx.value_at(times, t), part[sid].value_at(times, t),
+                                       equal_nan=True, err_msg=f"{sid} {t}")

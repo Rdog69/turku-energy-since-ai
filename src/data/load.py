@@ -55,18 +55,29 @@ def load_long(pkg: str | None = None) -> pd.DataFrame:
 def load_long_all(pkg: str | None = None) -> pd.DataFrame:
     """Package data plus downloaded external series in the same long format (if present).
 
-    Currently: Fingrid real-time series (src/data/fingrid.py), each with its own
-    first_usable_origin_utc, so every availability rule and test applies unchanged.
+    Currently:
+    * Fingrid real-time series of src/data/fingrid.py (fg_wind_rt, fg_nuclear_rt, fg_freq_rt,
+      fg_cons_rt), each with its own first_usable_origin_utc;
+    * the master external Fingrid series of src/data/external_long.py for the default groups
+      and period "main" only (198, 186, 192, 194, 191, 209, 75, 176, 242, 243, 251, 268; the
+      datasets that duplicate Frank's series are dropped there). Pre-June history is NOT loaded.
+
+    Every row keeps its own first_usable_origin_utc, so every availability rule and test applies
+    unchanged.
     """
+    from src.data.external_long import load_external_long
     from src.data.fingrid import load_long_extra
-    base = load_long(pkg)
-    extra = load_long_extra()
-    if extra is None:
-        return base
-    overlap = set(extra["series_id"]) & set(base["series_id"])
-    if overlap:
-        raise ValueError(f"external series clash with package series: {overlap}")
-    return pd.concat([base, extra[LONG_COLUMNS]], ignore_index=True)
+    parts = [load_long(pkg)]
+    seen = set(parts[0]["series_id"])
+    for extra in (load_long_extra(), load_external_long()):
+        if extra is None or extra.empty:
+            continue
+        overlap = set(extra["series_id"]) & seen
+        if overlap:
+            raise ValueError(f"external series clash with existing series: {overlap}")
+        seen |= set(extra["series_id"])
+        parts.append(extra[LONG_COLUMNS])
+    return parts[0] if len(parts) == 1 else pd.concat(parts, ignore_index=True)
 
 
 def load_actuals_validation(pkg: str | None = None) -> pd.DataFrame:
