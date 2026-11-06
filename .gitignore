@@ -9,10 +9,11 @@ TurkuEnergia_SinceAI2026/
 external_data/**/raw/
 # full demo export is ~20 MB; a small sample goes into the dashboard app instead
 app_demo_data/
+*.parquet
 # open external data tables (CC BY 4.0, see SOURCES.md) are committed despite *.parquet above
+# (exceptions must come after the rule they override)
 !external_data/fingrid/fingrid_rt.parquet
 !external_data/open_meteo/ecmwf_ifs025.parquet
-*.parquet
 spot_nordpool*.csv
 actuals_*.csv
 forecast_backtest*.csv
