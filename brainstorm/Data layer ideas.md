@@ -61,7 +61,8 @@ One row per (origin, step). Agree the names on Friday night, then only **add** c
 | `last_dir_up_share_4q` | float | | Up share in the last 4 usable quarters |
 | `roll_absgap_7d`, `roll_spike_hi_7d`, `roll_spike_lo_7d`, `roll_up_share_7d` | float | | Recent conditions; see [[Model ideas#Recent-conditions features]] |
 | `se1_last`, `se3_last`, `ee_last` | float | ENTSO-E | Cheap; keep only if the ablation shows a gain |
-| *Later:* `om_wind_rev_mw`, `om_model_spread`, `fg_wind_err_mw`, `fg_nuclear_delta_mw`, `umm_out_mw` | float | external | NaN until they exist |
+| *Later:* `om_wind_rev_mw`, `om_model_spread`, `fg_wind_err_mw`, `fg_nuclear_delta_mw`, `fg_freq_dev_mean_1h`, `spread_fi_se1`, `spread_fi_se3`, `umm_out_mw` | float | external | NaN until they exist |
+| *If allowed:* `is_pre_june_rule` | bool | – | For Frank's E1 pre-June history; see [[Model ideas#Pre-June history (from Frank's E1)]] |
 
 Also: `split` ∈ {train, valid, test}, so nobody filters by date by hand.
 
@@ -88,8 +89,19 @@ Rough size: ~3,600 hourly origins × 40 steps ≈ 145k rows, which fits in memor
 - Dataset IDs ☐: the plan guesses 181 wind, 188 nuclear, 191 hydro. Confirm them on data.fingrid.fi.
 - 💡 **`fg_wind_err_mw`** = realised wind − day-ahead wind forecast over the last 4 usable quarters (average). A wind shortfall that has lasted an hour tends to continue into the next few hours, and it points to up-regulation. This probably matters most for steps 1–8.
 - 💡 **`fg_nuclear_delta_mw`** = nuclear output now − 3 h ago. A large drop means a trip, and that tells us about up-regulation before anything else does. Rare, but it explains big spikes, which is good for the dashboard.
+- 💡 **Grid frequency** (Frank's E2, dataset ID ☐): below 50 Hz means the system is short. It's **Nordic-wide**, not Finland-only, and the fast reserves react to it within seconds, so its link to the *Finnish* mFRR direction isn't proven. Test it **after** `fg_wind_err_mw`, which is Finland-specific. Use a conservative delay (≥ 15 min, rounded up to the hour), not "3 min because it's published every 3 min". Feature: `fg_freq_dev_mean_1h` = mean (frequency − 50 Hz) over the last usable hour.
 - Rate limits: download the history **once** to a local file (git-ignored) and build features from that file, never from live API calls during the backtest.
 - ⚠ Corrected history: see [[Risks and checks#Leakage traps]]. Use a delay of at least 30 min and mention it in the report.
+
+## Energinet day-ahead price spread (conditional)
+
+From Frank's E3 ([[Comparison with Frank's branch]]). Only after Open-Meteo and Fingrid wind are in, and only if the licence question is answered.
+
+- `spread_fi_se1`, `spread_fi_se3` = FI spot − SE spot at delivery. When FI separates from its neighbours, the cross-border links are full and Finland has to balance alone.
+- Same availability rule as package spot (published around 14:00 local on D−1). Never use Energinet FI prices in place of package spot.
+- ⚠ No EE in Energinet's list, so the EE spread needs another source or is dropped.
+- ⚠ The prices come from Nord Pool: store them under the git-ignored data folder only, never commit them.
+- Rate-limited (Frank got a 429): download once, then work from the local file.
 
 ## UMM (dashboard first)
 

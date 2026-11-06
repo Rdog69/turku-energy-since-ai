@@ -73,8 +73,19 @@ My recommendation is **2**, with 1 as the fallback. Pinball loss punishes too-na
 - 💡 If the pinball score lags: try a **mixture approach**. Use P(up) together with the gap distribution for up quarters and for down quarters (both learned on similar hours/wind), and read P10/P50/P90 from the combined distribution. The gap distribution has two humps (+25 up, −17 down, PLAN §1), which this handles directly.
 - 💡 **Recency weights:** tune the half-life (e.g. 14 / 28 / 56 days) on validation. Don't guess it.
 
+## Pre-June history (from Frank's E1)
+
+💡 Frank suggests training on Fingrid history from Mar 2025 onwards ([[Comparison with Frank's branch]]). Oct–Nov 2025 is the same season as the test. That's the best fix for the drift problem that we have.
+
+- **Ask first.** Keep it out of the pipeline until the organisers say yes in writing in `#turku-energia`.
+- **Direction model first.** When the grid goes up or down shouldn't depend on the 1 Jun pricing change. Gap sizes and spike tails do: since 1 Jun, the imbalance price can be a mix of mFRR and aFRR prices. Add pre-June rows to the quantile and spike-tail models only if validation agrees.
+- **Down-weight it:** e.g. pre-June rows at 0.3–0.5 weight, tuned on validation. Or add an `is_pre_june_rule` flag so the model can tell the two periods apart.
+- **Gap needs spot:** pre-June FI spot isn't in the package. It would come from Energinet, which has the same licence question as Frank's E3.
+- **Bonus:** 2025 includes the 26 Oct DST change, so local-hour features can be checked against a real clock change.
+
 ## Things not to spend time on
 
 - Deep learning or sequence models: ~4 months of data, 36 hours, and LightGBM trains in seconds.
+- Pretrained time-series models (Frank's E6, Chronos-2 / TimesFM): Frank himself expects it to lose. Feeding it the history before each origin has to go through the availability filter, a new leakage risk. It also adds a model to the licence list. Do it only if everything else is done on Sunday morning, and drop it otherwise.
 - Per-step separate models: the step feature in one model shares data better.
 - Hyperparameter search beyond a small grid: the gains are small next to features and calibration.

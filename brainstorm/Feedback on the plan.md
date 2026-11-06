@@ -39,8 +39,11 @@ A section-by-section review of [[PLAN]]. Back to [[00 Brainstorm Hub]].
 | Open-Meteo Single Runs | Covers **all 40 steps** (forecast revisions); highest expected value |
 | Fingrid real-time wind (+ nuclear) | Strongest short-step signal; also shows unplanned outages |
 | UMM | **Dashboard only** ("why" and the outage feed). Add to the model only if there's time |
+| *4th, conditional:* Energinet day-ahead prices (FI vs SE spread) | From Frank's E3 ([[Comparison with Frank's branch]]). Day-ahead, so it covers all 40 steps. Only after Open-Meteo and Fingrid wind are in, **and** only if the Nord Pool licence question is cleared |
 
-**Cut:** Elering, FMI, Statnett, Mimer, Energinet, eSett. Finding 6 already shows that neighbours carry little signal about the gap, so fresher neighbour data is unlikely to change that.
+**Cut:** Elering, FMI, Statnett, Mimer, eSett, and Energinet's Danish system data. Finding 6 already shows that neighbours' **imbalance prices** carry little signal about the gap, so fresher neighbour data is unlikely to change that.
+
+✏ *Revised after comparing with Frank's branch:* I first cut Energinet completely. But finding 6 is about late-arriving neighbour imbalance prices, not day-ahead price spreads, so it doesn't rule out E3.
 
 ☐ **Open-Meteo coverage is the biggest unknown.** Only Sept and Oct runs were tested. If runs before ~September aren't available, the feature exists for only part of the training period. Check June runs first, before writing any feature code. See [[Data layer ideas#Open-Meteo]].
 
