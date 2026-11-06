@@ -140,7 +140,7 @@ def call(key_idx: int, key: str, base: str, model: str, prompt: str, system: str
         choice = r.choices[0]
         text = choice.message.content or ""
         u = r.usage
-        log_usage({"ts": time.time(), "task": task, "key": key_idx, "ok": True,
+        log_usage({"ts": time.time(), "task": task, "key": key_idx, "ok": True, "model": model,
                    "secs": round(time.time() - t0, 1), "finish": choice.finish_reason,
                    "prompt_tokens": getattr(u, "prompt_tokens", None),
                    "completion_tokens": getattr(u, "completion_tokens", None)})
@@ -266,6 +266,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def common(p):
+        p.add_argument("--model", "-m", help="override FEATHERLESS_MODEL for this run")
         p.add_argument("--context", "-c", action="append", default=[],
                        help="file to include as context (repeatable)")
         p.add_argument("--system", help="file with a system prompt")
@@ -274,7 +275,8 @@ def main(argv=None):
         p.add_argument("--allow-data", action="store_true",
                        help="allow raw timestamped (non-spot) data rows in the prompt")
 
-    sub.add_parser("ping", help="test every key")
+    pp = sub.add_parser("ping", help="test every key")
+    pp.add_argument("--model", "-m", help="override FEATHERLESS_MODEL for this run")
     sub.add_parser("usage", help="calls and tokens per key")
     a = sub.add_parser("ask", help="one task")
     a.add_argument("file", nargs="?", help="prompt file, or - for stdin")
@@ -291,6 +293,7 @@ def main(argv=None):
 
     args = ap.parse_args(argv)
     base, model, keys = get_config()
+    model = getattr(args, "model", None) or model
     return {"ping": cmd_ping, "ask": cmd_ask, "batch": cmd_batch, "usage": cmd_usage}[args.cmd](
         args, base, model, keys)
 
