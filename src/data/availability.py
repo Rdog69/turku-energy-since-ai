@@ -85,6 +85,12 @@ class SeriesIndex:
         out[ok] = self.val[pos_c[ok]]
         return out
 
+    def first_usable_at(self, times) -> np.ndarray:
+        """first_usable_origin_utc (ns) of the row at each timestamp; int64 max if no row."""
+        t = _ns(times)
+        pos = np.clip(np.searchsorted(self.ts, t), 0, len(self.ts) - 1)
+        return np.where(self.ts[pos] == t, self.fu[pos], np.iinfo(np.int64).max)
+
     def latest(self, origins) -> tuple[np.ndarray, np.ndarray]:
         """(latest usable timestamp in ns or -1, its value or NaN) for each origin."""
         o = _ns(origins)

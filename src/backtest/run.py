@@ -21,9 +21,10 @@ import pandas as pd
 
 from src import config
 from src.data.availability import build_index
-from src.data.load import load_long
+from src.data.load import load_long, load_long_all
 from src.features.build import build_features
 from src.models.anchor import SpotAnchor
+from src.models.blend import HorizonSplit
 from src.models.gbm import GBMModel
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
@@ -36,8 +37,30 @@ MODELS = {
                                         spike_mode="product"),
     "gbm_cal_product_norecency": lambda: GBMModel(name="gbm_cal_product_norecency", calibrate=True,
                                                   spike_mode="product"),
+    "gbm_weather": lambda: GBMModel(name="gbm_weather", calibrate=True, spike_mode="product",
+                                    use_weather=True),
+    "gbm_fingrid": lambda: GBMModel(name="gbm_fingrid", calibrate=True, spike_mode="product",
+                                    use_fingrid=True),
+    "gbm_fingrid_early": lambda: GBMModel(name="gbm_fingrid_early", calibrate=True, spike_mode="product",
+                                          use_fingrid=True, fresh_max_step=8),
+    "split_fingrid": lambda: HorizonSplit(
+        name="split_fingrid", split_step=8,
+        short=GBMModel(name="short_fingrid", calibrate=True, spike_mode="product", use_fingrid=True),
+        long=GBMModel(name="long_package", calibrate=True, spike_mode="product")),
+    "split_all": lambda: HorizonSplit(
+        name="split_all", split_step=8,
+        short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
+                                            spike_mode="product", use_weather=True, use_fingrid=True),
 }
 SUBMISSION_TS = ("forecast_origin_utc", "delivery_start_utc", "data_cutoff_utc")
+# Inputs saved next to the forecast so the dashboard can explain it.
+DASHBOARD_INPUTS = ["spot", "wind_fc", "cons_fc", "solar_fc", "spot_abs_ramp", "hour", "last_gap",
+                    "last_dir", "last_imb", "rt_wind_err", "rt_freq_dev", "rt_nuclear",
+                    "rt_nuclear_change_6h", "rt_cons_err", "om_wind_rev", "om_wind_rev_mw",
+                    "om_icing", "om_temp"]
 
 
 def run_script(pkg: Path, *args: str) -> int:
@@ -64,11 +87,11 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     return out / "forecast_origins.csv", out / "sample_submission.csv"
 
 
-def training_table(long, index, cutoff: pd.Timestamp) -> pd.DataFrame:
+def training_table(long, index, cutoff: pd.Timestamp, weather=None) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
-    f = build_features(long, origins, index=index)
+    f = build_features(long, origins, index=index, weather=weather)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -111,24 +134,35 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     pkg = config.package_dir()
-    long = load_long()
+    model = MODELS[args.model]()
+    long = load_long_all() if getattr(model, "use_fingrid", False) else load_long()
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
     cutoff = origins.min() if args.period == "validation" else config.TRAIN_CUTOFF
     assert cutoff <= config.TRAIN_CUTOFF
 
-    train = training_table(long, index, cutoff)
-    model = MODELS[args.model]().fit(train, cutoff)
+    weather = None
+    if getattr(model, "use_weather", False):
+        from src.data.weather import WeatherIndex
+        weather = WeatherIndex.load("ecmwf_ifs025")
+    train = training_table(long, index, cutoff, weather)
+    model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
-    feats = build_features(long, origins, index=index, with_targets=False)
+    feats = build_features(long, origins, index=index, with_targets=False, weather=weather)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"
     write_submission(feats, pred, template, sub_path)
     print(f"wrote {sub_path.relative_to(config.REPO_ROOT)} ({len(feats)} rows)")
+    # Full table (forecast + the inputs worth explaining) for the dashboard export.
+    # Contains spot prices: stays in results/ (git-ignored), never published.
+    keep = [c for c in DASHBOARD_INPUTS if c in feats]
+    full = pd.concat([feats[["origin", "step", "delivery", "data_cutoff"] + keep].reset_index(drop=True),
+                      pred.reset_index(drop=True)], axis=1)
+    full.to_parquet(out_dir / "forecast_full.parquet", index=False)
 
     rc = run_script(pkg, "validate_submission.py", "--backtest", str(sub_path), "--origins", str(origins_csv))
     if rc != 0:

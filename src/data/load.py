@@ -52,6 +52,23 @@ def load_long(pkg: str | None = None) -> pd.DataFrame:
     return long
 
 
+def load_long_all(pkg: str | None = None) -> pd.DataFrame:
+    """Package data plus downloaded external series in the same long format (if present).
+
+    Currently: Fingrid real-time series (src/data/fingrid.py), each with its own
+    first_usable_origin_utc, so every availability rule and test applies unchanged.
+    """
+    from src.data.fingrid import load_long_extra
+    base = load_long(pkg)
+    extra = load_long_extra()
+    if extra is None:
+        return base
+    overlap = set(extra["series_id"]) & set(base["series_id"])
+    if overlap:
+        raise ValueError(f"external series clash with package series: {overlap}")
+    return pd.concat([base, extra[LONG_COLUMNS]], ignore_index=True)
+
+
 def load_actuals_validation(pkg: str | None = None) -> pd.DataFrame:
     root = Path(pkg) if pkg else package_dir()
     df = pd.read_csv(root / "data" / "actuals_validation.csv")

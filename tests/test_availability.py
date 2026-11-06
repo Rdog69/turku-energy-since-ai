@@ -13,11 +13,11 @@ import pytest
 
 from src.config import VALIDATION_FIRST_ORIGIN, TEST_FIRST_ORIGIN
 from src.data.availability import build_index, wide_at
-from src.data.load import IMBALANCE, SPOT, load_long
-from src.features.build import FEATURE_COLUMNS, TARGET_COLUMNS, build_features
+from src.data.load import IMBALANCE, SPOT, load_long_all
+from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, TARGET_COLUMNS, build_features
 
 try:
-    LONG = load_long()
+    LONG = load_long_all()   # package + downloaded Fingrid real-time series, if present
 except FileNotFoundError:  # teammates without the package can still run the rest
     LONG = None
 
@@ -34,7 +34,7 @@ def _origins(n_random=12, seed=0):
     rng = np.random.default_rng(seed)
     all_hours = pd.date_range("2026-06-01T03:00Z", "2026-11-01T21:00Z", freq="h")
     picks = all_hours[rng.choice(len(all_hours), n_random, replace=False)]
-    return pd.DatetimeIndex(pd.to_datetime(FIXED, utc=True).append(picks)).sort_values()
+    return pd.DatetimeIndex(pd.to_datetime(FIXED, utc=True).append(picks)).unique().sort_values()
 
 
 @pytest.fixture(scope="module")
@@ -48,8 +48,9 @@ def test_features_ignore_unpublished_rows(full_features):
     for t in origins:
         truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
         part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False)
-        a = full.loc[full["origin"] == t, FEATURE_COLUMNS + ["data_cutoff"]].reset_index(drop=True)
-        b = part[FEATURE_COLUMNS + ["data_cutoff"]].reset_index(drop=True)
+        cols = FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS if c in full] + ["data_cutoff"]
+        a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
+        b = part[cols].reset_index(drop=True)
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"features at {t}")
 
 
@@ -86,6 +87,42 @@ def test_spot_and_wind_cover_full_horizon(full_features):
     _, full = full_features
     assert full["spot"].notna().all()
     assert full["wind_fc"].notna().all()
+
+
+def _weather():
+    from src.data.open_meteo import OUT_DIR
+    from src.data.weather import WeatherIndex
+    path = OUT_DIR / "ecmwf_ifs025.parquet"
+    if not path.exists():
+        pytest.skip("weather runs not downloaded (python -m src.data.open_meteo)")
+    return WeatherIndex.load(path=path)
+
+
+def test_weather_features_ignore_unpublished_runs():
+    """Same truncation test for the weather runs: drop every run not yet usable at t."""
+    from src.features.build import WEATHER_COLUMNS
+    weather = _weather()
+    origins = _origins(n_random=8, seed=1)
+    full = build_features(LONG, origins, with_targets=False, weather=weather)
+    assert full["om_wind_idx"].notna().mean() > 0.95, "weather coverage unexpectedly low"
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False,
+                              weather=weather.truncated(t))
+        a = full.loc[full["origin"] == t, WEATHER_COLUMNS].reset_index(drop=True)
+        b = part[WEATHER_COLUMNS].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"weather features at {t}")
+
+
+def test_weather_run_used_was_published():
+    from src.data.availability import to_ns
+    weather = _weather()
+    origins = _origins(n_random=20, seed=2)
+    o = to_ns(origins)
+    _, run = weather.lookup(o, o, "wind_idx")
+    found = run >= 0
+    fu = weather.run_fu[np.searchsorted(weather.run_init, run[found])]
+    assert (fu <= o[found]).all()
 
 
 def test_training_rows_known_before_cutoff():

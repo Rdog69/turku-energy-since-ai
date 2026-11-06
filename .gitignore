@@ -5,6 +5,13 @@ TurkuEnergia_SinceAI2026/
 *.zip
 # root-level data folder only (a bare "data/" would also hide the code in src/data/)
 /data/
+# raw API response caches (the tidy parquet tables next to them are committed)
+external_data/**/raw/
+# full demo export is ~20 MB; a small sample goes into the dashboard app instead
+app_demo_data/
+# open external data tables (CC BY 4.0, see SOURCES.md) are committed despite *.parquet above
+!external_data/fingrid/fingrid_rt.parquet
+!external_data/open_meteo/ecmwf_ifs025.parquet
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv

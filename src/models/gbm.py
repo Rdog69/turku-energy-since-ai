@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from src.features.build import FEATURE_COLUMNS
+from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -68,6 +68,7 @@ class GBMModel:
     calibrate: bool = False
     spike_mode: str = "direct"           # "direct" or "product"
     holdout_days: int = 14
+    use_weather: bool = False
     name: str = "gbm"
     params: dict = field(default_factory=lambda: dict(BASE_PARAMS))
 
@@ -78,6 +79,24 @@ class GBMModel:
     p_none: float = 0.0
     log: list = field(default_factory=list, repr=False)
 
+    use_fingrid: bool = False
+    # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
+    # NaN so the model can't fit noise on them at long horizons. None = use at every step.
+    fresh_max_step: int | None = None
+
+    def _mask_fresh(self, X: pd.DataFrame, steps) -> pd.DataFrame:
+        if not (self.use_fingrid and self.fresh_max_step):
+            return X
+        X = X.copy()
+        late = np.asarray(steps) > self.fresh_max_step
+        X.loc[late, FINGRID_RT_COLUMNS] = np.nan
+        return X
+
+    @property
+    def features(self) -> list[str]:
+        return (FEATURE_COLUMNS + (WEATHER_COLUMNS if self.use_weather else [])
+                + (FINGRID_RT_COLUMNS if self.use_fingrid else []))
+
     # ------------------------------------------------------------------ fitting
     def _weights(self, df, ref):
         if not self.tau_days:
@@ -86,7 +105,7 @@ class GBMModel:
         return np.exp(-np.clip(age_days, 0, None) / self.tau_days)
 
     def _fit_all(self, df: pd.DataFrame, ref: pd.Timestamp) -> dict:
-        X = df[FEATURE_COLUMNS]
+        X = self._mask_fresh(df[self.features], df["step"])
         w = self._weights(df, ref)
         m = {}
         for col, q in QUANTILES.items():
@@ -124,7 +143,7 @@ class GBMModel:
             inner = train.loc[train["y_first_usable"] <= split]
             hold = train.loc[train["origin"] >= split]
             m_inner = self._fit_all(inner, split)
-            raw = self._raw(m_inner, hold[FEATURE_COLUMNS])
+            raw = self._raw(m_inner, self._mask_fresh(hold[self.features], hold["step"]))
             for col in ("up", "high", "low"):
                 y = {"up": hold["y_dir"] == 1, "high": hold["y_spike_high"] == 1,
                      "low": hold["y_spike_low"] == 1}[col].astype(int).to_numpy()
@@ -133,7 +152,8 @@ class GBMModel:
                 resid = hold["y_gap"].to_numpy() - raw[col]
                 for lo, hi in STEP_BANDS:
                     band = hold["step"].between(lo, hi).to_numpy()
-                    self.offsets[(col, lo)] = float(np.quantile(resid[band], q))
+                    if band.any():   # a short-horizon model has no rows in later bands
+                        self.offsets[(col, lo)] = float(np.quantile(resid[band], q))
             self.log.append(f"calibration holdout: {len(hold)} rows from {split:%Y-%m-%d}; "
                             + ", ".join(f"{c}@{lo}={v:+.1f}" for (c, lo), v in self.offsets.items()))
 
@@ -142,7 +162,7 @@ class GBMModel:
 
     # --------------------------------------------------------------- prediction
     def predict(self, feats: pd.DataFrame, with_drivers: bool = True) -> pd.DataFrame:
-        X = feats[FEATURE_COLUMNS]
+        X = self._mask_fresh(feats[self.features], feats["step"])
         raw = self._raw(self.models, X)
         if self.calibrate:
             for col in ("up", "high", "low"):
@@ -151,7 +171,8 @@ class GBMModel:
             for col in QUANTILES:
                 for lo, hi in STEP_BANDS:
                     band = (steps >= lo) & (steps <= hi)
-                    raw[col][band] = raw[col][band] + self.offsets[(col, lo)]
+                    if band.any():
+                        raw[col][band] = raw[col][band] + self.offsets[(col, lo)]
 
         spot = feats["spot"].to_numpy()
         p_up = np.clip(raw["up"], 0, 1) * (1 - self.p_none)
@@ -167,10 +188,11 @@ class GBMModel:
         """Top-k features by |SHAP| of the p50 model, per row (LightGBM's built-in TreeSHAP)."""
         contrib = self.models["p50"].predict(X, pred_contrib=True)[:, :-1]  # drop bias column
         order = np.argsort(-np.abs(contrib), axis=1)[:, :k]
-        names = np.array(FEATURE_COLUMNS)
+        names = np.array(self.features)
         return [";".join(row) for row in names[order]]
 
     def describe(self) -> str:
         bits = [f"{self.name}: tau_days={self.tau_days}, calibrate={self.calibrate}, "
-                f"spikes={self.spike_mode}, p_none={self.p_none:.4f}"]
+                f"spikes={self.spike_mode}, weather={self.use_weather}, fingrid_rt={self.use_fingrid}, "
+                f"p_none={self.p_none:.4f}"]
         return "\n".join(bits + self.log)
