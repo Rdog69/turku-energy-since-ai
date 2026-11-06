@@ -189,7 +189,7 @@ python -m venv .venv
 pip install -r requirements.txt   # coming soon
 ```
 
-Then place the organisers' **starter package** in `starter_package/`. **It must never be committed**: it contains licensed Nord Pool data.
+The organisers' **starter package** is committed in `starter_package/` (verified against the locked SHA-256 sums). ⚠️ This repo is **private** on purpose: the package contains licensed Nord Pool spot data. **Never make the repo public** (or share it outside the team and the organisers) without first purging `starter_package/data/` from the git history, and delete the data after the event.
 
 ```
 starter_package/

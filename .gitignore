@@ -1,5 +1,8 @@
-# --- Licensed / organiser data: NEVER commit (Nord Pool spot data is licensed) ---
-starter_package/
+# --- Organiser data ---
+# starter_package/ IS committed on purpose (team decision, 6 Nov): this repo is PRIVATE.
+# Nord Pool spot data is licensed: never make this repo public or push it elsewhere
+# without first purging starter_package/data/ from the git history. Delete after the event.
+# starter_package/.gitignore ignores data/, so its files were added once with `git add -f`.
 starter_package_v1/
 TurkuEnergia_SinceAI2026/
 *.zip
