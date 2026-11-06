@@ -160,20 +160,32 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         per_origin[f"mean_gap_last{n}"] = np.nanmean(np.vstack(gaps), axis=0)
         per_origin[f"mean_dir_last{n}"] = np.nanmean(np.vstack(dirs), axis=0)
     # --- Fingrid real-time series (only if downloaded; see src/data/fingrid.py) ---
-    if "fg_wind_rt" in index:
-        def latest_pair(sid, ref_sid=None, lags=(0,)):
-            """Mean over the newest usable quarters of sid (minus ref_sid at the same quarter)."""
-            ts, _ = index[sid].latest(origins)
-            latest_ts.append(ts)
-            vals = []
-            for j in lags:
-                t_j = ts - j * NS_PER_QUARTER
-                v = index[sid].value_at(t_j, origin_ns)
-                if ref_sid:
-                    v = v - index[ref_sid].value_at(t_j, origin_ns)
-                vals.append(v)
-            return np.nanmean(np.vstack(vals), axis=0)
+    def latest_pair(sid, ref_sid=None, lags=(0,)):
+        """Mean over the newest usable quarters of sid (minus ref_sid at the same quarter)."""
+        ts, _ = index[sid].latest(origins)
+        latest_ts.append(ts)
+        vals = []
+        for j in lags:
+            t_j = ts - j * NS_PER_QUARTER
+            v = index[sid].value_at(t_j, origin_ns)   # availability-masked
+            if ref_sid:
+                v = v - index[ref_sid].value_at(t_j, origin_ns)
+            vals.append(v)
+        return np.nanmean(np.vstack(vals), axis=0)
 
+    if "fg_hydro_rt" in index:
+        # Level and 1-hour change: balancing shows up as plants and loads moving right now.
+        for sid, name in (("fg_hydro_rt", "rt_hydro"), ("fg_boilers_rt", "rt_boilers"),
+                          ("fg_netimport_rt", "rt_netimport"), ("fg_flow_se3_rt", "rt_flow_se3"),
+                          ("fg_flow_ee_rt", "rt_flow_ee")):
+            now = latest_pair(sid)
+            per_origin[name] = now
+            per_origin[name + "_chg_1h"] = now - latest_pair(sid, lags=(4,))
+        chp = latest_pair("fg_chp_dh_rt") + latest_pair("fg_chp_ind_rt")
+        chp_1h = latest_pair("fg_chp_dh_rt", lags=(4,)) + latest_pair("fg_chp_ind_rt", lags=(4,))
+        per_origin["rt_chp_chg_1h"] = chp - chp_1h
+
+    if "fg_wind_rt" in index:
         per_origin["rt_wind_err"] = latest_pair("fg_wind_rt", "fi_wind_fc_da")
         per_origin["rt_wind_err_last4"] = latest_pair("fg_wind_rt", "fi_wind_fc_da", range(4))
         per_origin["rt_cons_err"] = latest_pair("fg_cons_rt", "fi_consumption_fc_da")
@@ -241,6 +253,12 @@ FEATURE_COLUMNS = [
 FINGRID_RT_COLUMNS = [
     "rt_wind_err", "rt_wind_err_last4", "rt_cons_err", "rt_freq_dev", "rt_freq_dev_last4",
     "rt_nuclear", "rt_nuclear_change_6h",
+]
+
+FINGRID_RT2_COLUMNS = [
+    "rt_hydro", "rt_hydro_chg_1h", "rt_boilers", "rt_boilers_chg_1h", "rt_netimport",
+    "rt_netimport_chg_1h", "rt_flow_se3", "rt_flow_se3_chg_1h", "rt_flow_ee", "rt_flow_ee_chg_1h",
+    "rt_chp_chg_1h",
 ]
 
 WEATHER_COLUMNS = [

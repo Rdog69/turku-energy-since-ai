@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS
+from src.features.build import FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -80,6 +80,8 @@ class GBMModel:
     log: list = field(default_factory=list, repr=False)
 
     use_fingrid: bool = False
+    use_fingrid2: bool = False      # second batch of real-time series (hydro, boilers, flows, ...)
+    n_seeds: int = 1                # >1 = average models trained with different random seeds
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
@@ -89,13 +91,14 @@ class GBMModel:
             return X
         X = X.copy()
         late = np.asarray(steps) > self.fresh_max_step
-        X.loc[late, FINGRID_RT_COLUMNS] = np.nan
+        X.loc[late, [c for c in FINGRID_RT_COLUMNS + FINGRID_RT2_COLUMNS if c in X]] = np.nan
         return X
 
     @property
     def features(self) -> list[str]:
         return (FEATURE_COLUMNS + (WEATHER_COLUMNS if self.use_weather else [])
-                + (FINGRID_RT_COLUMNS if self.use_fingrid else []))
+                + (FINGRID_RT_COLUMNS if self.use_fingrid else [])
+                + (FINGRID_RT2_COLUMNS if self.use_fingrid2 else []))
 
     # ------------------------------------------------------------------ fitting
     def _weights(self, df, ref):
@@ -104,27 +107,35 @@ class GBMModel:
         age_days = (ref - df["delivery"]).dt.total_seconds().to_numpy() / 86400
         return np.exp(-np.clip(age_days, 0, None) / self.tau_days)
 
-    def _fit_all(self, df: pd.DataFrame, ref: pd.Timestamp) -> dict:
+    def _fit_all(self, df: pd.DataFrame, ref: pd.Timestamp) -> list[dict]:
+        return [self._fit_one(df, ref, seed) for seed in range(self.n_seeds)]
+
+    def _fit_one(self, df: pd.DataFrame, ref: pd.Timestamp, seed: int) -> dict:
         X = self._mask_fresh(df[self.features], df["step"])
         w = self._weights(df, ref)
+        params = {**self.params, "random_state": seed}
         m = {}
         for col, q in QUANTILES.items():
-            m[col] = lgb.LGBMRegressor(objective="quantile", alpha=q, **self.params).fit(
+            m[col] = lgb.LGBMRegressor(objective="quantile", alpha=q, **params).fit(
                 X, df["y_gap"], sample_weight=w)
-        m["up"] = lgb.LGBMClassifier(**self.params).fit(X, (df["y_dir"] == 1).astype(int), sample_weight=w)
+        m["up"] = lgb.LGBMClassifier(**params).fit(X, (df["y_dir"] == 1).astype(int), sample_weight=w)
         if self.spike_mode == "direct":
             for col in ("high", "low"):
-                m[col] = lgb.LGBMClassifier(**self.params).fit(
+                m[col] = lgb.LGBMClassifier(**params).fit(
                     X, df[f"y_spike_{col}"].astype(int), sample_weight=w)
         else:
             for col, direction in (("high", 1), ("low", -1)):
                 sub = df["y_dir"] == direction
                 ws = None if w is None else w[sub.to_numpy()]
-                m[col] = lgb.LGBMClassifier(**self.params).fit(
+                m[col] = lgb.LGBMClassifier(**params).fit(
                     X[sub], df.loc[sub, f"y_spike_{col}"].astype(int), sample_weight=ws)
         return m
 
-    def _raw(self, m: dict, X: pd.DataFrame) -> dict:
+    def _raw(self, ms: list[dict], X: pd.DataFrame) -> dict:
+        outs = [self._raw_one(m, X) for m in ms]
+        return {k: np.mean([o[k] for o in outs], axis=0) for k in outs[0]}
+
+    def _raw_one(self, m: dict, X: pd.DataFrame) -> dict:
         out = {col: m[col].predict(X) for col in QUANTILES}
         out["up"] = m["up"].predict_proba(X)[:, 1]
         out["high"] = m["high"].predict_proba(X)[:, 1]
@@ -186,7 +197,7 @@ class GBMModel:
 
     def top_drivers(self, X: pd.DataFrame, k: int = 3) -> list[str]:
         """Top-k features by |SHAP| of the p50 model, per row (LightGBM's built-in TreeSHAP)."""
-        contrib = self.models["p50"].predict(X, pred_contrib=True)[:, :-1]  # drop bias column
+        contrib = self.models[0]["p50"].predict(X, pred_contrib=True)[:, :-1]  # drop bias column
         order = np.argsort(-np.abs(contrib), axis=1)[:, :k]
         names = np.array(self.features)
         return [";".join(row) for row in names[order]]

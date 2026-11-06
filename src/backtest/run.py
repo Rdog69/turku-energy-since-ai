@@ -52,6 +52,42 @@ MODELS = {
         short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True),
         long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_rt2": lambda: HorizonSplit(
+        name="split_all_rt2", split_step=8,
+        short=GBMModel(name="short_rt2", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_fingrid2=True, use_weather=True),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_seeds": lambda: HorizonSplit(
+        name="split_all_seeds", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_x5", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5", calibrate=True, spike_mode="product", use_weather=True,
+                      n_seeds=5)),
+    "split_all_rt2_seeds": lambda: HorizonSplit(
+        name="split_all_rt2_seeds", split_step=8,
+        short=GBMModel(name="short_rt2_x5", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5", calibrate=True, spike_mode="product", use_weather=True,
+                      n_seeds=5)),
+    "final": lambda: HorizonSplit(
+        name="final", split_step=8, capacity_weighted=False,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5)),
+    "final_capw": lambda: HorizonSplit(
+        name="final_capw", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5)),
+    # calibration window check: re-tune on the last 21 / 28 training days instead of 14
+    **{f"split_all_h{d}": (lambda d=d: HorizonSplit(
+        name=f"split_all_h{d}", split_step=8,
+        short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, holdout_days=d),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True,
+                      holdout_days=d))) for d in (21, 28)},
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
@@ -145,7 +181,8 @@ def main(argv=None) -> int:
     weather = None
     if getattr(model, "use_weather", False):
         from src.data.weather import WeatherIndex
-        weather = WeatherIndex.load("ecmwf_ifs025")
+        weather = WeatherIndex.load("ecmwf_ifs025",
+                                    capacity_weighted=getattr(model, "capacity_weighted", False))
     train = training_table(long, index, cutoff, weather)
     model.fit(train, cutoff)
     print(model.describe())

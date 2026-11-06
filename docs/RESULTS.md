@@ -15,7 +15,17 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 6 Nov | `gbm_fingrid_early`: same, real-time features hidden after step 8 | + Fingrid RT | 42.86 | 12.38 | 0.810 | 0.0947 | 0.4154 | Better MAE; direction still worse after hour 2. |
 | 6 Nov | `split_fingrid`: separate models, steps 1–8 with Fingrid RT, steps 9–40 package-only | + Fingrid RT | 42.95 | 12.31 | 0.797 | 0.0927 | 0.4058 | Hour 1: MAE 41.5 → 39.4, direction 0.408 → 0.342, spikes 0.091 → 0.082. |
 | 6 Nov | `gbm_weather`: package + ECMWF weather runs (wind index, revision vs. the day-ahead run, temperature, icing) | + weather | 43.08 | 12.19 | 0.816 | 0.0932 | 0.4088 | Weather helps every metric. |
-| 6 Nov | **`split_all`**: steps 1–8 with Fingrid RT + weather, steps 9–40 with weather | + Fingrid RT + weather | **42.53** | **12.09** | 0.814 | **0.0921** | **0.4011** | **Current best on all four metrics.** |
+| 6 Nov | `split_all`: steps 1–8 with Fingrid RT + weather, steps 9–40 with weather | + Fingrid RT + weather | 42.53 | 12.09 | 0.814 | 0.0921 | 0.4011 | Best on all four metrics at the time. |
+| 7 Nov | `split_all_rt2`: + 10 more Fingrid RT series in the short model (hydro, electric boilers, net import, flows, CHP) | + Fingrid RT2 | 42.62 | 12.12 | 0.815 | 0.0912 | 0.4000 | Better spikes and direction, slightly worse MAE. |
+| 7 Nov | `split_all_seeds`: `split_all` with 5-seed averaging | same | 42.44 | 12.14 | 0.810 | 0.0917 | 0.3998 | |
+| 7 Nov | `split_all_rt2_seeds`: both | + Fingrid RT2 | 42.37 | 12.09 | 0.813 | 0.0913 | 0.3983 | Beats `split_all` in 3/4 weeks on MAE, 4/4 spikes, 3/4 direction, 2/4 pinball. |
+| 7 Nov | `split_all_h21` / `split_all_h28`: `split_all` re-tuned on the last 21 / 28 days instead of 14 | same | 42.56 / 42.54 | 12.15 / 12.07 | 0.845 / 0.813 | 0.0918 / 0.0904 | 0.3961 / 0.3961 | 28 days is better and steadier: the test-period P90 offset is +27…+30 instead of +28…+36. |
+| 7 Nov | `final`: `split_all_rt2_seeds` + 28-day re-tuning | + Fingrid RT2 | 42.38 | **12.01** | 0.817 | 0.0905 | 0.3938 | |
+| 7 Nov | **`final_capw`**: `final` + weather averaged over 14 points weighted by installed wind capacity (OpenStreetMap turbines) | + OSM farms, 6 more weather points | **42.34** | 12.06 | 0.814 | **0.0900** | **0.3908** | **Submitted model.** vs `final`: direction better in 3/4 weeks, MAE and spikes 2/4, pinball slightly worse every week (+0.04). Weighted by points it comes out ahead. |
+
+**Final vs baseline:** MAE −36 % (66.20 → 42.34), pinball −50 % (24.18 → 12.06), spike Brier −20 % (0.1132 → 0.0900), direction Brier −13 % (0.4509 → 0.3908).
+
+⚠ About 20 variants were compared on this one validation month, so expect the test period to come in somewhat worse.
 
 **Best vs baseline:** MAE −36 % (66.20 → 42.53), pinball −50 % (24.18 → 12.09), spike Brier −19 % (0.1132 → 0.0921), direction Brier −11 % (0.4509 → 0.4011).
 

@@ -14,7 +14,8 @@ import pytest
 from src.config import VALIDATION_FIRST_ORIGIN, TEST_FIRST_ORIGIN
 from src.data.availability import build_index, wide_at
 from src.data.load import IMBALANCE, SPOT, load_long_all
-from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, TARGET_COLUMNS, build_features
+from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, TARGET_COLUMNS,
+                                build_features)
 
 try:
     LONG = load_long_all()   # package + downloaded Fingrid real-time series, if present
@@ -48,7 +49,7 @@ def test_features_ignore_unpublished_rows(full_features):
     for t in origins:
         truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
         part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False)
-        cols = FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS if c in full] + ["data_cutoff"]
+        cols = FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS + FINGRID_RT2_COLUMNS if c in full] + ["data_cutoff"]
         a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
         b = part[cols].reset_index(drop=True)
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"features at {t}")

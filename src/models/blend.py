@@ -16,6 +16,7 @@ class HorizonSplit:
     long: object
     split_step: int = 8
     name: str = "horizon_split"
+    capacity_weighted: bool = False   # weather averaged by OSM wind capacity (src/data/weather.py)
 
     @property
     def use_weather(self) -> bool:
