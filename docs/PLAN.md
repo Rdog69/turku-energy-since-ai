@@ -2,6 +2,29 @@
 
 > Working plan for the Turku Energia imbalance price challenge. It's a living document, revised after looking at the starter package (6 Nov) and re-checked against the challenge brief and the training data the same evening. Every claim here is either **checked against the data** (✔ data), **from the official README** (✔ README), or marked as an **assumption** (☐).
 
+## 0. How we beat other teams
+
+Most teams will end up at "spot + predicted gap with LightGBM", because it's the obvious answer once you look at the data. That's our **floor, not our edge**. Points are scaled between the baseline (0) and the **best team** (full points), so we need to be better exactly where others will be lazy.
+
+**Everyone will have:** the gap-to-spot framing, a gradient-boosted model on package features, and an LLM summary on the dashboard.
+
+**Where we can win, best bets first.** Each one is tested on validation and kept only if it helps.
+
+| # | Edge | Why others will miss it | Status / risk |
+|---|---|---|---|
+| E1 | **Train on last winter.** Fingrid's API has the mFRR direction (369) and mFRR prices (244/106) back to **March 2025** (start of the Nordic 15-min mFRR energy market), including **Oct–Nov 2025**, the same season as the test period. The June 2026 change only affects how aFRR is mixed into the imbalance price; it doesn't change *when* the grid goes up or down, or how mFRR prices form. | Teams stop at the package, which starts on 1 Jun. | ⚠ The README says "train only on this data (1 Jun – 4 Oct)". Probably means "not the test period", but **ask before using it**. Needs the Fingrid key. |
+| E2 | **Grid frequency as a near-real-time signal.** Frequency below 50 Hz means the system is short now, which means up-regulation. Fingrid publishes it every 3 min. The gap correlates 0.76 from one quarter to the next but only ~0.2 at the package's 5-quarter delay, so fresh information lifts the early steps a lot. | It isn't in the package, and it takes power-system knowledge to think of. | It must be **different data with an honest delay**; never re-fetch package series with a shorter delay. Frequency covers the whole Nordic synchronous area, not just FI, so test it. Fingrid dataset ID ☐ (177?). |
+| E3 | **Congestion known a day ahead: FI vs SE1/SE3/EE spot spread.** When Finland's price splits from its neighbours, the links are full and Finland balances alone, so swings get bigger. Known for all 40 steps. | Needs another price source (ENTSO-E prices aren't on the free re-use list). | ✔ Energinet's public `DayAheadPrices` API serves FI, SE, NO, DK and DE (tested 6 Nov). ⚠ **Licence check**: the prices originate from Nord Pool. |
+| E4 | **Win the probability scores (40 of the 80 automatic points).** Calibrate on the most recent weeks; spikes = P(direction) × P(tail \| direction) (finding 11); per-step calibration. | Most teams will submit overconfident classifier outputs. | Validation spike shares are 12–13 % vs 7–9 % in training (finding 9), so calibration on recent data matters. Test-period recalibration: open question §12. |
+| E5 | **Keep the model simple and robust.** Four months of noisy data is small. Use few, physically meaningful features, regularisation, and week-by-week validation. | Teams with 200 features will overfit and collapse in October. | Cheap; it's a discipline, not a feature. |
+| E6 | **A pretrained time-series model as a challenger** (e.g. Chronos-2 or TimesFM with covariates) in an ablation and possibly a blend. | – | Likely loses to trees on this data, but "we tested it" strengthens the reasoning chain. Run on CPU, time-boxed to 1 h. |
+| E7 | **Jury points (20 for the reasoning chain + 20 % for Level 2).** A clear ablation table ("each source added X"), honest leakage handling, and a situation room built for the people who'll use it. | Most teams will show a model and a chart. | This is what Turku Energia asked for: understanding the drivers instead of a black box. |
+
+**Ruled out as edges:**
+- **More random APIs:** a source counts only if it measures what Finland's plan missed.
+- **News or LLM price prediction:** spot already includes it, and it carries leak risk.
+- **Weather ensemble spread:** the Open-Meteo Single Runs API has no ensemble runs, and the ensemble archive is stitched together afterwards, so it would use future information (tested 6 Nov).
+
 ## 1. What we are actually forecasting
 
 The target is the **Finnish imbalance price per 15-minute period, 1–40 steps (10 h) ahead**, from every full-hour origin. It works like this (✔ README, ✔ data):
@@ -55,12 +78,12 @@ Every external source needs an **honest publication delay**, which becomes its `
 |---|---|---|---|---|---|
 | **Starter package** | ✔ | Everything in README §5.2 | per row (binding) | Core | **Use** |
 | **Open-Meteo Single Runs** | ✔ Works with no key; Sept and Oct 2026 runs return data (ECMWF IFS, ICON) | Wind at 100 m, 10 m wind, gusts, temperature and humidity, per model run, at chosen points | init + model availability ☐ (ECMWF IFS ~+6–7 h, ICON ~+3–4 h; take the conservative end) | **High**: measures how the *wind forecast has been revised* since the day-ahead forecast | **Use** (priority 1) |
-| **Fingrid Open Data API** | ✔ Needs a **free API key** (instant sign-up at data.fingrid.fi); rate limits apply | Real-time **wind**, **nuclear** and **hydro** production and frequency (3-min data; dataset IDs ☐ to confirm, e.g. 181 wind, 188 nuclear, 191 hydro) | ☐ 15–30 min (the package itself uses 30 min for measured data) | **High**: realised wind gives the *current wind forecast error*, and a nuclear drop reveals an outage within minutes. Both are fresher than the package's 60-min imbalance delay. | **Use** (priority 1). ⚠ Never use dataset 245/hourly-updated forecasts: only the latest version is stored. |
+| **Fingrid Open Data API** | ✔ Needs a **free API key** (instant sign-up at data.fingrid.fi); rate limits apply | Real-time **wind**, **nuclear** and **hydro** production and frequency (3-min data; dataset IDs ☐ to confirm, e.g. 181 wind, 188 nuclear, 191 hydro) | ☐ 15–30 min (the package itself uses 30 min for measured data) | **High**: realised wind gives the *current wind forecast error*, and a nuclear drop reveals an outage within minutes. Both are fresher than the package's 60-min imbalance delay. | **Use** (priority 1). ⚠ Never use dataset 245/hourly-updated forecasts: only the latest version is stored. Also: **grid frequency** (E2) and **mFRR history from Mar 2025** (E1, if allowed). |
 | **Nord Pool UMM API** | ✔ Public, no key; historical Finnish messages with `publicationDate` and versions | Planned and unplanned outages: production units (e.g. OL3, wind farms) and transmission (e.g. Fenno-Skan) with MW unavailable | `publicationDate` of each **version** (use the version valid at the origin) | **Medium**: big outages are rare but explain spikes, which is good for the dashboard's "why" view | **Use** (priority 2) |
 | **FMI open data** | ✔ WFS, no key | Weather station observations (wind, temperature), e.g. Vaasa | ☐ ~10–20 min | Low–medium: overlaps with Fingrid realised wind | Optional |
 | **Elering** (Estonian TSO) | ✔ No key, history available | Estonian real-time system balance, production, consumption | ☐ 15–30 min | Medium: a neighbour signal fresher than ENTSO-E's ~2 h delay | **Use** (priority 3) |
 | **Statnett** (Norwegian TSO) | ✔ Live Nordic production and consumption per country; ☐ history not yet confirmed | Nordic real-time balance | ☐ | Medium, *if* history is available | Check history; otherwise skip |
-| **Energinet** (Danish TSO) | ✔ No key, history available | Danish power system data | ☐ | Low: far from the Finnish balance | Skip |
+| **Energinet** (Danish TSO) | ✔ No key, history available; rate-limited (got a 429 after a few calls) | **`DayAheadPrices`: day-ahead prices for FI, SE1–4, NO, DK, DE** (15 min). Danish system data otherwise. | Day-ahead prices: D-1 ~14:00 local, like the package's spot (use the same rule) | **Medium–high** for the FI–SE/EE price spread (E3); low for Danish data | **Use the prices** (priority 2) after the ⚠ licence check; skip the Danish data |
 | **eSett** (Nordic imbalance settlement) | ✔ Responds, but the test query returned nothing | Nordic imbalance data | ☐ | Low: mostly duplicates Fingrid | Skip |
 | **Svenska kraftnät Mimer** | ✔ Website responds; data export not tested | Swedish balancing data | ☐ | Low–medium | Optional |
 | **Nord Pool intraday prices** | ✘ Licensed, not in the package | – | – | – | Skip |
@@ -78,7 +101,7 @@ Every Nordic wind farm, nuclear and fossil plant, the gas price and the headline
 - **Gas, oil and CO₂ prices; sentiment; headlines:** they move spot over days to weeks, which spot already includes. They add leakage risk. **Skip.**
 - **Max output per farm from local weather:** worth doing only for wind on the west coast of Finland. Other countries' farms reach us through spot and neighbour prices.
 
-**Order of work:** package → Open-Meteo wind → Fingrid real-time → UMM → Elering.
+**Order of work:** package → Open-Meteo wind → Fingrid real-time (wind, nuclear, **frequency**) → FI–SE/EE price spread (Energinet) → UMM → Elering. Pre-June Fingrid history (E1) as soon as the organisers say yes.
 
 ## 5. Level 1: model
 
@@ -244,7 +267,9 @@ Five people. Each role has a clear output, and the hand-offs are files, so peopl
 - [ ] Ask in `#turku-energia`: are Fingrid real-time 3-min series acceptable with our own documented publication delay?
 - [ ] Ask in `#turku-energia`: is the Nord Pool UMM API allowed? (It's public, but it's Nord Pool.)
 - [ ] Ask in `#turku-energia`: during the test backtest, may we correct bias or recalibrate using test-period imbalance prices that are already usable at the origin (`first_usable_origin_utc ≤ t`)? The data rule allows it, but "train only on data up to 4 Oct" may not. This could be a real gain given the drift in finding 9, so ask before relying on it.
-- [ ] Confirm the Fingrid dataset IDs once we have the key.
+- [ ] **Ask in `#turku-energia` (biggest edge, E1):** may we train on Fingrid data from before 1 Jun 2026 (e.g. mFRR direction and prices since Mar 2025), as long as it's before the test period? The README says "train only on this data (1 Jun – 4 Oct)".
+- [ ] Energinet `DayAheadPrices` (E3): what's the licence for Nord Pool–derived prices republished by Energinet? Is it OK to use them in a hackathon submission?
+- [ ] Confirm the Fingrid dataset IDs once we have the key (wind, nuclear, hydro, **frequency**).
 - [ ] Open-Meteo: decide publication delays per model; confirm the archive covers 1 Jun – 2 Nov for the chosen models.
 - [ ] Featherless: everyone claims their $25 credit early (the cap is 1,200 claims); check which models the credit covers.
 - [ ] Claim the team's n8n Cloud Pro licence and everyone's Lovable Pro.
