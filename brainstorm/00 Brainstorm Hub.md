@@ -9,12 +9,18 @@ status: draft
 
 Brainstorm and review of the current plan ([[PLAN]], [[TLDR]], [[README]]). **[[PLAN]] is still the source of truth.** These notes suggest changes. Nothing in them is decided until it moves into the plan.
 
+
+```
 meow
 another meow
 meow
 
 meow
 MEOW! I really hope the credentials manager would work now.
+
+
+YEEEEESSSSS. IT WORKS.
+```
 
 Legend: ⚠ issue in the current plan · 💡 new idea · ☐ unverified, check before relying on it · ✔ checked.
 
