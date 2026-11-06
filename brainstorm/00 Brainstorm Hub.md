@@ -14,6 +14,7 @@ another meow
 meow
 
 meow
+MEOW! I really hope the credentials manager would work now.
 
 Legend: ⚠ issue in the current plan · 💡 new idea · ☐ unverified, check before relying on it · ✔ checked.
 
