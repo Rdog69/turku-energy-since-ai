@@ -268,6 +268,17 @@ starter_package/
 └─ make_templates.py
 ```
 
+### Fallback dashboard (Streamlit)
+
+Local fallback for the situation-room demo (time travel, 10 h fan chart, spike risk, track record). **Local only**: it shows licensed Nord Pool spot data, never deploy it publicly.
+
+```bash
+pip install -r requirements-app.txt
+streamlit run app/streamlit_app.py
+```
+
+It reads `results/dashboard/test` if present, else `app_demo_sample/test` (change in the sidebar or set `DASHBOARD_DATA_DIR`).
+
 ## Repository layout
 
 ```
