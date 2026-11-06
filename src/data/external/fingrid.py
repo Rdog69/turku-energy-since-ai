@@ -96,7 +96,7 @@ def client() -> Http:
     key = load_env().get("FINGRID_API_KEY")
     if not key:
         sys.exit("FINGRID_API_KEY missing: sign up at https://data.fingrid.fi and add it to .env")
-    return Http("fingrid", min_interval_s=2.1, headers={"x-api-key": key, "Accept": "application/json"})
+    return Http("fingrid", min_interval_s=2.6, headers={"x-api-key": key, "Accept": "application/json"})
 
 
 def fetch_raw(http: Http, ds: DS, start: str, end: str) -> pd.DataFrame:

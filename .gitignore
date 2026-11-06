@@ -45,3 +45,7 @@ desktop.ini
 # external data: raw API cache and logs stay local; processed csv.gz files are committed
 external_data/_cache/
 external_data/_log_*.txt
+
+# lab caches (features, predictions)
+experiments/lab/_cache/
+submissions/score_*/
