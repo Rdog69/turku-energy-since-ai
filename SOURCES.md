@@ -24,10 +24,10 @@ Required deliverable: every data source, external service, ready-made model and 
 | pytest | Leakage tests | MIT |
 | Organisers' `validate_submission.py`, `score.py`, `make_templates.py`, `baseline.ipynb` | Validation and scoring | Provided by the organisers |
 
-## Services (planned)
+## Services
 
 | Service | Use | Notes |
 |---|---|---|
-| Featherless.ai | LLM text for explanations | Output is text only, downstream of the forecast; never a model input |
-| Lovable | Dashboard frontend | Hosted builds never contain spot data |
-| n8n | Alert workflow | – |
+| Featherless.ai, model `Qwen/Qwen2.5-32B-Instruct` (Apache-2.0) | 2–3 sentence briefings per forecast hour | Text only, downstream of the forecast; never a model input. Prompts contain no spot or absolute prices (checked in code). Every number in an answer must appear in the facts, or a template is used instead. |
+| Lovable | Dashboard frontend ("Imbalance Situation Room") | The hosted preview only gets demo data with a synthetic spot curve; real data stays local. |
+| n8n Cloud | "Imbalance alert relay" workflow: webhook → filter → format → data table | Receives spot-free payloads only. Export in `automation/`. |

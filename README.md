@@ -211,6 +211,40 @@ python -m src.backtest.run --period test --model spot_anchor
 
 Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
 
+The current best model is `split_all`, which needs the two external data tables. They're committed in `external_data/`, so no download is needed. To refresh them:
+
+```bash
+python -m src.data.fingrid
+```
+
+Downloads Fingrid real-time wind, nuclear, frequency and consumption. Needs `FINGRID_API_KEY` in `.env`.
+
+```bash
+python -m src.data.open_meteo
+```
+
+Downloads the ECMWF weather runs from Open-Meteo. No key needed.
+
+**Dashboard data, briefings and alerts:**
+
+```bash
+python -m src.export.dashboard --model split_all --period test
+```
+
+Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).
+
+```bash
+python -m src.explain.featherless --period test
+```
+
+Adds an LLM briefing to each hour. Needs `FEATHERLESS_API_KEY`. Prompts are spot-free.
+
+```bash
+python -m src.automation.replay --period test --hours 24
+```
+
+Replays updates into the n8n alert workflow ([`automation/`](automation/)).
+
 To get the baseline's own score for comparison, run the organisers' `baseline.ipynb` once in the package folder. It writes `baseline_output/validation/score/score_summary.csv`, which the runner picks up automatically.
 
 Scores so far are logged in [`docs/RESULTS.md`](docs/RESULTS.md).

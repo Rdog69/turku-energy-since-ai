@@ -126,8 +126,9 @@ def alerts_for(blocks: pd.DataFrame, prev: pd.DataFrame | None, width_ref: float
         if p is not None and abs(b.p50 - p.p50) >= 25:
             out.append({"type": "forecast_change", "severity": "medium", "start": _z(b.start), "end": _z(b.end),
                         "window_local": win,
-                        "message": (f"Forecast for {win} moved {b.p50 - p.p50:+.0f} €/MWh since the previous "
-                                    f"update (now {b.p50:.0f} €/MWh)."),
+                        # No absolute price in the text: messages go to the LLM and n8n, and an
+                        # absolute forecast next to its gap would reveal the (licensed) spot price.
+                        "message": f"Forecast for {win} moved {b.p50 - p.p50:+.0f} €/MWh since the previous update.",
                         "facts": {"p50": _r(b.p50), "change": _r(b.p50 - p.p50)}})
         if b.width >= 2.0 * width_ref:
             out.append({"type": "high_uncertainty", "severity": "low", "start": _z(b.start), "end": _z(b.end),
