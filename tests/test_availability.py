@@ -14,7 +14,7 @@ import pytest
 from src.config import VALIDATION_FIRST_ORIGIN, TEST_FIRST_ORIGIN
 from src.data.availability import build_index, wide_at
 from src.data.load import IMBALANCE, SPOT, load_long_all
-from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, TARGET_COLUMNS, build_features
+from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, RT_IMBALANCE_COLUMNS, TARGET_COLUMNS, build_features
 
 try:
     LONG = load_long_all()   # package + downloaded Fingrid real-time series, if present
@@ -48,7 +48,8 @@ def test_features_ignore_unpublished_rows(full_features):
     for t in origins:
         truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
         part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False)
-        cols = FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS if c in full] + ["data_cutoff"]
+        cols = (FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS + RT_IMBALANCE_COLUMNS if c in full]
+                + ["data_cutoff"])
         a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
         b = part[cols].reset_index(drop=True)
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"features at {t}")
@@ -71,6 +72,33 @@ def test_matches_reference_filter(full_features):
         assert rows["last_gap"].iloc[0] == pytest.approx(imb.iloc[-1] - wide.loc[ts, SPOT])
         last4 = (wide[IMBALANCE] - wide[SPOT]).loc[:ts].dropna().iloc[-4:]
         assert rows["mean_gap_last4"].iloc[0] == pytest.approx(last4.mean())
+
+
+def test_rt_imbalance_matches_reference_filter(full_features):
+    """rt_sd_* / rt_plan_err equal the newest rows of the slow reference-filtered tables."""
+    origins, full = full_features
+    assert "rt_sd_last" in full, "fg198 not loaded"
+    sd_id, prod_id, plan_id = ("fg198_surplus_deficit_rt", "fg192_production_rt",
+                               "fg242_production_plan_da")
+    checked = 0
+    for t in origins[::2]:
+        wide = wide_at(LONG, t)
+        row = full.loc[full["origin"] == t].iloc[0]
+        sd = wide[sd_id].dropna()
+        if sd.empty:
+            continue
+        assert row["rt_sd_last"] == pytest.approx(sd.iloc[-1])
+        assert row["rt_sd_mean4"] == pytest.approx(sd.iloc[-4:].mean())
+        assert row["rt_sd_trend"] == pytest.approx(sd.iloc[-1] - sd.iloc[-5])
+        prod = wide[prod_id].dropna()
+        err = (prod - wide[plan_id].reindex(prod.index)).iloc[-4:]
+        assert row["rt_plan_err"] == pytest.approx(err.iloc[-1])
+        assert row["rt_plan_err_mean4"] == pytest.approx(err.mean())
+        # the newest measured quarter must be strictly older than the origin
+        assert sd.index[-1] + pd.Timedelta(minutes=15) <= t
+        assert row["data_cutoff"] >= sd.index[-1]
+        checked += 1
+    assert checked >= 5
 
 
 def test_data_cutoff_before_origin(full_features):

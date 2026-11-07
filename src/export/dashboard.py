@@ -58,6 +58,11 @@ DRIVER_LABELS = {
     "om_wind_rev": "Wind forecast revision", "om_wind_rev_mw": "Wind forecast revision (MW)",
     "om_wind_speed": "Wind speed (weather model)", "om_temp": "Temperature", "om_icing": "Icing risk",
     "om_lead_h": "Weather run age",
+    "rt_sd_last": "Live imbalance vs plan (now)", "rt_sd_mean4": "Live imbalance vs plan (last hour)",
+    "rt_sd_trend": "Live imbalance vs plan (trend over 1 h)",
+    "rt_sd_cum": "Live imbalance vs plan (cumulative)",
+    "rt_plan_err": "Production vs BRP plan (now)", "rt_plan_err_mean4": "Production vs BRP plan (last hour)",
+    "rt_hydro_change_1h": "Hydro output change (1 h)",
 }
 
 LEVERS = {
@@ -199,7 +204,9 @@ def context_for(row: pd.Series) -> dict:
     keys = {"wind_fc_mw": "wind_fc", "consumption_fc_mw": "cons_fc", "wind_now_vs_forecast_mw": "rt_wind_err",
             "frequency_deviation_hz": "rt_freq_dev", "nuclear_mw": "rt_nuclear",
             "nuclear_change_6h_mw": "rt_nuclear_change_6h", "latest_imbalance_vs_spot": "last_gap",
-            "weather_wind_revision_mw": "om_wind_rev_mw", "icing_share": "om_icing"}
+            "weather_wind_revision_mw": "om_wind_rev_mw", "icing_share": "om_icing",
+            "live_imbalance_vs_plan_mw": "rt_sd_mean4", "production_vs_plan_mw": "rt_plan_err_mean4",
+            "hydro_change_1h_mw": "rt_hydro_change_1h"}
     return {k: _r(row.get(v), 3 if "hz" in k or "share" in k else 0) for k, v in keys.items()
             if v in row and row.get(v) is not None}
 

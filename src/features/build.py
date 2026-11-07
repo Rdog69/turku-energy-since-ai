@@ -89,6 +89,51 @@ def add_weather(f: pd.DataFrame, index: dict[str, SeriesIndex], weather) -> pd.D
     return f
 
 
+RT_SD = "fg198_surplus_deficit_rt"        # measured net import minus the exchange plan (MW)
+RT_SD_CUM = "fg186_surplus_deficit_cum_rt"
+RT_PROD = "fg192_production_rt"
+RT_PROD_PLAN = "fg242_production_plan_da"  # BRP production plan, published 18:00 on D-1
+RT_HYDRO = "fg191_hydro_rt"
+
+
+def add_rt_imbalance(per_origin: pd.DataFrame, index: dict[str, SeriesIndex], origins: pd.DatetimeIndex,
+                     latest_ts: list) -> None:
+    """Live imbalance features from Fingrid real-time series (usable ~45-75 min after the quarter).
+
+    Same pattern as the other rt_* features: the newest usable quarter comes from
+    `SeriesIndex.latest`, older quarters from `value_at(..., origin)`, so a quarter that is not
+    published at the origin is NaN. Appends the newest measured quarter used to `latest_ts`.
+    """
+    origin_ns = to_ns(origins)
+
+    def newest(sid):
+        ts, _ = index[sid].latest(origins)
+        latest_ts.append(ts)
+        return ts
+
+    def vals(sid, ts, lags):
+        return np.vstack([index[sid].value_at(ts - j * NS_PER_QUARTER, origin_ns) for j in lags])
+
+    if RT_SD in index:
+        ts = newest(RT_SD)
+        sd = vals(RT_SD, ts, range(5))      # newest quarter, then 1..4 quarters earlier
+        per_origin["rt_sd_last"] = sd[0]
+        per_origin["rt_sd_mean4"] = np.nanmean(sd[:4], axis=0)
+        per_origin["rt_sd_trend"] = sd[0] - sd[4]
+    if RT_SD_CUM in index:
+        ts = newest(RT_SD_CUM)
+        per_origin["rt_sd_cum"] = vals(RT_SD_CUM, ts, [0])[0]
+    if RT_PROD in index and RT_PROD_PLAN in index:
+        ts = newest(RT_PROD)
+        err = vals(RT_PROD, ts, range(4)) - vals(RT_PROD_PLAN, ts, range(4))   # plan usable at origin
+        per_origin["rt_plan_err"] = err[0]
+        per_origin["rt_plan_err_mean4"] = np.nanmean(err, axis=0)
+    if RT_HYDRO in index:
+        ts = newest(RT_HYDRO)
+        h = vals(RT_HYDRO, ts, [0, 4])
+        per_origin["rt_hydro_change_1h"] = h[0] - h[1]
+
+
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
                    with_targets: bool = True, weather=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
@@ -184,6 +229,8 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         per_origin["rt_nuclear"] = nuc
         per_origin["rt_nuclear_change_6h"] = nuc - nuc_6h
 
+    add_rt_imbalance(per_origin, index, origins, latest_ts)
+
     # data_cutoff_utc: the newest *measured* quarter used (never a day-ahead or calendar row,
     # whose timestamps are in the future). Always < origin.
     newest = np.max(np.vstack(latest_ts), axis=0)
@@ -241,6 +288,11 @@ FEATURE_COLUMNS = [
 FINGRID_RT_COLUMNS = [
     "rt_wind_err", "rt_wind_err_last4", "rt_cons_err", "rt_freq_dev", "rt_freq_dev_last4",
     "rt_nuclear", "rt_nuclear_change_6h",
+]
+
+RT_IMBALANCE_COLUMNS = [
+    "rt_sd_last", "rt_sd_mean4", "rt_sd_trend", "rt_sd_cum", "rt_plan_err", "rt_plan_err_mean4",
+    "rt_hydro_change_1h",
 ]
 
 WEATHER_COLUMNS = [
