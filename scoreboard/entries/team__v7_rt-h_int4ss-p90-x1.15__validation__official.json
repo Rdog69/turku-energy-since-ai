@@ -1,0 +1,31 @@
+{
+  "owner": "Team",
+  "model": "v7_rt + h_int4ss, P90 x1.15",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 40.193775,
+  "pinball": 11.02701,
+  "spike_brier": 0.084032,
+  "direction_brier": 0.379886,
+  "coverage": 0.835131,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "Equal-weight blend of Frank's v7_rt and Abdo's h_int4ss, with P90 stretched 15% away from P50",
+  "notes": "Built with submissions/tools/stretch_p90.py from submissions/blend_v7_rt_h_int4ss_*.csv. Factor 1.15 chosen by cross-fit between September and August (each month's best factor also improves the other month); only P90 changes.",
+  "forecast_file": "submissions/blend_hi15_validation.csv",
+  "branch": "brainstorming-frank",
+  "commit": "7a39353",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T15:44:44Z"
+}
