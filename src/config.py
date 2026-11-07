@@ -46,3 +46,19 @@ TEST_LAST_ORIGIN = pd.Timestamp("2026-11-01T21:00:00Z")         # 1 Nov 23:00
 
 # Train only on data up to the end of 4 Oct (README section 3).
 TRAIN_CUTOFF = TEST_FIRST_ORIGIN
+
+# Second validation fold ("fold B"): August, local dates 1-31 Aug. Origins 2026-07-31T21:00Z to
+# 2026-08-31T20:00Z. Train cutoff = first origin, the same honest rule as validation.
+FOLD_B_FIRST_ORIGIN = pd.Timestamp("2026-07-31T21:00:00Z")      # 1 Aug 00:00
+FOLD_B_LAST_ORIGIN = pd.Timestamp("2026-08-31T20:00:00Z")       # 31 Aug 23:00
+
+# Backtest periods: local start/end dates (inclusive) for make_templates.py and the actuals
+# builder. "test" uses the organisers' forecast_origins.csv / sample_submission.csv instead.
+PERIODS = {
+    "validation": dict(start="2026-09-07", end="2026-10-04", first_origin=VALIDATION_FIRST_ORIGIN,
+                       last_origin=VALIDATION_LAST_ORIGIN),
+    "fold_b": dict(start="2026-08-01", end="2026-08-31", first_origin=FOLD_B_FIRST_ORIGIN,
+                   last_origin=FOLD_B_LAST_ORIGIN),
+    "test": dict(start="2026-10-05", end="2026-11-01", first_origin=TEST_FIRST_ORIGIN,
+                 last_origin=TEST_LAST_ORIGIN),
+}
