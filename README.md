@@ -10,6 +10,7 @@ What we hand in on the Since AI platform, one folder per deliverable (challenge 
 | 4 | Data sources, external services, models, software, licences | [`sources/`](sources/) | **Written** | Abdo |
 | 5 | 5–8 presentation slides | [`slides/`](slides/) | Placeholder | Jim (draft on `brainstorming-jim`) |
 | 6 | Demo video, at most 5 minutes | [`video/`](video/) | Placeholder (script outline) | Team |
+| — | **Everything about the model** (how it works, data, every feature, settings, drivers, validation, video material) | [`model/`](model/) | **Written** | Abdo |
 | L2 | Situational view (dashboard) | [`dashboard/`](dashboard/) | **Built:** branch `front-end`, shows the submitted model | Abdo + Frank |
 
 ## Scoring reminders (challenge brief, section 06)
