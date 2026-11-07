@@ -6,25 +6,32 @@ import { alertWeights, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { dateShort, dayLong, hhmm, hourOf, type Lang } from "@/lib/time";
 
-export function TimeBar({ p, i, setI, lang, playing, setPlaying, offset = 0, compact = false }: {
+export function TimeBar({ p, i, setI, lang, playing, setPlaying, win, compact = false, offset = 0 }: {
   p: Period; i: number; setI: (i: number) => void; lang: Lang; playing: boolean; setPlaying: (v: boolean) => void;
-  /** ms past forecast hour i (the Overview page scrolls in 15-minute steps) */
-  offset?: number; compact?: boolean;
+  win?: [number, number]; compact?: boolean;
+  /** ms past forecast hour i (the graph scrolls in 15-minute steps) */
+  offset?: number;
 }) {
   const n = p.origins.length;
   const T = reviewMs(p, i);
-  const now = T + offset;
   const cutoff = p.t0 + p.cutoff[i] * 60_000;
-  const age = Math.round((now - cutoff) / 60_000);
+  const age = Math.round((T - cutoff) / 60_000);
   const weights = useMemo(() => alertWeights(p), [p]);
   const maxW = Math.max(1, ...weights);
   const go = (d: number) => setI(Math.max(0, Math.min(n - 1, i + d)));
+  const track = useRef<HTMLDivElement>(null);
 
+  // day ticks under the timeline (local midnight)
   const days = useMemo(() => {
     const out: { k: number; ms: number }[] = [];
     for (let k = 0; k < n; k++) if (hourOf(reviewMs(p, k)) === 0) out.push({ k, ms: reviewMs(p, k) });
     return out;
   }, [p, n]);
+
+  // the window the main graph shows, as a box on the whole-period strip
+  const t0 = reviewMs(p, 0), t1 = reviewMs(p, n - 1);
+  const fr = (ms: number) => Math.max(0, Math.min(1, (ms - t0) / (t1 - t0)));
+  const box = win ? { l: fr(win[0]) * 100, w: Math.max(0.6, (fr(win[1]) - fr(win[0])) * 100) } : null;
 
   const btn = "inline-flex h-10 w-10 items-center justify-center rounded-md border border-rule bg-sheet text-ink-2 transition-[color,transform] duration-150 ease-out hover:text-bank active:scale-[0.96] disabled:opacity-40";
 
@@ -34,8 +41,8 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, offset = 0, com
         <div>
           {!compact && <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-2"><Clock size={14} strokeWidth={2} />{t(lang, "reviewTime")}</p>}
           <p className={`num font-bold leading-tight text-ink ${compact ? "text-[22px]" : "text-[30px]"}`}>
-            <span className="capitalize">{dayLong(now, lang)}</span>{" "}
-            <span className="text-bank">{hhmm(now, lang)}</span>
+            <span className="capitalize">{dayLong(T + offset, lang)}</span>{" "}
+            <span className="text-bank">{hhmm(T + offset, lang)}</span>
           </p>
           <p className="num text-[13.5px] text-ink-2">
             {t(lang, "made")} {hhmm(T, lang)}, {t(lang, "newest", { t: hhmm(cutoff, lang), m: age })}
@@ -54,32 +61,32 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, offset = 0, com
         </div>
       </div>
 
-      <div className={compact ? "mt-3" : "mt-4"}>
-        {/* the full-page view keeps its hour-by-hour bars; the Overview page has just the line */}
-        {!compact && (
-          <svg className="block h-[30px] w-full" viewBox={`0 0 ${n} 30`} preserveAspectRatio="none" aria-hidden>
-            {weights.map((w, k) => w > 0 && (
-              <rect key={k} x={k} y={30 - (w / maxW) * 28} width={0.85} height={(w / maxW) * 28}
-                fill={k === i ? "hsl(var(--bank))" : "hsl(var(--ink-3))"} fillOpacity={k === i ? 1 : 0.45} />
-            ))}
-          </svg>
+      <div className={`relative ${compact ? "mt-2" : "mt-4"}`} ref={track}>
+        {box && (
+          <span aria-hidden className="pointer-events-none absolute top-0 z-[1] h-[54px] rounded-[5px] border-2 border-bank/75 bg-bank/[0.07] transition-[left,width] duration-100 ease-out"
+            style={{ left: `${box.l}%`, width: `${box.w}%` }} />
         )}
+        {/* how much was worth checking, hour by hour: the bars line up with the slider */}
+        <svg className="block h-[30px] w-full" viewBox={`0 0 ${n} 30`} preserveAspectRatio="none" aria-hidden>
+          {weights.map((w, k) => w > 0 && (
+            <rect key={k} x={k} y={30 - (w / maxW) * 28} width={0.85} height={(w / maxW) * 28}
+              fill={k === i ? "hsl(var(--bank))" : "hsl(var(--ink-3))"} fillOpacity={k === i ? 1 : 0.45} />
+          ))}
+        </svg>
         <Slider.Root value={[i]} min={0} max={n - 1} step={1} onValueChange={([v]) => { setPlaying(false); setI(v); }}
-          aria-label={t(lang, "timeline")} className="relative flex h-5 w-full touch-none select-none items-center">
-          <Slider.Track className="relative h-px w-full grow bg-ink-3/45">
-            <Slider.Range className="absolute h-px bg-bank" />
+          aria-label={t(lang, "timeline")} className="relative flex h-6 w-full touch-none select-none items-center">
+          <Slider.Track className="relative h-[3px] w-full grow rounded-full bg-rule">
+            <Slider.Range className="absolute h-full rounded-full bg-bank" />
           </Slider.Track>
-          <Slider.Thumb className="block h-3 w-3 rounded-full bg-bank ring-4 ring-bank/15 transition-[box-shadow] duration-150 hover:ring-bank/25 focus-visible:outline-none focus-visible:ring-bank/40" />
+          <Slider.Thumb className="block h-5 w-5 rounded-full border-2 border-bank bg-sheet shadow-[0_2px_6px_-1px_rgba(11,60,106,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank focus-visible:ring-offset-2" />
         </Slider.Root>
-        {!compact && (
-          <div className="relative h-4">
-            {days.filter((_, k) => k % 2 === 0).map((d, j) => (
-              <span key={d.k} className={`num absolute -translate-x-1/2 text-[11.5px] text-ink-3 ${j % 2 ? "hidden md:inline" : ""}`} style={{ left: `${(d.k / (n - 1)) * 100}%` }}>
-                {dateShort(d.ms, lang)}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="relative h-4">
+          {days.filter((_, k) => k % 2 === 0).map((d, j) => (
+            <span key={d.k} className={`num absolute -translate-x-1/2 text-[11.5px] text-ink-3 ${j % 2 ? "hidden md:inline" : ""}`} style={{ left: `${(d.k / (n - 1)) * 100}%` }}>
+              {dateShort(d.ms, lang)}
+            </span>
+          ))}
+        </div>
       </div>
     </section>
   );

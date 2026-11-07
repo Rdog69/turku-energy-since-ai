@@ -62,7 +62,7 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
         onOpen={(a) => setPanel({ kind: "alert", a })} onAll={() => setPanel({ kind: "all" })} />
 
       <section aria-label={t(lang, "chartTitle")} className="rounded-xl border border-rule bg-sheet/50 px-4 pb-3 pt-4 sm:px-5">
-        <TimeBar p={p} i={i} setI={jump} lang={lang} playing={playing} setPlaying={setPlaying} offset={offset} compact />
+        <TimeBar p={p} i={i} setI={jump} lang={lang} playing={playing} setPlaying={setPlaying} win={view} offset={offset} compact />
         <div className="mb-1 mt-4 flex flex-wrap items-center justify-between gap-3 pr-[150px]">
           <TimeLegend lang={lang} />
           <button type="button" onClick={() => setZones(!zones)} aria-pressed={zones}
