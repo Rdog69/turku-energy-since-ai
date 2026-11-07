@@ -2,7 +2,7 @@
 
 Everything we must hand in, where each requirement comes from, and where it is met. **Deadline: Sun 8 Nov 2026, 10:00 Finnish time, through the Since AI platform.** The team freezes the model in the 06:00–09:00 window.
 
-The submitted documents themselves live on the team branch **`deliverables`** (one folder per item, maintained by Abdo; links below are to that branch). This folder is the checklist that ties them to the rules. Last checked: Sat 7 Nov 2026, late evening.
+The submitted documents themselves live on the team branch **`deliverables`** (one folder per item, maintained by Abdo; links below are to that branch). This folder is the checklist that ties them to the rules. Last checked: Sat 7 Nov 2026, 23:45.
 
 **Sources of the requirements:**
 - **Brief:** `starter_package/TurkuEnergia_SinceAI2026/1_Turku_Energia_Challenge_Brief_EN.pdf`, sections 02 (deliverables), 06 (scoring) and 07 (submission format).
@@ -18,10 +18,10 @@ Status: ✅ done and checked · 🟡 exists, needs a final step · ❌ missing �
 |---|---|---|---|---|
 | 1 | Machine-readable forecast file in the starter-package format, **checked with the validation script** | ✅ | `deliverables` branch: `forecast/forecast_backtest.csv`. SHA-256 `923d508e…ae30eb`, byte-identical to `submissions/blend_v7_rt_h_int4ss_test.csv` here. Validator: 26,920 rows, 0 errors, 0 warnings | Re-run the validator on the exact file uploaded; upload it named `forecast_backtest.csv` |
 | 2 | Source code and instructions for running it | 🟡 | `deliverables`: `code/README.md` (run order for both halves and the blend); code on `brainstorming-frank` (`src/`, `submissions/tools/`) and `brainstorming-abdo` (`experiments/lab/`) | Record the final commit hashes of both branches in `code/README.md` at the freeze |
-| 3 | Short evaluation report: reasoning chain, factors affecting the forecast, validation-period metrics | 🟡 | `deliverables`: `report/evaluation_report.md`, `model/README.md` | Merge Jim's points (planned); check the numbers match the final blend (Sep 40.19 / 11.07 / 0.0840 / 0.3799) |
+| 3 | Short evaluation report: reasoning chain, factors affecting the forecast, validation-period metrics | ✅ | `deliverables`: `report/evaluation_report.md` (final, one-model wording, `d9d8597`) and `model/README.md` (`28d0f3c`); numbers match the final model (Sep 40.19 / 11.07 / 0.0840 / 0.3799) | – |
 | 4 | Data sources, external services, ready-made models and software components, with their usage rights | ✅ | `deliverables`: `sources/SOURCES_AND_LICENCES.md` (covers the package, Fingrid, Open-Meteo, Elering, OSM, LightGBM, React/Vite/d3/lucide, Source Sans 3, Featherless, Claude) | Add any source used after 7 Nov (for example ECMWF HRES, if `v10_hres` makes it in) |
 | 5 | About 5–8 presentation slides | ❌ | `deliverables`: `slides/README.md` is a placeholder; Jim's draft on `brainstorming-jim`: `reports/slides.*` | Finish and export `slides/slides.pdf` |
-| 6 | Demo video, **at most 5 minutes**: the next 10 h in 15-minute periods, the uncertainty, significant deviations, the main factors | ❌ | `deliverables`: `video/README.md` has an outline; Jim's script on `brainstorming-jim`: `reports/demo_video_script.md` | Record it. Update the outline: the dashboard now has one **Overview** page (not Simple/Trader), scrolling in 15-minute steps, a period slider under the graph |
+| 6 | Demo video, **at most 5 minutes**: the next 10 h in 15-minute periods, the uncertainty, significant deviations, the main factors | ✅ | `media/tasehinta-demo.mp4` on `master` and here (42 MB), embedded in the main README; `deliverables`: `video/README.md` | Upload it with the submission (check the platform's size limit) |
 
 ## 2. Level 2: added value if the demo shows it (brief §02, §06, §07)
 
@@ -32,6 +32,7 @@ Status: ✅ done and checked · 🟡 exists, needs a final step · ❌ missing �
 | Moving the review point into the past | ✅ | Period slider, scrolling and drag in 15-minute steps, Play |
 | Reasoned "check this" suggestions (never trading instructions) | ✅ | Side panel per item ("Check the intraday position for…"); Production view |
 | **"Plus an API from which this information can be retrieved"** (brief §02, Level 2) | 🟡 | Not in the submitted dashboard. Jim has a FastAPI backend on `brainstorming-jim` (`api/main.py`) that reads an older forecast file | Decide: point Jim's API at the final file and mention it, or leave it out (it is described as part of the Level 2 result, not a Level 1 must) |
+| Live link for the jury | ✅ | [tasehinta.lovable.app](https://tasehinta.lovable.app): the same file as `frontend/bundle.html` |
 | The dashboard shows the **submitted** forecast | ✅ | `frontend/scripts/build_data.py` reads `submissions/blend_v7_rt_h_int4ss_*.csv` and checks that the two halves reproduce it exactly |
 
 ## 3. Rules we must not break
