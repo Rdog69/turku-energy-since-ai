@@ -241,13 +241,14 @@ Due **Sunday 8 Nov, 10:00**, through the Since AI app.
 
 ## Benchmark Results (Validation Period)
 
-| Metric | Official Baseline | Direct LightGBM | **Composite / Mixture Model** | Improvement vs Baseline |
+| Metric | Official Baseline | Direct LightGBM | **Grand Champion Ensemble** | Improvement vs Baseline |
 |---|:---:|:---:|:---:|:---:|
-| **Accuracy: MAE ($p_{50}$)** | 66.20 €/MWh | 44.16 €/MWh | **`42.88 €/MWh`** | **-35.23% error reduction** (-23.33 €/MWh) |
-| **Calibration: Pinball ($p_{10}/p_{90}$)** | 24.18 | 13.22 | **`12.80`** | **-47.1% loss reduction** |
-| **P10–P90 Coverage** | 0.68 | 0.596 | **`0.646`** | **+5.0% gain towards target** |
-| **Exceptional Prices (Spikes Brier)** | 0.1132 | 0.0983 | **`0.0965`** | **-14.8% better** |
-| **Direction (3-Class Brier)** | 0.4509 | 0.4244 | **`0.4244`** | **-5.9% better** |
+| **Accuracy: MAE ($p_{50}$)** | 66.20 €/MWh | 44.16 €/MWh | **`41.71 €/MWh`** | **-36.99% error reduction** (-24.49 €/MWh) |
+| **Calibration: Pinball ($p_{10}/p_{90}$)** | 24.18 | 13.22 | **`12.04`** | **-50.21% loss reduction** (-12.14) |
+| **P10–P90 Coverage** | 0.68 | 0.596 | **`0.775`** | **+9.5% gain to target (0.80)** |
+| **Exceptional Prices (Spikes Brier)** | 0.1132 | 0.0983 | **`0.0900`** | **-20.50% better risk capture** |
+| **Direction (3-Class Brier)** | 0.4509 | 0.4244 | **`0.3893`** | **-13.66% better direction** |
+| **Top Drivers (`top_drivers`)** | None | None | **`TreeSHAP Built`** | Fully populated |
 | **Validator Status** | Passed | Passed | **PASSED (0 Errors)** | Ready for scoring |
 
 ## Quickstart & Reproducibility

@@ -20,7 +20,7 @@ Rather than predicting raw prices with black-box regression, we model the physic
 3. The TSO activates **mFRR balancing reserves** in a dominating direction (up or down).
 4. Prices form along an **asymmetric merit order**: up-regulation jumps steeply along thermal generation costs (median $+25$ €/MWh), whereas down-regulation is relatively flat (median $-17$ €/MWh).
 
-By constructing a **Direction-Mixture CDF Model** and selecting optimal estimators per scored metric, our solution beats the official competition baseline by **35.0% on MAE** and **47.0% on calibration pinball loss**, while strictly complying with all data availability and anti-leakage constraints.
+By constructing an **asymmetric Direction-Mixture CDF Model**, incorporating **Fingrid real-time wind error nowcasting**, splitting step horizons (`[1-4]`, `[5-8]`, `[9-16]`), and blending with a **CatBoost outlier regularizer**, our Grand Champion solution beats the official competition baseline by **37.0% on MAE (41.71 vs 66.20 €/MWh)**, **50.2% on calibration pinball loss (12.04 vs 24.18)**, **20.5% on price spike risk (0.0900 vs 0.1132)**, and **13.7% on direction prediction (0.3893 vs 0.4509)**, while strictly complying with all data availability and anti-leakage constraints.
 
 ---
 
@@ -70,35 +70,30 @@ Every feature group and architectural improvement was evaluated on the official 
 | **0. Official Naive Baseline** | 66.20 | 24.18 | 0.1132 | 0.4509 | Ignores spot price; persistence decays rapidly. |
 | **1. Static Spot Anchor** (`spot - 7.7`) | 44.20 | 22.10 | 0.1105 | 0.4509 | Spot price alone captures ~33% of variance. |
 | **2. Direct LightGBM Baseline** | 44.16 | 13.21 | 0.0983 | 0.4244 | Net load + decaying recent gap anchors short steps. |
-| **3. Step-Band Pinball Calibration** | 44.16 | 13.22 | 0.0983 | 0.4244 | Empirical residual shifting regularizes tails. |
-| **4. Standalone CatBoost Regressor** | 43.32 | 13.15 | 0.0980 | 0.4244 | Symmetric oblivious trees resist extreme upward outliers. |
-| **5. Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | Inverting bimodal CDF expands P10-P90 coverage. |
-| **6. Mixture (0.60) + CatBoost (0.40) Ensemble** | **42.88** | **12.80** | **0.0965** | **0.4244** | **🏆 Best Overall Score (-35.2% MAE, -47.1% Pinball).** |
+| **3. Standalone CatBoost Regressor** | 43.32 | 13.15 | 0.0980 | 0.4244 | Symmetric oblivious trees resist extreme upward outliers. |
+| **4. Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | Inverting bimodal CDF expands P10-P90 coverage. |
+| **5. Mixture + CatBoost Blend** | 42.88 | 12.80 | 0.0965 | 0.4244 | 60/40 blend captures center & dampens spikes. |
+| **6. Fingrid RT Wind Error + Step Bands + Autumn Prior** | 41.81 | 12.01 | 0.0907 | 0.3895 | Real-time plan error nowcasting + seasonal prior. |
+| **7. Grand Champion Ensemble (Full Stack + TreeSHAP)** | **`41.71`** | **`12.04`** | **`0.0900`** | **`0.3893`** | **🏆 Best Overall Score (-37.0% MAE, -50.2% Pinball).** |
 
 ### Net Score Improvement Over Baseline:
-* **Accuracy (MAE):** Reduced by **23.33 €/MWh (-35.23%)**
-* **Calibration (Pinball):** Reduced by **11.38 (-47.1%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-14.8%**
-* **Balancing Direction (Brier):** Improved by **-5.9%**
+* **Accuracy (MAE):** Reduced by **24.49 €/MWh (-36.99%)**
+* **Calibration (Pinball):** Reduced by **12.14 (-50.21%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-20.50%**
+* **Balancing Direction (Brier):** Improved by **-13.66%**
 
 ---
 
 ## 4. Performance Across the 10-Hour Forecast Horizon
 
-The model demonstrates strong temporal adaptation: short steps benefit from decaying real-time state features, while long steps remain securely anchored by day-ahead fundamentals:
+The model demonstrates strong temporal adaptation: short steps benefit from fresh Fingrid real-time state features, while long steps remain securely anchored by day-ahead fundamentals:
 
 | Horizon | Steps | MAE ($p_{50}$) [€/MWh] | Pinball Loss ($p_{10}/p_{90}$) | P10–P90 Coverage | Spike Brier | Direction Brier |
 |---|---|---|---|---|---|---|
-| **Hour 1** | 1–4 | **41.58** | 12.38 | 66.1% | 0.0926 | 0.4032 |
-| **Hour 2** | 5–8 | 42.38 | 12.60 | 64.5% | 0.0937 | 0.4152 |
-| **Hour 3** | 9–12 | 43.01 | 12.74 | 64.1% | 0.0951 | 0.4286 |
-| **Hour 4** | 13–16 | 42.97 | 12.78 | 65.1% | 0.0953 | 0.4266 |
-| **Hour 5** | 17–20 | 43.10 | 12.81 | 65.2% | 0.0963 | 0.4295 |
-| **Hour 6** | 21–24 | 43.15 | 12.89 | 64.5% | 0.0968 | 0.4284 |
-| **Hour 7** | 25–28 | 43.31 | 12.92 | 64.3% | 0.0976 | 0.4296 |
-| **Hour 8** | 29–32 | 43.60 | 12.96 | 64.2% | 0.0987 | 0.4349 |
-| **Hour 9** | 33–36 | 43.78 | 13.04 | 64.2% | 0.0996 | 0.4372 |
-| **Hour 10** | 37–40 | **43.67** | 13.10 | 63.8% | 0.0998 | 0.4347 |
+| **Hour 1** | 1–4 | **`36.90`** | **`11.24`** | 78.4% | **`0.0812`** | **`0.3392`** |
+| **Hour 2** | 5–8 | 40.12 | 11.82 | 77.9% | 0.0884 | 0.3785 |
+| **Hours 3–4** | 9–16 | 41.25 | 12.08 | 77.6% | 0.0910 | 0.3950 |
+| **Hours 5–10** | 17–40 | 42.79 | 12.25 | 77.2% | 0.0935 | 0.4021 |
 
 ---
 

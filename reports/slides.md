@@ -61,13 +61,13 @@ $$\longrightarrow \text{mFRR Balancing Activation} \longrightarrow \text{Asymmet
 |---|---|---|---|---|---|
 | **Official Baseline** | 66.20 | 24.18 | 0.1132 | 0.4509 | Reference (0 pts) |
 | **Static Spot Anchor** | 44.20 | 22.10 | 0.1105 | 0.4509 | -33.2% MAE |
-| **Direct LightGBM** | 44.16 | 13.21 | 0.0983 | 0.4244 | -33.3% MAE, -45.4% Pinball |
-| **CatBoost Regressor** | 43.32 | 13.15 | 0.0980 | 0.4244 | -34.6% MAE |
+| **Direct LightGBM Baseline** | 44.16 | 13.21 | 0.0983 | 0.4244 | -33.3% MAE, -45.4% Pinball |
 | **Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | -35.0% MAE, -47.0% Pinball |
-| **Mixture (0.6) + CatBoost (0.4)** | **42.88** | **12.80** | **0.0965** | **0.4244** | **🏆 Best Overall (-35.2% MAE)** |
+| **Fingrid RT Wind Error + Step Bands** | 41.81 | 12.01 | 0.0907 | 0.3895 | -36.8% MAE, -50.3% Pinball |
+| **Grand Champion Ensemble** | **`41.71`** | **`12.04`** | **`0.0900`** | **`0.3893`** | **🏆 Best Overall (-37.0% MAE, -50.2% Pinball)** |
 
-* **Short Horizon (Steps 1–4):** MAE drops to **41.58 €/MWh** (halving near-term uncertainty).
-* **Long Horizon (Steps 37–40):** Stable at **43.67 €/MWh** anchored by day-ahead fundamentals.
+* **Short Horizon (Steps 1–4):** MAE drops to **36.90 €/MWh** (powered by Fingrid real-time nowcasting).
+* **Long Horizon (Steps 37–40):** Stable at **42.79 €/MWh** anchored by day-ahead fundamentals.
 
 ---
 

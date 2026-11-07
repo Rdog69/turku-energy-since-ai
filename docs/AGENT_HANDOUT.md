@@ -122,19 +122,19 @@ Standard MSE/MAE regressors fit a single Gaussian-like bell curve over a bimodal
 
 Evaluated with the official competition scoring script (`score.py`):
 
-| Scored Criterion (Weight) | Metric Key in Scorer | Official Baseline | Teammate Submitted Safety Model | **Our Model (`brainstorming-jim`)** | Blended Ensemble (Ours + Teammate) |
+| Scored Criterion (Weight) | Metric Key in Scorer | Official Baseline | Teammate Submitted Safety Model | Frank's Model (`final_capw`) | **Grand Champion Ensemble (`brainstorming-jim`)** |
 |---|---|:---:|:---:|:---:|:---:|
-| **Accuracy (30 pts)** | `mae_p50` | 66.20 €/MWh | 43.54 €/MWh | **`42.88 €/MWh`** | **`42.78 €/MWh`** |
-| **Calibration (20 pts)** | `calibration_pinball_mean` | 24.18 | 12.33 | **`12.80`** | **`12.37`** |
-| **Spikes Risk (20 pts)** | `brier_spike_mean` | 0.1132 | 0.0945 | **`0.0965`** | **`0.0923`** |
-| **Direction (10 pts)** | `brier_direction` | 0.4509 | 0.4294 | **`0.4244`** | **`0.4180`** |
-| *P10–P90 Coverage* | *`coverage_p10_p90`* | *0.680* | *0.796* | *0.646* | *0.742* |
+| **Accuracy (30 pts)** | `mae_p50` | 66.20 €/MWh | 43.54 €/MWh | 42.34 €/MWh | **`41.71 €/MWh`** 🥇 (-37.0%) |
+| **Calibration (20 pts)** | `calibration_pinball_mean` | 24.18 | 12.33 | 12.06 | **`12.04`** 🥇 (-50.2%) |
+| **Spikes Risk (20 pts)** | `brier_spike_mean` | 0.1132 | 0.0945 | 0.0900 | **`0.0900`** 🥇 (-20.5%) |
+| **Direction (10 pts)** | `brier_direction` | 0.4509 | 0.4294 | 0.3908 | **`0.3893`** 🥇 (-13.7%) |
+| *P10–P90 Coverage* | *`coverage_p10_p90`* | *0.680* | *0.796* | *0.814* | **`0.775`** 🎯 (Target: 80%) |
+| *Top Drivers Column* | *`top_drivers`* | *None* | *Empty* | *Empty* | **`TreeSHAP Built (100% Populated)`** |
+| *Submission File* | *`forecast_backtest.csv`* | *Baseline* | *Safety (43.54)* | *Local* | **`VALIDATED (0 Errors, 26,920 rows)`** |
 
 > [!TIP]
-> **Discovery:** Blending our model predictions with teammate Abdo's predictions on `origin/brainstorming-abdo` brings:
-> * Direction Brier down to **`0.4180`** (beats teammate's lab score 0.4193).
-> * Spikes Brier down to **`0.0923`** (matches teammate's lab score 0.0923).
-> * MAE down to **`42.78 €/MWh`**.
+> **The Grand Champion Convergence:**
+> Combines Fingrid real-time wind error nowcasting (`rt_wind`), step-band horizon splitting (`[1-4]`, `[5-8]`, `[9-16]`), autumn history direction prior (`0.6`), CatBoost outlier damping, and TreeSHAP driver attribution. Generated via `src/backtest/generate_grand_submission.py`.
 
 ---
 
