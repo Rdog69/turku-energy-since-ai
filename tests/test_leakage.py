@@ -67,3 +67,35 @@ def test_training_window_compliance():
     assert train["origin"].max() <= pd.Timestamp("2026-10-04T21:00:00Z"), "Training origin leaks into test period!"
 
 
+def test_submission_file_guard():
+    """Verify that root forecast_backtest.csv strictly satisfies all hackathon submission requirements."""
+    from pathlib import Path
+    import numpy as np
+
+    root = Path(__file__).resolve().parents[1]
+    sub_path = root / "forecast_backtest.csv"
+    assert sub_path.exists(), "forecast_backtest.csv missing!"
+    df = pd.read_csv(sub_path)
+
+    # 1. Row count & schema
+    assert len(df) == 26920, f"Expected 26920 rows, got {len(df)}"
+    assert "top_drivers" in df.columns, "Missing top_drivers column!"
+
+    # 2. Monotonicity
+    assert (df["p10"] <= df["p50"]).all(), "Monotonicity violated: p10 > p50"
+    assert (df["p50"] <= df["p90"]).all(), "Monotonicity violated: p50 > p90"
+
+    # 3. Probabilities
+    dir_sum = df["p_up"] + df["p_down"] + df["p_none"]
+    assert np.allclose(dir_sum, 1.0, atol=1e-4), "Direction probabilities do not sum to 1.0"
+    assert (df["p_spike_high"] + df["p_spike_low"] <= 1.0001).all(), "Spike probabilities sum > 1.0"
+
+    # 4. Explainability: 100% non-empty TreeSHAP drivers
+    assert not df["top_drivers"].isna().any(), "NaN top_drivers found!"
+    assert not df["top_drivers"].str.strip().eq("").any(), "Empty top_drivers string found!"
+
+    # 5. Anti-leakage / Causality
+    assert (pd.to_datetime(df["data_cutoff_utc"]) <= pd.to_datetime(df["forecast_origin_utc"])).all(), "Causality violated: cutoff > origin!"
+
+
+
