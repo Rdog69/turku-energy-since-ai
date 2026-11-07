@@ -80,6 +80,13 @@ MODELS = {
                        use_fingrid=True, use_weather=True, use_icon=True),
         long=GBMModel(name="long_weather_icon", calibrate=True, spike_mode="product",
                       use_weather=True, use_icon=True)),
+    # Final candidate: ICON in both models + live imbalance in the short model (T4 + T5 combined).
+    "split_all_rt_icon": lambda: HorizonSplit(
+        name="split_all_rt_icon", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_icon_rt", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, use_icon=True, use_rt_imbalance=True),
+        long=GBMModel(name="long_weather_icon", calibrate=True, spike_mode="product",
+                      use_weather=True, use_icon=True)),
     "split_all_spread": lambda: HorizonSplit(
         name="split_all_spread", split_step=8,
         short=GBMModel(name="short_fingrid_weather_spread", calibrate=True, spike_mode="product",
