@@ -39,7 +39,7 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `v5_tmp`: `v4_n50` + town temperature and its revision since the day-ahead consumption forecast (heating demand) | + town weather | 41.05 | 11.87 | 0.794 | 0.0870 | 0.3866 | Not kept. +0.20 % (Sep; direction better in 3/4 weeks) but −0.20 % (Aug). See the August section. |
 | 7 Nov | `v5_st`: both | + town weather | 41.03 | 11.90 | 0.795 | 0.0868 | 0.3865 | Not kept. +0.21 % (Sep) but −0.16 % (Aug). |
 | 7 Nov | `v6_h`: `v4_n50` also trained on 15 months before the package (5 Mar 2025 – 31 May 2026, every 3rd hourly origin; 238k training rows instead of 94k). The organisers allowed pre-June data on 7 Nov (`QUESTIONS.md` Q1) | + pre-June history | 40.74 | 11.19 | 0.770 | 0.0855 | 0.3890 | vs `v4_n50`: +2.26 % weighted by points (Sep; pinball better 4/4 weeks, MAE 3/4), +2.96 % (Aug; pinball 5/5, direction 5/5, MAE 4/5, spikes 4/5). |
-| 7 Nov | **`v6_hf`**: `v6_h` + a pricing-rule flag (`regime_2026` = 1 for deliveries from 1 Jun 2026, the package period) | + pre-June history | **40.67** | **11.19** | 0.771 | **0.0856** | **0.3892** | **Submitted model.** vs `v6_h`: +0.03 % (Sep; MAE better 4/4 weeks) and +0.15 % (Aug; spikes 5/5), with pinball slightly worse. A near tie, kept because it wins both months and encodes the rule change the organisers asked teams to account for. vs `v4_n50`: +2.29 % (Sep), +3.10 % (Aug). Coverage 0.77 is a little under the 80 % target, but the scored pinball loss is 5.8 % better. |
+| 7 Nov | `v6_hf`: `v6_h` + a pricing-rule flag (`regime_2026` = 1 for deliveries from 1 Jun 2026, the package period) | + pre-June history | 40.67 | 11.19 | 0.771 | 0.0856 | 0.3892 | Submitted model in round 6. vs `v6_h`: +0.03 % (Sep; MAE better 4/4 weeks) and +0.15 % (Aug; spikes 5/5), with pinball slightly worse. A near tie, kept because it wins both months and encodes the rule change the organisers asked teams to account for. vs `v4_n50`: +2.29 % (Sep), +3.10 % (Aug). Coverage 0.77 is a little under the 80 % target, but the scored pinball loss is 5.8 % better. |
 
 **History rows (round 6):** a package-format table built by Abdo's `experiments/lab/build_history.py` (`brainstorming-abdo`):
 - **Inputs:** Fingrid's package series, the spot price from Elering and the calendar.
@@ -48,9 +48,18 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 - **Missing before June:** ENTSO-E neighbour series, weather runs and Fingrid real-time data. Their features are empty on history rows.
 - **P(none)** is still taken from June onwards only.
 
-**Final vs baseline:** MAE −39 % (66.20 → 40.67), pinball −54 % (24.18 → 11.19), spike Brier −24 % (0.1132 → 0.0856), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
+**Round 7 (7 Nov), each change on top of `v6_hf`, weighted by points (Sep / Aug):**
 
-⚠ About 37 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
+| Model | Change | MAE | Pinball | Coverage | Spikes | Direction | Verdict |
+|---|---|---|---|---|---|---|---|
+| `v7_runs` | Direction runs, 24-hour shares, same quarter yesterday (after Abdo's "runs") | 40.82 | 11.30 | – | 0.0861 | 0.3907 | Dropped: −0.57 % / +0.35 %, worse on all four in September. |
+| `v7_w` | History rows at half weight | 40.64 | 11.25 | – | 0.0864 | 0.3888 | Dropped: −0.33 % / −0.98 %. |
+| `v7_all` | Every hourly history origin (3× the history rows) | 40.64 | 11.15 | – | 0.0846 | 0.3858 | Dropped: +0.51 % / −0.68 %; August spikes 3.2 % worse. |
+| **`v7_rt`** | Fingrid real-time series on the history rows too (all 14 ids, Mar 2025 – May 2026, same 30-min rule) | **40.64** | 11.20 | 0.787 | **0.0855** | 0.3892 | **Submitted model.** +0.02 % / +0.19 %: a near tie that wins both months (MAE better in 3/4 and 3/5 weeks). |
+
+**Final vs baseline:** MAE −39 % (66.20 → 40.64), pinball −54 % (24.18 → 11.20), spike Brier −24 % (0.1132 → 0.0855), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %).
+
+⚠ About 41 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
 
 ## Second check: August
 
@@ -72,7 +81,11 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | `v5_tmp` | 28.08 | 7.03 | 0.734 | 0.0709 | 0.4473 |
 | `v5_st` | 27.98 | 7.05 | 0.736 | 0.0710 | 0.4470 |
 | `v6_h` | 27.77 | **6.57** | 0.771 | 0.0684 | 0.4390 |
-| **`v6_hf` (submitted)** | **27.74** | 6.59 | 0.770 | **0.0680** | **0.4388** |
+| `v6_hf` | 27.74 | 6.59 | 0.770 | **0.0680** | 0.4388 |
+| `v7_runs` | 27.93 | **6.47** | – | 0.0678 | 0.4364 |
+| `v7_w` | 27.95 | 6.69 | – | 0.0686 | 0.4410 |
+| `v7_all` | 27.78 | 6.58 | – | 0.0702 | **0.4336** |
+| **`v7_rt` (submitted)** | **27.67** | 6.56 | 0.769 | **0.0680** | 0.4378 |
 
 - **Same fold as the teammates:** `final_capw` reproduces Abdo's August numbers exactly (29.53 / 7.34 / 0.0882 / 0.4562), and `split_all` is within 0.02 MAE of Pavlo's (28.41).
 - **ICON holds:** `v3_bmi` vs `v3_bm` is better on all four metrics (+0.8 % weighted by points). ICON was chosen on September only, so this is a clean check.
@@ -137,3 +150,4 @@ Abdo's committed validation files (`brainstorming-abdo`, `submissions/`), scored
   - **September, ours:** better MAE, band and spikes, with the band better in all 4 weeks against both of his files.
   - **August, his:** better MAE, spikes and direction; the band is a tie.
 - **A 50/50 blend with `v6_h` adds little on September** (+0.3 %): direction improves, the band gets worse. August is the open question. His model is stronger there, so a blend might help, but it can't be checked without his August forecasts.
+- **Later on 7 Nov, Abdo's `team_hist`** (half `v4_n50`, half his history-mode model) reported 40.19 / 11.26 / 0.0846 / 0.3789 (Sep) and 27.12 / 6.29 / 0.0657 / 0.4243 (Aug) from his lab scorer, commit d85191f. That would be 36.4 % and 28.4 % better than the baseline, against 35.7 % and 26.2 % for `v7_rt`. Not rescored: only its test file is committed. The team scoreboard (`scoreboard/` on main) ranks every model on both months.

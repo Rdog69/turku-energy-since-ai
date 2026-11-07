@@ -1,0 +1,30 @@
+{
+  "owner": "Frank",
+  "model": "v7_rt",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 40.639862,
+  "pinball": 11.199129,
+  "spike_brier": 0.085526,
+  "direction_brier": 0.389243,
+  "coverage": 0.787079,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "v6_hf with Fingrid real-time series on the 2025 history rows too",
+  "notes": "Real-time history: all 14 Fingrid ids, Mar 2025 - May 2026, same 30-min rule.",
+  "forecast_file": "",
+  "branch": "brainstorming-frank",
+  "commit": "e3e5272",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T14:32:06Z"
+}

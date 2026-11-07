@@ -18,11 +18,11 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 
 | Metric | Points | Baseline | **Our model** | Improvement |
 |---|---|---|---|---|
-| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **40.67** | **−39 %** |
-| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.19** | **−54 %** |
-| Exceptional prices: Brier score | 20 | 0.1132 | **0.0856** | **−24 %** |
+| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **40.64** | **−39 %** |
+| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.20** | **−54 %** |
+| Exceptional prices: Brier score | 20 | 0.1132 | **0.0855** | **−24 %** |
 | Direction: three-class Brier score | 10 | 0.4509 | **0.3892** | **−14 %** |
-| P10–P90 coverage (target 80 %) | – | 0.68 | **0.77** | slightly narrow |
+| P10–P90 coverage (target 80 %) | – | 0.68 | **0.79** | well calibrated |
 
 **Weighted by the points (30/20/20/10), the model is 35.7 % better than the organisers' baseline** (MAE alone: 38.6 %). It's better in every one of the 4 validation weeks, on all four metrics. About 37 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July plus the pre-June history) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
 
@@ -71,6 +71,7 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
    - The pricing rule changed on 1 June 2026, so the older imbalance prices are recomputed with the new volume-weighted rule.
    - A flag tells the model which rule a row was priced under.
    - It improved both September and August, most of all the uncertainty band (pinball −6 %).
+   - The history rows also get Fingrid's real-time series (all 14, downloaded for March 2025 – May 2026), so the hours 1–2 model learns from them too. A small gain in both months.
 
 ### What it looks at
 
@@ -102,9 +103,10 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 | + second weather model, ICON-EU | 41.31 | 11.88 | 0.0873 | 0.3902 |
 | + neighbour wind for the median only | 41.21 | 11.88 | 0.0873 | 0.3902 |
 | + steadier spike calibration, learned wind production | 41.08 | 11.88 | 0.0871 | 0.3899 |
-| **+ 15 months of pre-June history, with a pricing-rule flag (final)** | **40.67** | **11.19** | **0.0856** | **0.3892** |
+| + 15 months of pre-June history, with a pricing-rule flag | 40.67 | 11.19 | 0.0856 | 0.3892 |
+| **+ real-time series on the history rows too (final)** | **40.64** | **11.20** | **0.0855** | **0.3892** |
 
-On August (trained on June–July plus the pre-June history) the final model scores 27.74 / 6.59 / 0.0680 / 0.4388. That's 3.1 % better than the model without history, weighted by points, with the band better in all 5 weeks.
+On August (trained on June–July plus the pre-June history) the final model scores 27.67 / 6.56 / 0.0680 / 0.4378. That's 3.3 % better than the model without history, weighted by points.
 
 Tried and left out, because they didn't win in both September and August:
 - neighbour wind for the band (it stays in the median);
@@ -304,13 +306,13 @@ python -m src.backtest.run --period test --model spot_anchor
 
 Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
 
-The submitted model is `v6_hf`:
+The submitted model is `v7_rt`:
 
 ```bash
-python -m src.backtest.run --period test --model v6_hf
+python -m src.backtest.run --period test --model v7_rt
 ```
 
-It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
+It needs the external data tables (Fingrid real-time and its pre-June history, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
 
 It also needs the pre-June history: `external_data/history/pkg_history.parquet` or `pkg_history.csv.gz`, built by `experiments/lab/build_history.py` on the `brainstorming-abdo` branch. It isn't committed here, because it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only). To refresh the tables:
 
@@ -332,7 +334,7 @@ Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbou
 **Dashboard data, briefings and alerts:**
 
 ```bash
-python -m src.export.dashboard --model v6_hf --period test
+python -m src.export.dashboard --model v7_rt --period test
 ```
 
 Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).

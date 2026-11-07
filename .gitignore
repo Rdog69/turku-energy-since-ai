@@ -13,6 +13,7 @@ app_demo_data/
 # open external data tables (CC BY 4.0, see SOURCES.md) are committed despite *.parquet above
 # (exceptions must come after the rule they override)
 !external_data/fingrid/fingrid_rt.parquet
+!external_data/fingrid/fingrid_rt_history.parquet
 !external_data/open_meteo/ecmwf_ifs025.parquet
 !external_data/open_meteo/ecmwf_ifs025_extra.parquet
 !external_data/open_meteo/icon_eu.parquet

@@ -10,6 +10,8 @@ first_usable_origin_utc.
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -211,6 +213,9 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
     # 1 for deliveries under the 1 June 2026 imbalance pricing rule (the package period), 0 for the
     # pre-June history rows. Only models trained with history use it (HISTORY_COLUMNS).
     f["regime_2026"] = (d_ns >= DATA_START.value).astype(float)
+    # The same quarter one day earlier (published long before the origin): direction and gap.
+    f["dir_yday"] = at(DIRECTION, -96)
+    f["gap_yday"] = at(IMBALANCE, -96) - at(SPOT, -96)
 
     # --- newest usable realised values at the origin (same for every step of an origin) ---
     per_origin = pd.DataFrame(index=origins)
@@ -245,6 +250,28 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
             dirs.append(index[DIRECTION].value_at(ts_j, origin_ns))
         per_origin[f"mean_gap_last{n}"] = np.nanmean(np.vstack(gaps), axis=0)
         per_origin[f"mean_dir_last{n}"] = np.nanmean(np.vstack(dirs), axis=0)
+
+    # Direction runs over the newest usable quarters (after Abdo's "runs" features,
+    # brainstorming-abdo docs/brainstorm/swarm/history.md): how long the current direction has
+    # lasted, how often it flipped in the last 4 h, 24-hour shares of up-regulation and spikes,
+    # and the extremes of the gap in the last 4 h. value_at() masks unpublished quarters (NaN).
+    dir_ts, _ = index[DIRECTION].latest(origins)
+    D = np.vstack([index[DIRECTION].value_at(dir_ts - j * NS_PER_QUARTER, origin_ns) for j in range(96)]).T
+    G = np.vstack([index[IMBALANCE].value_at(imb_ts - j * NS_PER_QUARTER, origin_ns)
+                   - index[SPOT].value_at(imb_ts - j * NS_PER_QUARTER, origin_ns) for j in range(96)]).T
+    known, g_known = ~np.isnan(D), ~np.isnan(G)
+    same = known & (D == D[:, :1])
+    run = np.argmin(np.hstack([same, np.zeros((len(D), 1), bool)]), axis=1).astype(float)
+    flips = ((D[:, :15] != D[:, 1:16]) & known[:, :15] & known[:, 1:16]).sum(axis=1).astype(float)
+    per_origin["dir_run_len"] = np.where(known[:, 0], run, np.nan)
+    per_origin["dir_switches_16"] = np.where(known[:, 0], flips, np.nan)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)    # all-NaN rows (no data yet) stay NaN
+        per_origin["up_share_96"] = np.nanmean(np.where(known, D == 1, np.nan), axis=1)
+        per_origin["spike_hi_share_96"] = np.nanmean(np.where(g_known, G > SPIKE_MARGIN, np.nan), axis=1)
+        per_origin["spike_lo_share_96"] = np.nanmean(np.where(g_known, G < -SPIKE_MARGIN, np.nan), axis=1)
+        per_origin["gap_max_16"] = np.nanmax(G[:, :16], axis=1)
+        per_origin["gap_min_16"] = np.nanmin(G[:, :16], axis=1)
     # --- Fingrid real-time series (only if downloaded; see src/data/fingrid.py) ---
     def latest_pair(sid, ref_sid=None, lags=(0,)):
         """Mean over the newest usable quarters of sid (minus ref_sid at the same quarter)."""
@@ -368,6 +395,10 @@ WINDHAT_COLUMNS = ["om_wind_hat", "om_wind_hat_err", "om_wind_hat_rev"]
 
 # Pricing-rule flag for models trained with the pre-June history (see regime_2026 above).
 HISTORY_COLUMNS = ["regime_2026"]
+
+# Direction runs, 24-hour shares and the same quarter yesterday (round 7).
+RUNS_COLUMNS = ["dir_run_len", "dir_switches_16", "up_share_96", "spike_hi_share_96", "spike_lo_share_96",
+                "gap_max_16", "gap_min_16", "dir_yday", "gap_yday"]
 
 # Town weather: solar revision and temperature (heating demand) revision since the day-ahead forecasts.
 TOWN_SOLAR_COLUMNS = ["om_rad_rev", "om_solar_rev_mw"]

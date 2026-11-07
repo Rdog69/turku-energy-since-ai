@@ -23,8 +23,8 @@ from sklearn.linear_model import LogisticRegression
 
 from src.config import DATA_START
 from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, HISTORY_COLUMNS, MEMORY_COLUMNS,
-                                NORDIC_COLUMNS, TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS, WEATHER2_COLUMNS,
-                                WEATHER_COLUMNS, WINDHAT_COLUMNS)
+                                NORDIC_COLUMNS, RUNS_COLUMNS, TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS,
+                                WEATHER2_COLUMNS, WEATHER_COLUMNS, WINDHAT_COLUMNS)
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -109,6 +109,10 @@ class GBMModel:
     spike_shrink: int | None = None  # m0 for the shrunk spike Platt maps (see _Platt); None = plain
     use_history: bool = False       # training rows also from the pre-June history (config.HISTORY_PATH)
     history_flag: bool = False      # + the regime_2026 feature (pricing rule of the row)
+    history_every: int = 3          # every n-th hourly origin before June goes into the training table
+    history_weight: float = 1.0     # sample weight of pre-June rows (package-period rows weigh 1)
+    history_rt: bool = False        # pre-June rows also get Fingrid real-time features (fingrid_rt_history)
+    use_runs: bool = False          # direction runs, 24-hour shares, same quarter yesterday
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
@@ -132,6 +136,7 @@ class GBMModel:
                 + (TOWN_SOLAR_COLUMNS if self.use_town_solar else [])
                 + (TOWN_TEMP_COLUMNS if self.use_town_temp else [])
                 + (HISTORY_COLUMNS if self.history_flag else [])
+                + (RUNS_COLUMNS if self.use_runs else [])
                 + (MEMORY_COLUMNS if self.use_memory else []))
 
     # ------------------------------------------------------------------ fitting
@@ -147,6 +152,9 @@ class GBMModel:
     def _fit_one(self, df: pd.DataFrame, ref: pd.Timestamp, seed: int) -> dict:
         X = self._mask_fresh(df[self.features], df["step"])
         w = self._weights(df, ref)
+        if self.use_history and self.history_weight != 1.0:
+            hw = np.where(df["delivery"] < DATA_START, self.history_weight, 1.0)
+            w = hw if w is None else w * hw
         params = {**self.params, "random_state": seed}
         m = {}
         for col, q in QUANTILES.items():

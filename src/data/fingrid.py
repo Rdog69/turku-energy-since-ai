@@ -128,13 +128,15 @@ def to_quarters(df: pd.DataFrame, series_id: str, unit: str, ds: int) -> pd.Data
     return out
 
 
-def download(start: str, end: str) -> Path:
+def download(start: str, end: str, out_name: str = "fingrid_rt.parquet") -> Path:
     key = api_key()
     parts = []
     for ds, (sid, unit) in DATASETS.items():
-        parts.append(to_quarters(fetch_dataset(ds, start, end, key), sid, unit, ds))
+        df = fetch_dataset(ds, start, end, key)
+        if len(df):
+            parts.append(to_quarters(df, sid, unit, ds))
     long = pd.concat(parts, ignore_index=True)
-    out = OUT_DIR / "fingrid_rt.parquet"
+    out = OUT_DIR / out_name
     long.to_parquet(out, index=False)
     print(f"wrote {out.relative_to(REPO_ROOT)}: {len(long)} quarter rows "
           + ", ".join(f"{s}={n}" for s, n in long.groupby('series_id').size().items()))
@@ -151,12 +153,28 @@ def load_long_extra() -> pd.DataFrame | None:
     return df
 
 
+def load_rt_history() -> pd.DataFrame | None:
+    """Real-time series before the main table starts (Mar 2025 - May 2026), for models trained on
+    the pre-June history. Same quarter means and the same 30-min publication rule as the main table.
+
+        python -m src.data.fingrid --start 2025-03-01 --end 2026-05-29 --out fingrid_rt_history.parquet
+    """
+    path = OUT_DIR / "fingrid_rt_history.parquet"
+    if not path.exists():
+        return None
+    df = pd.read_parquet(path)
+    for col in ("timestamp_utc", "first_usable_origin_utc"):
+        df[col] = pd.to_datetime(df[col], utc=True)
+    return df
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", default="2026-05-29")
     ap.add_argument("--end", default="2026-11-03")
+    ap.add_argument("--out", default="fingrid_rt.parquet", help="table name in external_data/fingrid/")
     args = ap.parse_args(argv)
-    download(args.start, args.end)
+    download(args.start, args.end, args.out)
 
 
 if __name__ == "__main__":

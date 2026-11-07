@@ -82,6 +82,13 @@ DRIVER_LABELS = {
     # Town weather
     "om_rad_rev": "Sunshine revision since day-ahead", "om_solar_rev_mw": "Solar production revision (MW)",
     "om_temp_town": "Temperature in the towns", "om_temp_rev": "Temperature revision since day-ahead",
+    # Pre-June history and direction runs
+    "regime_2026": "Pricing rule (June 2026 onwards)",
+    "dir_run_len": "How long the current direction has lasted", "dir_switches_16": "Direction flips, last 4 h",
+    "up_share_96": "Share of up-regulation, last 24 h", "spike_hi_share_96": "Share of high spikes, last 24 h",
+    "spike_lo_share_96": "Share of low spikes, last 24 h", "gap_max_16": "Highest gap to spot, last 4 h",
+    "gap_min_16": "Lowest gap to spot, last 4 h", "dir_yday": "Direction at this time yesterday",
+    "gap_yday": "Gap to spot at this time yesterday",
 }
 
 LEVERS = {

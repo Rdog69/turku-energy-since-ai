@@ -120,6 +120,19 @@ def with_history(long: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def with_rt_history(long: pd.DataFrame) -> pd.DataFrame:
+    """long plus the Fingrid real-time series before the main table starts (src.data.fingrid
+    load_rt_history), so history rows get real-time features too. Rows already in long win."""
+    from src.data.fingrid import load_rt_history
+    rt = load_rt_history()
+    if rt is None:
+        raise FileNotFoundError("real-time history missing: python -m src.data.fingrid --start 2025-03-01 "
+                                "--end 2026-05-29 --out fingrid_rt_history.parquet")
+    have = pd.MultiIndex.from_frame(long[["series_id", "timestamp_utc"]])
+    new = rt.loc[~pd.MultiIndex.from_frame(rt[["series_id", "timestamp_utc"]]).isin(have), LONG_COLUMNS]
+    return pd.concat([long, new], ignore_index=True)
+
+
 def load_actuals_validation(pkg: str | None = None) -> pd.DataFrame:
     root = Path(pkg) if pkg else package_dir()
     df = pd.read_csv(root / "data" / "actuals_validation.csv")

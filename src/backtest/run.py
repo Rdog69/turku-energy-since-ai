@@ -36,21 +36,25 @@ TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "lear
 def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
                icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
                wind_hat: bool = False, town_solar: bool = False, town_temp: bool = False,
-               history: bool = False, history_flag: bool = False) -> HorizonSplit:
+               history: bool = False, history_flag: bool = False, history_every: int = config.HISTORY_EVERY_H,
+               history_weight: float = 1.0, runs: bool = False, history_rt: bool = False) -> HorizonSplit:
     """final_capw plus optional round-3/4/5/6 changes. tuned: x = none, l = long model, b = both models.
 
     bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
     spike_shrink: m0 for the shrunk spike calibration (GBMModel.spike_shrink).
     wind_hat: learned wind production from the weather points (src/models/wind_power.py).
     town_solar / town_temp: solar and temperature revisions at 8 towns (src/data/weather.load_towns).
-    history: also train on the pre-June history (config.HISTORY_PATH); history_flag adds regime_2026.
+    history: also train on the pre-June history (config.HISTORY_PATH); history_flag adds regime_2026;
+    history_every: every n-th hourly origin before June; history_weight: sample weight of those rows.
+    runs: direction runs, 24-hour shares and the same quarter yesterday (build.RUNS_COLUMNS).
     """
     def params(on: bool) -> dict:
         return dict(TUNED_PARAMS if on else BASE_PARAMS)
     common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
                   use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
                   use_wind_hat=wind_hat, use_town_solar=town_solar, use_town_temp=town_temp,
-                  use_history=history, history_flag=history_flag)
+                  use_history=history, history_flag=history_flag, history_every=history_every,
+                  history_weight=history_weight, use_runs=runs, history_rt=history_rt)
     short_kw = dict(use_fingrid=True, use_fingrid2=True, params=params(tuned == "b"), **common)
     if bands4:
         short = HorizonSplit(name=f"{name}_short", split_step=4,
@@ -158,6 +162,13 @@ MODELS = {
     # origin), without and with the pricing-rule flag. Needs the organisers' OK on pre-June data.
     "v6_h": lambda: _v4_hybrid("v6_h", history=True),
     "v6_hf": lambda: _v4_hybrid("v6_hf", history=True, history_flag=True),
+    # Round 7: v6_hf plus one change each: every hourly history origin; history rows at half
+    # weight; direction runs / 24-hour shares / same quarter yesterday.
+    "v7_all": lambda: _v4_hybrid("v7_all", history=True, history_flag=True, history_every=1),
+    "v7_w": lambda: _v4_hybrid("v7_w", history=True, history_flag=True, history_weight=0.5),
+    "v7_runs": lambda: _v4_hybrid("v7_runs", history=True, history_flag=True, runs=True),
+    # v6_hf with Fingrid real-time series on the history rows too (Mar 2025 - May 2026).
+    "v7_rt": lambda: _v4_hybrid("v7_rt", history=True, history_flag=True, history_rt=True),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,
@@ -214,17 +225,18 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
 
 
 def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None,
-                   wind_map=None, towns=None, history: bool = False) -> pd.DataFrame:
+                   wind_map=None, towns=None, history: bool = False,
+                   every: int = config.HISTORY_EVERY_H) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff.
 
-    history: also every HISTORY_EVERY_H-th hourly origin from HISTORY_START until the package
-    starts (long must then include the history rows, see src.data.load.with_history).
+    history: also every `every`-th hourly origin from HISTORY_START until the package starts
+    (long must then include the history rows, see src.data.load.with_history).
     """
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
     if history:
         early = pd.date_range(config.HISTORY_START + pd.Timedelta(hours=6), first,
-                              freq=f"{config.HISTORY_EVERY_H}h", inclusive="left")
+                              freq=f"{every}h", inclusive="left")
         origins = early.append(origins)
     f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2,
                        wind_map=wind_map, towns=towns)
@@ -277,6 +289,9 @@ def main(argv=None) -> int:
     if history:
         from src.data.load import with_history
         long = with_history(long)
+        if getattr(model, "history_rt", False):
+            from src.data.load import with_rt_history
+            long = with_rt_history(long)
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
@@ -311,7 +326,8 @@ def main(argv=None) -> int:
         towns = load_towns()
         if towns is None:
             raise FileNotFoundError("town weather missing: python -m src.data.open_meteo --points solar")
-    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map, towns, history)
+    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map, towns, history,
+                           getattr(model, "history_every", config.HISTORY_EVERY_H))
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")

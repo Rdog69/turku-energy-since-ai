@@ -1,0 +1,30 @@
+{
+  "owner": "Abdo",
+  "model": "team_hist",
+  "period": "fold_b",
+  "scorer": "lab",
+  "mae": 27.12,
+  "pinball": 6.29,
+  "spike_brier": 0.0657,
+  "direction_brier": 0.4243,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "Half Frank's v4_n50, half Abdo's history-mode INT4",
+  "notes": "From his commit d85191f message (lab scorer, 2 decimals).",
+  "forecast_file": "",
+  "branch": "brainstorming-abdo",
+  "commit": "d85191f",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T14:32:07Z"
+}

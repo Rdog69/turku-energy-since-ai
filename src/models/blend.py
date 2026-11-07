@@ -47,6 +47,14 @@ class HorizonSplit:
     def use_history(self) -> bool:
         return getattr(self.short, "use_history", False) or getattr(self.long, "use_history", False)
 
+    @property
+    def history_every(self) -> int:
+        return getattr(self.long, "history_every", 3)
+
+    @property
+    def history_rt(self) -> bool:
+        return getattr(self.short, "history_rt", False) or getattr(self.long, "history_rt", False)
+
     def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "HorizonSplit":
         # The short model trains on early steps only, so all its capacity goes there.
         self.short.fit(train.loc[train["step"] <= self.split_step].reset_index(drop=True), cutoff)
@@ -110,6 +118,20 @@ class MedianFrom:
         a, b = getattr(self.base, "use_history", False), getattr(self.median, "use_history", False)
         if a != b:
             raise ValueError("MedianFrom: base and median must both use the history, or neither")
+        return a
+
+    @property
+    def history_every(self) -> int:
+        a, b = getattr(self.base, "history_every", 3), getattr(self.median, "history_every", 3)
+        if a != b:
+            raise ValueError("MedianFrom: base and median must use the same history_every")
+        return a
+
+    @property
+    def history_rt(self) -> bool:
+        a, b = getattr(self.base, "history_rt", False), getattr(self.median, "history_rt", False)
+        if a != b:
+            raise ValueError("MedianFrom: base and median must both use the real-time history, or neither")
         return a
 
     @property
