@@ -48,3 +48,8 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# front-end: the generated payload and offline bundle hold licensed spot prices
+frontend/public/payload.json
+frontend/bundle.html
+frontend/node_modules/

@@ -77,6 +77,9 @@ def _v4_hybrid(name: str, **extra) -> MedianFrom:
                       median=make_final(f"{name}_median", "b", nordic=True, **kw))
 
 
+# ECMWF weather table per model (default ecmwf_ifs025); see src/data/weather.build_mix.
+WEATHER_MODEL = {"v10_hres": "ecmwf_mix"}
+
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
 MODELS = {
     "spot_anchor": SpotAnchor,
@@ -182,6 +185,9 @@ MODELS = {
     # 14 Jun - 26 Jul; -0.53 % vs the current settings there).
     "v9_tune": lambda: _v4_hybrid("v9_tune", history=True, history_flag=True, history_rt=True,
                                   params_override=TUNE9_PARAMS),
+    # Round 10: v7_rt with weather on the pre-June history rows too: ECMWF HRES runs before 29 May 2026,
+    # the usual ECMWF 0.25° runs after (src/data/weather.build_mix). Weather source set in WEATHER_MODEL.
+    "v10_hres": lambda: _v4_hybrid("v10_hres", history=True, history_flag=True, history_rt=True),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,
@@ -316,7 +322,7 @@ def main(argv=None) -> int:
     weather = None
     if getattr(model, "use_weather", False):
         from src.data.weather import WeatherIndex
-        weather = WeatherIndex.load("ecmwf_ifs025",
+        weather = WeatherIndex.load(WEATHER_MODEL.get(args.model, "ecmwf_ifs025"),
                                     capacity_weighted=getattr(model, "capacity_weighted", False))
     nordic = None
     if getattr(model, "use_nordic", False):

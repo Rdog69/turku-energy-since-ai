@@ -1,0 +1,79 @@
+@import "./styles/fonts.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tasehinta: a central-bank bulletin for the next ten hours.
+   Paper tinted toward blue-grey, institutional blue for the rail and the median,
+   the fan in graded blues, vermilion only for high-price risk, sea-teal only for low-price risk. */
+@layer base {
+  :root {
+    --paper: 210 22% 94%;        /* page ground            #EBEFF3 */
+    --sheet: 210 25% 97.5%;      /* raised reading surface #F6F8FA */
+    --ink: 213 44% 14%;          /* body ink               #142233 */
+    --ink-2: 212 18% 36%;        /* secondary ink          #4B5B6C */
+    --ink-3: 211 14% 52%;        /* tertiary ink, axes     #73828F */
+    --rule: 210 18% 80%;         /* hairlines              #C5CFD8 */
+    --bank: 211 81% 23%;         /* institutional blue     #0B3C6A */
+    --bank-ink: 210 45% 90%;     /* text on the rail       #DCE5EF */
+    --bank-ink-2: 211 32% 70%;   /* quiet text on the rail #A0B4C9 */
+    --fan-outer: 211 52% 80%;    /* p10-p50                #B6CCE3 */
+    --fan-inner: 211 48% 72%;    /* p50-p90                #9DB9D6 */
+    --verm: 10 66% 49%;          /* high-price risk        #CF4A2A */
+    --verm-soft: 10 70% 92%;
+    --teal: 178 80% 28%;         /* low-price risk         #0E7F7A */
+    --teal-soft: 176 45% 89%;
+    --ochre: 36 70% 38%;         /* changed / review       #A56B1D */
+
+    /* shadcn tokens mapped onto the bulletin palette */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--sheet);
+    --card-foreground: var(--ink);
+    --popover: var(--sheet);
+    --popover-foreground: var(--ink);
+    --primary: var(--bank);
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 90%;
+    --secondary-foreground: var(--ink);
+    --muted: 210 20% 90%;
+    --muted-foreground: var(--ink-2);
+    --accent: 210 30% 88%;
+    --accent-foreground: var(--ink);
+    --destructive: var(--verm);
+    --destructive-foreground: 0 0% 100%;
+    --border: var(--rule);
+    --input: var(--rule);
+    --ring: var(--bank);
+    --radius: 0.375rem;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Source Sans 3", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+  h1, h2, h3 { text-wrap: balance; }
+  p { text-wrap: pretty; }
+  ::selection { background: hsl(var(--bank) / 0.18); color: hsl(var(--ink)); }
+  :focus-visible { outline: 2px solid hsl(var(--bank)); outline-offset: 2px; border-radius: 2px; }
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--rule)) transparent; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .num { font-variant-numeric: tabular-nums lining-nums; }
+  .hair { border-color: hsl(var(--rule)); }
+}
+
+/* the one authored moment: the fan opens from the review line when a period loads */
+@keyframes fan-open { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+.fan-open { animation: fan-open 640ms cubic-bezier(0.23, 1, 0.32, 1) both; }

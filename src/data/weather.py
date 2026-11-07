@@ -166,3 +166,21 @@ class WeatherIndex:
 class TownIndex(WeatherIndex):
     """Same lookups, for the town variables from summarise_towns()."""
     VARS = ("rad", "cloud", "temp")
+
+
+def build_mix(switch: str = "2026-05-29T00:00Z") -> None:
+    """Write ecmwf_mix(.parquet, _extra.parquet): ECMWF HRES runs before `switch`, ECMWF 0.25° from it.
+
+    The 0.25° runs (our package-period weather) start on 29 May 2026 in Open-Meteo's Single Runs API;
+    HRES (9 km, `ecmwf_ifs`) is the only ECMWF model it serves for the pre-June history rows. Both keep
+    their own first_usable_origin_utc (run init + 8 h), so the availability rule is unchanged.
+        python -c "from src.data.weather import build_mix; build_mix()"
+    """
+    cut = pd.Timestamp(switch)
+    for suffix in ("", "_extra"):
+        hres = pd.read_parquet(OUT_DIR / f"ecmwf_ifs{suffix}.parquet")
+        main = pd.read_parquet(OUT_DIR / f"ecmwf_ifs025{suffix}.parquet")
+        out = pd.concat([hres[hres["run_init"] < cut], main[main["run_init"] >= cut]], ignore_index=True)
+        out.to_parquet(OUT_DIR / f"ecmwf_mix{suffix}.parquet", index=False)
+        print(f"ecmwf_mix{suffix}: {out['run_init'].nunique()} runs "
+              f"({hres.loc[hres['run_init'] < cut, 'run_init'].nunique()} HRES before {cut:%Y-%m-%d})")
