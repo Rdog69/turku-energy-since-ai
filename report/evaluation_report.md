@@ -1,6 +1,6 @@
 # Evaluation report: imbalance-price forecast for Turku Energia
 
-**Submission:** an equal-weight blend of two independently built gradient-boosting models. Frank's `v7_rt` and Abdo's `h_int4ss` each forecast all 40 quarter-hours of the next 10 hours, every full hour.
+**Submission:** one forecasting model, a gradient-boosting ensemble. Every full hour it forecasts all 40 quarter-hours of the next 10 hours; inside, two independently built components (`v7_rt` and `h_int4ss`) each make that forecast and the model averages them.
 
 **Result on the organisers' validation month (7 Sep – 4 Oct 2026):**
 
@@ -27,15 +27,15 @@ Turku Energia's imbalance price is settled per 15 minutes. It equals the day-ahe
 ## 2. Reasoning chain
 
 1. **Spot is known in advance; forecast the gap.** The day-ahead price is published the afternoon before, so the real unknown is the *gap* = imbalance − spot. Forecasting "spot + a typical gap" alone cuts the baseline's error by about a third.
-2. **The direction decides the sign of the gap.** About 60 % of quarters are down-regulated (price below spot) and 40 % up-regulated. Both models predict the direction probabilities first, then the gap. Spike probabilities are built as P(direction) × P(large gap | direction), so the band, the spike risk and the direction always agree with each other.
+2. **The direction decides the sign of the gap.** About 60 % of quarters are down-regulated (price below spot) and 40 % up-regulated. The model predicts the direction probabilities first, then the gap. Spike probabilities are built as P(direction) × P(large gap | direction), so the band, the spike risk and the direction always agree with each other.
 3. **What moves the gap, and when it is known:**
    - **The recent state:** the latest published gap and direction, and their 1–4 hour averages. These carry the most information for the first two hours.
    - **Real-time grid data (Fingrid):** the measured surplus or deficit, wind against its forecast, frequency, nuclear and hydro changes, electric boilers, CHP, cross-border flows. These matter in the first hours and turn into noise later.
    - **Weather-forecast revisions:** how the newest ECMWF and ICON-EU runs revise wind against the run the day-ahead forecast was based on, at wind-farm locations weighted by installed capacity. A wind forecast that is falling after the day-ahead market closed means a coming shortfall, so up-regulation and higher prices.
    - **The shape of the day-ahead price:** ramps, the day's peaks and troughs, the position in the day.
-4. **Use 15 more months of history, rebuilt for the new price rule.** The package starts on 1 June 2026. The organisers allow earlier data (Q&A, 7 Nov), but before June the price followed an older rule (max/min of mFRR and aFRR instead of the volume-weighted average). We rebuilt the pre-June imbalance price with the June rule from Fingrid's mFRR and aFRR prices and volumes. The rebuild reproduces the official price on **99.5 % of Jun–Oct 2026 quarters** (MAE 0.09 €/MWh; the old rule gives 5.45). Training on Mar 2025 – Oct 2026 instead of four months improved both models on every score, most of all the uncertainty band.
-5. **Calibrate on the most recent weeks.** Both models re-scale their probabilities and band widths on the last weeks before each forecast period, shrunk toward "no change" when those weeks hold little evidence, so a quiet spell cannot switch the spike warnings off.
-6. **Two different models, averaged.** The two models were built separately, with different features, horizon splits and calibration, so their errors only partly overlap. An equal-weight average has no fitted weights to overfit. It beats both members on all four scores in September and is the best of the three averaged over both months (32.8 % better than the baseline, against 32.4 % for `h_int4ss` and 30.9 % for `v7_rt`).
+4. **Use 15 more months of history, rebuilt for the new price rule.** The package starts on 1 June 2026. The organisers allow earlier data (Q&A, 7 Nov), but before June the price followed an older rule (max/min of mFRR and aFRR instead of the volume-weighted average). We rebuilt the pre-June imbalance price with the June rule from Fingrid's mFRR and aFRR prices and volumes. The rebuild reproduces the official price on **99.5 % of Jun–Oct 2026 quarters** (MAE 0.09 €/MWh; the old rule gives 5.45). Training on Mar 2025 – Oct 2026 instead of four months improved both components on every score, most of all the uncertainty band.
+5. **Calibrate on the most recent weeks.** Both components re-scale their probabilities and band widths on the last weeks before each forecast period, shrunk toward "no change" when those weeks hold little evidence, so a quiet spell cannot switch the spike warnings off.
+6. **One model, built as an ensemble.** Its two components were built separately, with different features, horizon splits and calibration, so their errors only partly overlap. The model averages them with equal weights, so there are no fitted weights to overfit. The ensemble beats each component on all four scores in September and is best averaged over both months: 32.8 % better than the baseline, against 32.4 % for component `h_int4ss` alone and 30.9 % for component `v7_rt` alone.
 
 ## 3. Data (all used only from their `first_usable_origin_utc`)
 
@@ -51,17 +51,17 @@ Turku Energia's imbalance price is settled per 15 minutes. It equals the day-ahe
 
 The full list with licences is in `sources/SOURCES_AND_LICENCES.md`.
 
-## 4. The two models
+## 4. The model and its two components
 
-**Frank's `v7_rt`:**
+**Component A, `v7_rt`:**
 - **Learner:** LightGBM quantile regressions for the gap's P10/P50/P90, plus classifiers for up-regulation and for large gaps given each direction.
 - **Trees:** small and slow-learning (15 leaves, at least 800 rows per leaf), with settings chosen on training-only folds. Averaged over 5 seeds.
-- **Horizons:** two models, one for hours 1–2 with fresh real-time grid data, one for hours 3–10 without it.
+- **Horizons:** two sub-models, one for hours 1–2 with fresh real-time grid data, one for hours 3–10 without it.
 - **Neighbour wind:** a twin model that sees Nordic wind supplies only the median.
 - **Calibration:** on the last 28 days (Platt scaling for probabilities, a shift for the band).
 - **Training:** 15 months of history, with Fingrid real-time series on the history rows too.
 
-**Abdo's `h_int4ss`:**
+**Component B, `h_int4ss`:**
 - **Mixture model:** P(up) × the gap's quantile grid given up, plus P(down) × the grid given down; every output is read from that one distribution.
 - **Learner:** LightGBM, 7 leaves, 350 trees.
 - **Horizons:** separate models for steps 1–4, 5–8 and 9–16, and one for the rest.
@@ -76,7 +76,7 @@ The full list with licences is in `sources/SOURCES_AND_LICENCES.md`.
 - **Smoothing:** a light smoothing with the previous hour's forecast.
 - **Training:** Mar 2025 – Oct 2026.
 
-**The blend:** an equal-weight average of all eight output columns. The quantiles are re-sorted, the direction probabilities renormalised, the spike probabilities capped so they sum to at most 1, and the freshest `data_cutoff_utc` of the two is used. `top_drivers` comes from `v7_rt`'s TreeSHAP.
+**Combining the components:** an equal-weight average of all eight output columns. The quantiles are re-sorted, the direction probabilities renormalised, the spike probabilities capped so they sum to at most 1, and the freshest `data_cutoff_utc` of the two is used. `top_drivers` comes from component A's TreeSHAP.
 
 ## 5. Factors that drive the forecast
 
@@ -97,22 +97,22 @@ Organisers' `score.py` 0.1.1; MAE / pinball / spike Brier / direction Brier. In 
 | Model | September 2026 (organisers' validation) | August 2026 (second check) |
 |---|---|---|
 | Organisers' baseline | 66.20 / 24.18 / 0.1132 / 0.4509 | 38.67 / 11.65 / 0.0792 / 0.4792 |
-| `v7_rt` | 40.64 / 11.20 / 0.0855 / 0.3892 | 27.67 / 6.56 / 0.0680 / 0.4378 |
-| `h_int4ss` | 40.55 / 11.28 / 0.0865 / 0.3844 | 27.15 / 6.16 / 0.0639 / 0.4219 |
-| **Submitted blend** | **40.19 / 11.07 / 0.0840 / 0.3799** | **27.05 / 6.22 / 0.0648 / 0.4202** |
+| Component A alone (`v7_rt`) | 40.64 / 11.20 / 0.0855 / 0.3892 | 27.67 / 6.56 / 0.0680 / 0.4378 |
+| Component B alone (`h_int4ss`) | 40.55 / 11.28 / 0.0865 / 0.3844 | 27.15 / 6.16 / 0.0639 / 0.4219 |
+| **Submitted model (the ensemble)** | **40.19 / 11.07 / 0.0840 / 0.3799** | **27.05 / 6.22 / 0.0648 / 0.4202** |
 | Better than baseline, points-weighted | **36.7 %** | **29.0 %** |
 
 Coverage of the P10–P90 band: 81.4 % in September and 82.4 % in August (target about 80 %).
 
 **How we kept ourselves honest:**
 - **Two check months.** Every change had to improve **both** September and August, each trained only on the data before it, and most of the weeks within them.
-- **Fixed weights.** Blend weights are fixed at 50/50 rather than fitted. Ensemble weights and calibration factors were tested by cross-fitting (fit on one month, check on the other).
+- **Fixed weights.** The components are weighted 50/50, not fitted. Ensemble weights and calibration factors were tested by cross-fitting (fit on one month, check on the other).
 - **A shared scoreboard.** Every model on the team was scored the same way with the organisers' script.
-- **Simplicity over a small gain.** A P90 stretch (×1.15) and a spike cap gained about 0.2 points on the same two months, but pushed band coverage to 84–85 %. We kept the simpler blend.
+- **Simplicity over a small gain.** A P90 stretch (×1.15) and a spike cap gained about 0.2 points on the same two months, but pushed band coverage to 84–85 %. We kept the simpler model.
 
 ## 7. No future data
 
-Every input row is used only from its `first_usable_origin_utc`. External data got conservative publication delays, rounded up to the next full hour. Both pipelines have automated leak tests: they rebuild every feature for random forecast hours with all not-yet-published rows deleted and require identical values.
+Every input row is used only from its `first_usable_origin_utc`. External data got conservative publication delays, rounded up to the next full hour. Both components' pipelines have automated leak tests: they rebuild every feature for random forecast hours with all not-yet-published rows deleted and require identical values.
 
 Training also leaves out the last two hours before each cutoff, whose prices were not yet published then (a label embargo).
 
@@ -126,9 +126,9 @@ Each of these was tested on both months and dropped:
 - outage messages (UMM);
 - Estonian and Danish system data;
 - FMI station observations;
-- direction-run features in Frank's model;
-- a third blend member;
-- per-output blend weights.
+- direction-run features in component A;
+- a third ensemble component;
+- per-output component weights.
 
 `docs/EXPERIMENTS.md` (branch `brainstorming-abdo`) and `docs/RESULTS.md` (branch `brainstorming-frank`) list about 300 experiments.
 
