@@ -2,7 +2,7 @@
 
 Team entry for the Turku Energia challenge, Since AI 2026. Marks: ✔ checked in the data or code, ☐ assumption. `TODO(number)` marks analyses we have not run.
 
-> **Final model: `split_all_rt_icon`** (section 4). It was chosen because it beats the previous best, `split_all`, on both validation folds: fold A (7 Sep – 4 Oct, the organisers' validation window) and fold B (August). Numbers are for fold A unless marked fold B.
+> **Pipeline model: `v6_hf`** (Frank's branch, section 4). It is the model in the repo's submission pipeline. Fold A (7 Sep – 4 Oct, the organisers' validation window): MAE 40.67, pinball 11.19, spike Brier 0.0856, direction Brier 0.3892, 35.7 % better than the baseline weighted by points. Fold B (August): 27.74 / 6.59 / 0.0680 / 0.4388. Our own `split_all_rt_icon` (Pavlo) is now one ablation row, not the final model. Abdo's `team5050` (½ `v4_n50` + ½ his model) leads the team scoreboard (31.1 % average against 30.9 % for `v6_hf`). TODO(team): v6_hf or team5050 — which file is submitted. Numbers are for fold A unless marked fold B.
 
 ## 1. The problem and our framing
 
@@ -30,7 +30,7 @@ Data: the organisers' package (Fingrid, ENTSO-E, Nord Pool spot, calendar), plus
 | ECMWF IFS runs (Open-Meteo) | run start + 8 h | Measured about 7.1 h on 6 Nov. ☐ |
 | ICON-EU runs (Open-Meteo) | run start + 5 h | Measured about 3.9 h. ☐ |
 
-The Open-Meteo Historical Forecast API is not used, because it does not give the point-in-time run vintages our availability rule requires. Fingrid's updated forecasts (245, 241) are not used for the same reason. Data from before 1 Jun 2026 is fetched but **not used** until the organisers approve it. ☐
+The Open-Meteo Historical Forecast API is not used, because it does not give the point-in-time run vintages our availability rule requires. Fingrid's updated forecasts (245, 241) are not used for the same reason. Data from before 1 Jun 2026 is used by `v6_hf` only: the organisers allowed it on 7 Nov (`QUESTIONS.md` Q1). The `split_all` family and `split_all_rt_icon` do not use it. The Fingrid real-time and weather series do not reach before June, so those features are empty on history rows. ☐
 
 **Worked example** (origin Fri 2 Oct 2026 09:00 UTC, 12:00 local; times in UTC, read from the same index the model uses):
 
@@ -63,7 +63,7 @@ All findings below come from training data up to 4 Oct only (✔ PLAN §2).
 | **Live imbalance and plan error** | Fingrid's real-time surplus/deficit (datasets 198 and 186: measured net import against the confirmed exchange plan), production against the balance responsible parties' day-ahead plans, hydro output change over 1 h; usable about 45-75 min after the quarter. Hydro change is the clearest signal (up-regulation share 0.26 in the lowest quintile, 0.54 in the highest); the surplus/deficit series alone shows little relation to the next hour's gap (training data, steps 1–4) | `rt_sd_*`, `rt_plan_err*`, `rt_hydro_change_1h`, steps 1–8 only |
 | Weak factors | Neighbour imbalance prices (corr. with the gap about 0.1), consumption error (about −0.04) | cheap features, little gain |
 
-**Per-row explanations.** `top_drivers` lists the top 3 features by |SHAP| of the P50 model (LightGBM's built-in TreeSHAP), not text from an LLM. These are model attributions: they describe what drives the fitted model's output, not physical causes of the gap. Over all 26,920 rows of the final model's test forecast, the features that appear most often among the top 3 are spot (64 % of rows), the consumption forecast (52 %), ICON-EU's wind index (50 %), temperature (15 %), ICON's wind revision (15 %), the solar forecast (14 %), measured wind against its forecast (10 %) and the ECMWF-vs-ICON disagreement (10 %).
+**Per-row explanations.** `top_drivers` lists the top 3 features by |SHAP| of the P50 model (LightGBM's built-in TreeSHAP), not text from an LLM. These are model attributions: they describe what drives the fitted model's output, not physical causes of the gap. Over all 26,920 rows of the `split_all_rt_icon` test forecast, the features that appear most often among the top 3 are spot (64 % of rows), the consumption forecast (52 %), ICON-EU's wind index (50 %), temperature (15 %), ICON's wind revision (15 %), the solar forecast (14 %), measured wind against its forecast (10 %) and the ECMWF-vs-ICON disagreement (10 %).
 
 ## 4. The model
 
@@ -74,12 +74,25 @@ All models are LightGBM trained from scratch (`src/models/gbm.py`); no pretraine
 - **Spikes:** `P(spike high) = P(up) × P(gap > 50 | up)`, and `P(spike low) = P(down) × P(gap < −50 | down)`. The two sum to at most 1 and stay consistent with the direction forecast.
 - **Calibration:** we hold out the last 14 days of the training window, fit the models on the earlier data, and learn (a) Platt scaling for the three probabilities and (b) offsets for P10, P50, P90 in three step bands (1–8, 9–20, 21–40). Then we refit on the full window and apply the maps. In the ablation below this takes coverage from 0.51 to 0.79 (with recency weights) and from 0.53 to about 0.80 for the package-only chain. Pooling the calibration over three rolling holdouts was tested and rejected (section 6).
 - **Horizon split:** steps 1–8 come from a short model trained on steps 1–8 only, which gets the fresh real-time data. Steps 9–40 come from a long model without real-time features. Reason: real-time signals are stale after a few hours, and giving them to every step made results worse (section 5).
-- **Final model `split_all_rt_icon`:**
-  - Short model (steps 1–8): package features, Fingrid real-time (wind, nuclear, frequency, consumption), the live surplus/deficit (198/186), production against the BRP plan (192 − 242), hydro change over 1 h (191), and both weather models (ECMWF and ICON-EU, plus their disagreement).
+- **Pipeline model `v6_hf`** (details in `docs/RESULTS.md`). It builds on the horizon split above, with these parts:
+  - **Horizon split:** a short model for steps 1–8 with fresh real-time data, a long model for steps 9–40.
+  - **`MedianFrom`:** the P50 and its drivers come from a twin model that also sees wind in Sweden, Norway, Denmark and Estonia. The band and probabilities come from the model without it, because the neighbour wind improved the median but made the band worse in both September and August.
+  - **5 seeds:** each model is trained five times and averaged.
+  - **Tuned trees:** 15 leaves, at least 800 rows per leaf, learning rate 0.03, 300 trees, 60 % of features per tree, picked on three training-only folds (26 Jul – 6 Sep).
+  - **4-hour memory:** mean gap and direction over the last 16 usable quarters.
+  - **ICON-EU:** the second weather model (wind index, its revision, ECMWF–ICON disagreement), ported from our `split_all_icon`.
+  - **Learned wind production:** non-negative weights for 22 weather points fitted to Fingrid's measured wind (dataset 181, data published before the cutoff only).
+  - **Shrunk spike calibration:** the spike correction is shrunk toward the uncalibrated model when the calibration window holds few spike quarters (s = m / (m + 50)).
+  - **Calibration window:** the last 28 days.
+  - **Pre-June history:** also trained on 5 Mar 2025 – 31 May 2026 (every 3rd hourly origin), with a `regime_2026` flag (1 for deliveries from 1 Jun 2026). Older imbalance prices are recomputed under the June 2026 rule (99.5 % match, section 7).
+- **Our branch's model `split_all_rt_icon`** (an ablation row in sections 5–6, not the pipeline model):
+  - Short model (steps 1–8): package features, Fingrid real-time (wind, nuclear, frequency, consumption), the live surplus/deficit (198/186), production against the BRP plan (192 − 242), hydro change over 1 h (191), and both weather models.
   - Long model (steps 9–40): package features and both weather models.
   - Each group adds about 1 % or less; we kept a group only if it improved both validation folds (section 5).
-- **No recency weights** in the final variant: they helped MAE but hurt the probabilities.
-- Order of work: package → ECMWF weather → Fingrid real-time → live imbalance and ICON-EU. Every step after `split_all` had to win on both folds.
+  - Its ICON-EU features were ported into Frank's models from `v3_bmi` onward. Its live-imbalance features were not used by Frank.
+- **No recency weights** in these variants: they helped MAE but hurt the probabilities.
+- Order of work in our branch: package → ECMWF weather → Fingrid real-time → live imbalance and ICON-EU. Every step after `split_all` had to win on both folds.
+- Which file is finally submitted is a team decision (see the note at the top of this report).
 
 ## 5. The reasoning chain: step by step
 
@@ -110,7 +123,16 @@ Fold A results below: organisers' `score.py` 0.1.1, spike margin 50. Lower is be
 | + live imbalance in the short model (`split_all_rt`) | 42.52 | 12.07 | 0.815 | 0.0918 | 0.4005 | Small gain, all at hours 1–2 |
 | + ICON-EU weather in both models (`split_all_icon`) | 42.14 | 12.06 | 0.807 | 0.0923 | 0.3995 | MAE −0.39 |
 | `split_all` with pooled calibration (`split_all_pcal`) | 42.34 | 12.01 | 0.765 | 0.0907 | 0.3969 | Better here, worse on fold B: **rejected** |
-| **Final: live imbalance + ICON-EU (`split_all_rt_icon`)** | **42.14** | **12.06** | 0.808 | **0.0922** | **0.3978** | Better than `split_all` on both folds |
+| Ablation: live imbalance + ICON-EU (`split_all_rt_icon`) | 42.14 | 12.06 | 0.808 | 0.0922 | 0.3978 | Better than `split_all` on both folds. Best of our branch. |
+| Frank, round 3: `final_capw`, then smaller, slower trees (`final_tuned`) | 41.82 | 11.90 | 0.802 | 0.0886 | 0.3899 | MAE better in 4/4 weeks |
+| + 4-hour memory (`v3_bm`) | 41.68 | 11.90 | 0.800 | 0.0880 | 0.3888 | Memory pays off once the trees are regularised |
+| + ICON-EU, ported from `split_all_icon` (`v3_bmi`) | 41.31 | 11.88 | 0.796 | 0.0873 | 0.3902 | MAE better in 4/4 weeks |
+| + neighbour wind for the median only (`v3_bmi_n50`) | 41.21 | 11.88 | 0.796 | 0.0873 | 0.3902 | Median better in Sep and Aug, band worse |
+| + shrunk spike calibration (`v4_eb`) | 41.31 | 11.88 | 0.796 | 0.0869 | 0.3902 | Spikes better in 4/4 weeks (Sep), 5/5 (Aug) |
+| + learned wind production, both models (`v4_n50`) | 41.08 | 11.88 | 0.797 | 0.0871 | 0.3899 | Earlier submitted model |
+| + 15 months of pre-June history (`v6_h`) | 40.74 | 11.19 | 0.770 | 0.0855 | 0.3890 | Pinball better in 4/4 weeks |
+| **+ `regime_2026` flag (`v6_hf`)** | **40.67** | **11.19** | 0.771 | 0.0856 | 0.3892 | **Pipeline model.** A near tie with `v6_h`; wins both months |
+| Abdo, `team5050` (½ `v4_n50` + ½ his model) | 40.97 | 11.63 | 0.801 | 0.0861 | 0.3803 | Leads the team scoreboard; best direction Brier |
 
 **What each step added** (change in the metric; negative is better):
 
@@ -120,7 +142,22 @@ Fold A results below: organisers' `score.py` 0.1.1, spike margin 50. Lower is be
 | → LightGBM + calibration + product spikes (package only) | −1.1 | −2.6 | −0.0193 | −0.0360 |
 | → + weather runs | −0.1 | −0.3 | −0.0007 | −0.0060 |
 | → + Fingrid real-time, first 2 h only | −0.6 | −0.1 | −0.0011 | −0.0077 |
-| → + ICON-EU weather + live imbalance (final model) | −0.39 | −0.03 | +0.0001 | −0.0033 |
+| → + ICON-EU weather + live imbalance (`split_all_rt_icon`, our branch, against `split_all`) | −0.39 | −0.03 | +0.0001 | −0.0033 |
+
+Frank's steps, from `docs/RESULTS.md` (his chain also starts at the baseline, so the first rows repeat ours):
+
+| Step | MAE | Pinball | Spikes | Direction |
+|---|---:|---:|---:|---:|
+| Baseline → spot anchor | −21.9 | −9.2 | 0 | 0 |
+| → LightGBM + calibration + product spikes (package) | −1.1 | −2.6 | −0.0193 | −0.0360 |
+| → + weather runs | −0.1 | −0.3 | −0.0007 | −0.0060 |
+| → + Fingrid real-time, first 2 h only | −0.6 | −0.1 | −0.0011 | −0.0077 |
+| → + more real-time series, 5 seeds, 28-day calibration, capacity-weighted weather | −0.2 | −0.03 | −0.0021 | −0.0103 |
+| → + smaller, slower trees + 4-hour memory | −0.7 | −0.2 | −0.0020 | −0.0020 |
+| → + second weather model (ICON-EU) | −0.4 | −0.02 | −0.0007 | +0.0014 |
+| → + neighbour wind for the median only | −0.1 | 0 | 0 | 0 |
+| → + steadier spike calibration and learned wind production | −0.1 | 0 | −0.0002 | −0.0003 |
+| → + 15 months of pre-June history with a pricing-rule flag | −0.4 | −0.7 | −0.0015 | −0.0007 |
 
 Reading the chain (each step changes one thing, except where noted):
 
@@ -138,15 +175,17 @@ The August fold and the week-by-week breakdown are in section 6.
 
 ## 6. Validation metrics against the baseline
 
-| Metric (7 Sep – 4 Oct) | Baseline | `split_all_rt_icon` | Change |
-|---|---:|---:|---:|
-| MAE of P50 (€/MWh) | 66.20 | 42.14 | −36 % |
-| Mean pinball loss of P10/P90 | 24.18 | 12.06 | −50 % |
-| P10–P90 coverage (target 0.80) | 0.683 | 0.808 | closer to target |
-| Brier, exceptional prices | 0.1132 | 0.0922 | −19 % |
-| Brier, direction | 0.4509 | 0.3978 | −12 % |
+| Metric (7 Sep – 4 Oct) | Baseline | `v6_hf` | Change | `team5050` | `split_all_rt_icon` |
+|---|---:|---:|---:|---:|---:|
+| MAE of P50 (€/MWh) | 66.20 | 40.67 | −39 % | 40.97 | 42.14 |
+| Mean pinball loss of P10/P90 | 24.18 | 11.19 | −54 % | 11.63 | 12.06 |
+| P10–P90 coverage (target 0.80) | 0.683 | 0.771 | closer to target | 0.801 | 0.808 |
+| Brier, exceptional prices | 0.1132 | 0.0856 | −24 % | 0.0861 | 0.0922 |
+| Brier, direction | 0.4509 | 0.3892 | −14 % | 0.3803 | 0.3978 |
 
-The baseline row is reproduced exactly with the organisers' `baseline.ipynb`. The final model's test forecast (673 origins, 26,920 rows) passes `validate_submission.py` ✔, and every `data_cutoff_utc` is at or before its origin ✔. The organisers have not published test-period scores.
+Weighted by points (30/20/20/10), the improvement over the baseline in September is 35.7 % for `v6_hf` and 35.2 % for `team5050`; in August it is 26.0 % and 26.9 %. Averaged over both months: `team5050` 31.1 %, `v6_hf` 30.9 %, `v4_n50` 29.1 %, `split_all_rt_icon` 27.6 % (team scoreboard). Abdo's August numbers come from his lab scorer; the others are scored officially.
+
+The baseline row is reproduced exactly with the organisers' `baseline.ipynb`. The test forecast of `split_all_rt_icon` (673 origins, 26,920 rows) passes `validate_submission.py` ✔, and every `data_cutoff_utc` is at or before its origin ✔. The organisers have not published test-period scores.
 
 ### Second fold (August)
 
@@ -162,15 +201,21 @@ Every candidate after `split_all` was trained on rows published by 1 Aug 00:00 (
 | | B | 28.41 | 7.10 | 0.765 | 0.0732 | 0.4480 |
 | `split_all_icon` (+ ICON-EU) | A | 42.14 | 12.06 | 0.807 | 0.0923 | 0.3995 |
 | | B | 28.11 | 6.99 | 0.758 | 0.0738 | 0.4445 |
-| **`split_all_rt_icon` (final)** | A | **42.14** | 12.06 | 0.808 | 0.0922 | 0.3978 |
-| | B | **28.02** | **6.97** | 0.760 | 0.0741 | 0.4443 |
+| `split_all_rt_icon` | A | 42.14 | 12.06 | 0.808 | 0.0922 | 0.3978 |
+| | B | 28.02 | 6.97 | 0.760 | 0.0741 | 0.4443 |
+| `v4_n50` (Frank) | A | 41.08 | 11.88 | 0.797 | 0.0871 | 0.3899 |
+| | B | 27.99 | 7.00 | 0.738 | 0.0710 | 0.4466 |
+| **`v6_hf` (Frank, pipeline model)** | A | **40.67** | **11.19** | 0.771 | 0.0856 | 0.3892 |
+| | B | **27.74** | 6.59 | 0.770 | 0.0680 | 0.4388 |
+| `team5050` (Abdo) | A | 40.97 | 11.63 | 0.801 | 0.0861 | 0.3803 |
+| | B (lab scorer) | 27.27 | 6.57 | | 0.0677 | 0.4281 |
 
 August is calmer (lower MAE and pinball), the intervals under-cover slightly (0.76–0.78), and the direction score is worse than on fold A, with only two months of training data. No organisers' baseline exists for August, so we do not report improvement percentages there.
 
 What fold B decided:
 - **Pooled calibration** (three rolling 14-day holdouts instead of one) improved every fold-A metric but made fold B worse on MAE, pinball and direction, and pulled fold-A coverage down to 0.765. We kept the single holdout.
-- **Live imbalance and ICON-EU** each improved fold B in the same direction as fold A. Together (`split_all_rt_icon`) they beat `split_all` on both folds on MAE, pinball and direction, so this became the final model. The spike Brier is flat on fold A (+0.0001) and better on fold B (−0.0009).
-- The gains are small (about 1 % of MAE) next to the week-to-week swing below, so the ranking of close variants rests on agreement across both folds, not on the size of any one gain.
+- **Live imbalance and ICON-EU** each improved fold B in the same direction as fold A. Together (`split_all_rt_icon`) they beat `split_all` on both folds on MAE, pinball and direction, so it is the best model of our branch. The spike Brier is flat on fold A (+0.0001) and better on fold B (−0.0009).
+- Frank's later rounds (section 5) also had to win on August, and `v6_hf` does. The gains of our own variants are small (about 1 % of MAE) next to the week-to-week swing below, so the ranking of close variants rests on agreement across both folds, not on the size of any one gain.
 
 ### Diagnostics on the validation forecasts
 
@@ -182,13 +227,14 @@ What fold B decided:
 
 ## 7. Limitations
 
-- **The numbers are optimistic.** We compared 16 variants on the validation window (7 Sep – 4 Oct). Selection on one window inflates the result, and the weekly results swing a lot (MAE 31 to 50 between weeks, `reports/weekly_metrics.md`). From `split_all` on, every change also had to win on the August fold (section 6), which limits this, but the earlier steps were chosen on fold A alone. The test period will tell. No confidence intervals are reported. TODO(number: paired-origin uncertainty intervals).
+- **The numbers are optimistic.** About 37 variants were compared on the validation month (`docs/RESULTS.md`); we compared 16 of them on the validation window (7 Sep – 4 Oct). Selection on one window inflates the result, and the weekly results swing a lot (MAE 31 to 50 between weeks, `reports/weekly_metrics.md`). From `split_all` on, every change also had to win on the August fold (section 6), which limits this, but the earlier steps were chosen on fold A alone, and Frank's tuning folds (26 Jul – 6 Sep) overlap August. The test period will tell. No confidence intervals are reported. TODO(number: paired-origin uncertainty intervals).
+- **Older imbalance prices were recomputed under the June 2026 rule.** The pre-June history used by `v6_hf` has a target rebuilt with the 1 June 2026 volume-weighted rule. It matches the official price on 99.5 % of Jun–Oct 2026 quarters. The `regime_2026` flag tells the model which rule a row was priced under. Pre-June rows have no ENTSO-E neighbour series, weather runs or Fingrid real-time data.
 - **Fingrid real-time history was downloaded after the fact.** If Fingrid corrected or revised values after first publication, the backtest saw the corrected values, not what was available at the origin. We cannot verify vintages. ☐ This is a question for the organisers, together with the delay rule below.
 - **The real-time delay is our assumption.** We use 30 min after each quarter, the organisers' own delay for measured Fingrid data. ☐ We have not asked the organisers whether real-time series with our own delay are accepted. If they are not, the model falls back to the package-plus-weather variant (MAE 43.08 on validation).
-- **Calibration drift into October and November.** The 14-day holdout before the test (20 Sep – 4 Oct) was volatile. For the final model's test run, the learned P90 offset is +18 €/MWh in the short model and +38 to +44 €/MWh in the long model, against +14 to +21 for `split_all` on validation. It is either a correct adaptation to the autumn regime or overfitting to two noisy weeks. The input drift in `reports/drift_inputs.md` shows the test period has much more wind and higher consumption than even the last 14 training days, so the holdout covers that regime only partly, and the week-by-week table (`reports/weekly_metrics.md`) shows how much one window can swing. Pooled calibration over three holdouts was tested and rejected on fold B (section 6); shrinking the offsets is untested.
+- **Calibration drift into October and November.** The 14-day holdout before the test (20 Sep – 4 Oct) was volatile. For the `split_all_rt_icon` test run, the learned P90 offset is +18 €/MWh in the short model and +38 to +44 €/MWh in the long model, against +14 to +21 for `split_all` on validation. It is either a correct adaptation to the autumn regime or overfitting to two noisy weeks. The input drift in `reports/drift_inputs.md` shows the test period has much more wind and higher consumption than even the last 14 training days, so the holdout covers that regime only partly, and the week-by-week table (`reports/weekly_metrics.md`) shows how much one window can swing. Pooled calibration over three holdouts was tested and rejected on fold B (section 6); shrinking the offsets is untested.
 - **Daylight saving change on 25 Oct** falls inside the test period (a 25-hour local day). Features use the package's local calendar (`cal_hour_local`, `cal_weekday_local`, `cal_is_dst`), which the organisers computed from local Finnish time, so the hour of day should stay correct. ✔ the leakage test includes origins around the change. ☐ We have not checked forecast quality separately on that day. The submission has 673 origins, one more than 28 × 24, because of the extra hour.
 - **The weather power curve is generic** (hand-set, not fitted), and the 8 weather points are approximate wind-cluster centres. A better mapping could help.
-- **Few spikes and short history.** The training data has only about four months. The test period is autumn into November, a season the training data covers little of. Icing and winter effects are barely represented.
+- **Few spikes and short history.** The package alone has only about four months; `v6_hf` adds 15 months of history. The test period is autumn into November, a season the training data covers little of. Icing and winter effects are barely represented.
 - **No plant or position data.** We do not know Turku Energia's capacity, marginal costs, contracts or trading position. The dashboard therefore gives **suggestions to review** ("check the Naantali plan for 16–18"), never instructions.
 - **LLM text is explanation only.** It cannot change the forecast and is checked against a fact sheet, but it can still be wrong in tone or emphasis.
 
@@ -198,5 +244,5 @@ What fold B decided:
 - **Calibration that holds across regimes.** Pooling three holdouts did not help on fold B; shrinking the offsets towards a long-run value, or calibrating up and down quarters separately (the low-spike probability is over-forecast), are the next things to test, again on both folds.
 - **Uncertainty on the deltas.** Repeat runs with different seeds and paired-origin intervals, so that gains of 1 % can be told apart from noise.
 - Outage messages from Nord Pool UMM: large fresh trips (above 800 MW) preceded the strongest spikes in training, but only 20 quarters (fetched, not used yet).
-- Pre-June Fingrid history (last autumn and winter) once the organisers approve it.
+- Real-time Fingrid and weather data for the pre-June history rows, which are empty there now.
 - With plant data from Turku Energia: move from "suggestions to review" to capacity-aware recommendations.
