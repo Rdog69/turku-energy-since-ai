@@ -1,11 +1,13 @@
+import { ChartCandlestick, Factory, Gauge, Info, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
 import { PAYLOAD, PERIOD_IDS } from "@/lib/model";
+import { Tip } from "./Bits";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/time";
 
 export type View = "simple" | "trader" | "production";
 export const VIEWS: View[] = ["simple", "trader", "production"];
-const VIEW_KEYS: Record<View, [string, string]> = {
-  simple: ["vSimple", "vSimpleHint"], trader: ["vTrader", "vTraderHint"], production: ["vProd", "vProdHint"],
+const VIEW_KEYS: Record<View, [string, string, LucideIcon]> = {
+  simple: ["vSimple", "vSimpleHint", Gauge], trader: ["vTrader", "vTraderHint", ChartCandlestick], production: ["vProd", "vProdHint", Factory],
 };
 
 export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
@@ -22,12 +24,16 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
 
       <nav aria-label={t(lang, "view")} className="space-y-1.5">
         <p className="text-[13px] font-semibold text-bank-ink2">{t(lang, "view")}</p>
-        {VIEWS.map((v) => (
-          <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={seg(view === v)}>
-            <span className="block">{t(lang, VIEW_KEYS[v][0])}</span>
-            <span className={`block text-[12.5px] font-normal ${view === v ? "text-ink-2" : "text-bank-ink2"}`}>{t(lang, VIEW_KEYS[v][1])}</span>
-          </button>
-        ))}
+        {VIEWS.map((v) => {
+          const [label, hint, Icon] = VIEW_KEYS[v];
+          return (
+            <Tip key={v} text={t(lang, hint)} side="right">
+              <button type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`${seg(view === v)} flex items-center gap-2.5`}>
+                <Icon size={18} strokeWidth={1.75} className="shrink-0" />{t(lang, label)}
+              </button>
+            </Tip>
+          );
+        })}
       </nav>
 
       <nav aria-label={t(lang, "period")} className="space-y-1.5">
@@ -51,15 +57,17 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
         </div>
       </div>
 
-      <div className="space-y-4 text-[13.5px] leading-snug">
-        <div>
-          <p className="font-semibold text-white">{t(lang, "model")}</p>
-          <p className="mt-1 text-bank-ink2">{t(lang, "modelText")}</p>
-        </div>
-        <p className="text-bank-ink2">{t(lang, "rules")}</p>
-      </div>
-
-      <p className="mt-auto text-[12px] leading-snug text-bank-ink2">{t(lang, "local")}</p>
+      <ul className="mt-auto space-y-1">
+        {([["infoModel", "modelText", Info], ["infoRules", "rules", ShieldCheck], ["infoLocal", "local", Lock]] as const).map(([label, text, Icon]) => (
+          <li key={label}>
+            <Tip text={t(lang, text)} side="right">
+              <button type="button" className="flex w-full items-center gap-2.5 rounded-[4px] px-3 py-1.5 text-left text-[13.5px] text-bank-ink2 transition-colors duration-150 hover:bg-white/10 hover:text-white">
+                <Icon size={16} strokeWidth={1.75} className="shrink-0" />{t(lang, label)}
+              </button>
+            </Tip>
+          </li>
+        ))}
+      </ul>
     </aside>
   );
 }

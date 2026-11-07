@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Tooltip from "@radix-ui/react-tooltip";
+import { ChevronDown } from "lucide-react";
 import { Rail, VIEWS, type View } from "@/components/Rail";
 import { SimpleView } from "@/components/SimpleView";
 import { ProductionView } from "@/components/ProductionView";
@@ -105,7 +106,7 @@ export default function App() {
           <div>
             <button type="button" onClick={() => setDetails(!details)} aria-expanded={details}
               className="rounded-md border border-rule bg-sheet px-4 py-2 text-[14px] font-semibold text-bank transition-transform duration-150 ease-out active:scale-[0.96]">
-              {details ? t(lang, "hideDetails") : t(lang, "details")}
+              <span className="inline-flex items-center gap-1.5">{details ? t(lang, "hideDetails") : t(lang, "details")}<ChevronDown size={16} strokeWidth={2} className={`transition-transform duration-150 ${details ? "rotate-180" : ""}`} /></span>
             </button>
           </div>
           {details && <QuarterTable p={p} i={i} lang={lang} focus={focus} />}

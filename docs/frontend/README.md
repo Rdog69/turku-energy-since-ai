@@ -1,6 +1,6 @@
 # Feeding Abdo's frontend (`origin/front-end`) the current candidate
 
-Checked Sat 7 Nov 2026, evening, against `origin/front-end` commit `891f536`.
+Checked Sat 7 Nov 2026, evening, against `origin/front-end` commits `891f536` and `69cee5a` (its data script is the same in both).
 
 ## What the frontend reads
 

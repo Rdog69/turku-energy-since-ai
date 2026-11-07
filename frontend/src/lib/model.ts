@@ -144,16 +144,17 @@ export interface HourSummary {
   hi: number; lo: number; pu: number; pd: number; p50: number; spot: number | null; level: HourLevel; side: "high" | "low" | null;
 }
 
-/** the 40 quarters folded into 10 hours, with the same thresholds as the alerts (high price 40/55 %, low price 50/65 %) */
-export function hourSummary(p: Period, i: number): HourSummary[] {
+/** the 40 quarters in buckets of `size` (4 = hours, 1 = quarter-hours), with the alert thresholds
+ *  (high price 40/55 %, low price 50/65 %) */
+export function hourSummary(p: Period, i: number, size = 4): HourSummary[] {
   const F = forecastAt(p, i);
   const o = p.origins[i];
   const T = reviewMin(p, i);
   const out: HourSummary[] = [];
-  for (let h = 0; h < 10; h++) {
-    const s = [4 * h, 4 * h + 1, 4 * h + 2, 4 * h + 3];
+  for (let h = 0; h < STEPS / size; h++) {
+    const s = Array.from({ length: size }, (_, j) => size * h + j);
     const mx = (a: number[]) => Math.max(...s.map((k) => a[k]));
-    const mean = (a: number[]) => s.reduce((acc, k) => acc + a[k], 0) / 4;
+    const mean = (a: number[]) => s.reduce((acc, k) => acc + a[k], 0) / size;
     const hi = mx(F.hi), lo = mx(F.lo);
     const sp = s.map((k) => known(p.spot, p.spot_fu, o + k, T)).filter((v): v is number => v !== null);
     const hiLvl = hi >= 0.55 ? 2 : hi >= 0.4 ? 1 : 0;

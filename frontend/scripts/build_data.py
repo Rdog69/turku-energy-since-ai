@@ -2,7 +2,7 @@
 
     .venv\\Scripts\\python.exe frontend/scripts/build_data.py        (from the repo root)
 
-Copied from Abdo's front-end branch (origin/front-end, commit 891f536) into brainstorming-frank and pointed at
+Copied from Abdo's front-end branch (origin/front-end, commit 891f536; app updated to 69cee5a) into brainstorming-frank and pointed at
 the team's current submission: 1/2 Frank's v7_rt + 1/2 Abdo's h_int4ss, P90 stretched x1.15, spike
 probabilities capped by direction (submissions/MANIFEST.md). The forecast shown is the submitted file itself;
 the two members are loaded too (for the "models disagree" alert), and the script checks that blending them

@@ -1,5 +1,5 @@
 import { useMemo, useRef } from "react";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pause, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Clock, Pause, Play } from "lucide-react";
 import * as Slider from "@radix-ui/react-slider";
 import type { Period } from "@/data/types";
 import { alertWeights, reviewMs } from "@/lib/model";
@@ -31,7 +31,7 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying }: {
     <section aria-label={t(lang, "reviewTime")} className="border-b border-rule pb-4">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
         <div>
-          <p className="text-[13px] font-semibold text-ink-2">{t(lang, "reviewTime")}</p>
+          <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-2"><Clock size={14} strokeWidth={2} />{t(lang, "reviewTime")}</p>
           <p className="num text-[30px] font-bold leading-tight text-ink">
             <span className="capitalize">{dayLong(T, lang)}</span>{" "}
             <span className="text-bank">{hhmm(T, lang)}</span>
@@ -69,13 +69,12 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying }: {
           <Slider.Thumb className="block h-5 w-5 rounded-full border-2 border-bank bg-sheet shadow-[0_2px_6px_-1px_rgba(11,60,106,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank focus-visible:ring-offset-2" />
         </Slider.Root>
         <div className="relative h-4">
-          {days.filter((_, k) => k % 2 === 0).map((d) => (
-            <span key={d.k} className="num absolute -translate-x-1/2 text-[11.5px] text-ink-3" style={{ left: `${(d.k / (n - 1)) * 100}%` }}>
+          {days.filter((_, k) => k % 2 === 0).map((d, j) => (
+            <span key={d.k} className={`num absolute -translate-x-1/2 text-[11.5px] text-ink-3 ${j % 2 ? "hidden md:inline" : ""}`} style={{ left: `${(d.k / (n - 1)) * 100}%` }}>
               {dateShort(d.ms, lang)}
             </span>
           ))}
         </div>
-        <p className="mt-1 text-[12.5px] text-ink-3">{t(lang, "timelineHint")}</p>
       </div>
     </section>
   );
