@@ -20,15 +20,12 @@ external data tables are committed, so nothing is downloaded.
 OMP_NUM_THREADS=1 .venv/bin/python -m pytest -q -rsf
 ```
 
-Result on the fresh clone (about 10 min on one thread): 71 tests, 69 passed, 1 skipped, 1 failed.
+Expected result (about 10 min on one thread): 71 tests, 70 passed, 1 skipped.
 
 - Skipped: `tests/test_availability.py:244`. The town weather files are not downloaded. Harmless;
   it needs `python -m src.data.open_meteo --points solar`.
-- Failed: `tests/test_code_audit.py::test_no_lags_or_rolling_windows_in_src`. It flags
-  `src/data/external/elering_spot.py:30` (`df.start.diff().shift(-1)`). That line sets the end of
-  each spot interval in a fetcher, not a feature, so it is a false positive of the audit pattern.
-  The fix is to add the line to `ALLOWED_WINDOW_OPS` in `tests/test_code_audit.py` or to rewrite it
-  without `.shift`. The leakage truncation tests all pass.
+- The fresh-clone check first found one failure, in `tests/test_code_audit.py`: a `.shift(` inside
+  the Elering spot fetcher, which is not a feature. It is now whitelisted with its reason.
 
 ## 3. One backtest (not run while writing this guide)
 
