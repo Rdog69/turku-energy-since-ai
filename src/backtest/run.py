@@ -5,7 +5,8 @@
 
 Validation: trains on rows whose targets were published by the first validation origin
 (7 Sep 00:00), forecasts 7 Sep - 4 Oct and scores against actuals_validation.csv with the
-organisers' score.py. Test: trains on everything published by 5 Oct 00:00 and writes
+organisers' score.py. fold_b: same, for August (cutoff 1 Aug 00:00), actuals built by
+src/backtest/actuals.py. Test: trains on everything published by 5 Oct 00:00 and writes
 results/<model>/test/forecast_backtest.csv, ready for the validator and submission.
 """
 from __future__ import annotations
@@ -26,6 +27,15 @@ from src.features.build import build_features
 from src.models.anchor import SpotAnchor
 from src.models.blend import HorizonSplit
 from src.models.gbm import GBMModel
+
+def _split_all(name: str, **calib) -> HorizonSplit:
+    """The split_all architecture (short: Fingrid RT + weather, long: weather) with calibration options."""
+    return HorizonSplit(
+        name=name, split_step=8,
+        short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, **calib),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True, **calib))
+
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
 MODELS = {
@@ -52,6 +62,9 @@ MODELS = {
         short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True),
         long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    # split_all with pooled out-of-time calibration: 3 rolling 14-day holdouts ending at the cutoff
+    # instead of the single last 14 days (T1; see docs/RESULTS.md).
+    "split_all_pcal": lambda: _split_all("split_all_pcal", calib_mode="pooled", calib_folds=3),
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
@@ -77,11 +90,11 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     """(origins csv, template csv) for the period."""
     if period == "test":
         return pkg / "forecast_origins.csv", pkg / "sample_submission.csv"
-    out = config.RESULTS_DIR / "templates" / "validation"
+    out = config.RESULTS_DIR / "templates" / period
     if not (out / "sample_submission.csv").exists():
         out.mkdir(parents=True, exist_ok=True)
-        rc = run_script(pkg, "make_templates.py", "--test-start", "2026-09-07", "--test-end",
-                        "2026-10-04", "--output-dir", str(out))
+        rc = run_script(pkg, "make_templates.py", "--test-start", config.PERIODS[period]["start"],
+                        "--test-end", config.PERIODS[period]["end"], "--output-dir", str(out))
         if rc != 0:
             raise RuntimeError("make_templates.py failed")
     return out / "forecast_origins.csv", out / "sample_submission.csv"
@@ -129,7 +142,7 @@ def write_submission(feats: pd.DataFrame, pred: pd.DataFrame, template: Path, pa
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--period", choices=["validation", "test"], default="validation")
+    ap.add_argument("--period", choices=["validation", "fold_b", "test"], default="validation")
     ap.add_argument("--model", choices=sorted(MODELS), default="spot_anchor")
     args = ap.parse_args(argv)
 
@@ -139,7 +152,7 @@ def main(argv=None) -> int:
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
-    cutoff = origins.min() if args.period == "validation" else config.TRAIN_CUTOFF
+    cutoff = origins.min() if args.period != "test" else config.TRAIN_CUTOFF
     assert cutoff <= config.TRAIN_CUTOFF
 
     weather = None
@@ -167,11 +180,17 @@ def main(argv=None) -> int:
     rc = run_script(pkg, "validate_submission.py", "--backtest", str(sub_path), "--origins", str(origins_csv))
     if rc != 0:
         return rc
-    if args.period == "validation":
-        baseline = pkg / "baseline_output" / "validation" / "score" / "score_summary.csv"
-        extra = ["--baseline-summary", str(baseline)] if baseline.exists() else []
-        rc = run_script(pkg, "score.py", "--submission", str(sub_path), "--actuals",
-                        "data/actuals_validation.csv", "--spike-margin", str(int(config.SPIKE_MARGIN)),
+    if args.period != "test":
+        if args.period == "validation":
+            actuals = "data/actuals_validation.csv"        # the organisers' file
+            baseline = pkg / "baseline_output" / "validation" / "score" / "score_summary.csv"
+            extra = ["--baseline-summary", str(baseline)] if baseline.exists() else []
+        else:
+            from src.backtest.actuals import write_actuals
+            actuals = str(write_actuals(args.period))      # built from the package long data
+            extra = []
+        rc = run_script(pkg, "score.py", "--submission", str(sub_path), "--actuals", actuals,
+                        "--spike-margin", str(int(config.SPIKE_MARGIN)),
                         "--output-dir", str(out_dir / "score"), *extra)
     return rc
 
