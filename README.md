@@ -314,7 +314,7 @@ python -m src.backtest.run --period test --model v6_hf
 
 It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
 
-It also needs the pre-June history: `external_data/history/pkg_history.parquet` or `pkg_history.csv.gz`, built by `experiments/lab/build_history.py` on the `brainstorming-abdo` branch. It isn't committed here, because it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only). To refresh the tables:
+It also needs the pre-June history, `external_data/history/pkg_history.csv.gz` (or a local `pkg_history.parquet`), built by `experiments/lab/build_history.py`. It is committed on this branch, and it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only), which is one more reason the repo must stay private. To refresh the tables:
 
 ```bash
 python -m src.data.fingrid
@@ -387,23 +387,33 @@ It reads `results/dashboard/test` if present, else `app_demo_sample/test` (chang
 
 ```
 .
-├─ README.md
-├─ requirements.txt
+├─ README.md, SOURCES.md, CLAUDE.md, AGENTS.md
+├─ requirements.txt, requirements-app.txt
 ├─ src/
 │  ├─ config.py           # paths, periods, constants
-│  ├─ data/
-│  │  ├─ load.py          # load the package's long-format data
-│  │  └─ availability.py  # THE availability rule: available_at(), fast SeriesIndex lookups
+│  ├─ data/               # loading, THE availability rule (availability.py), weather runs,
+│  │                      # Fingrid / Open-Meteo / OSM fetchers, external_long.py, external/ fetchers
 │  ├─ features/build.py   # leakage-safe feature table, one row per (origin, step)
-│  ├─ models/anchor.py    # spot-anchor model (the floor to beat)
-│  └─ backtest/run.py     # train → forecast → write → validate → score
-├─ tests/                 # leakage tests (run with pytest)
-├─ docs/                  # plan, TL;DR, results log
+│  ├─ models/             # spot anchor, LightGBM (gbm.py), HorizonSplit / MedianFrom (blend.py),
+│  │                      # learned wind production, tuning
+│  ├─ backtest/           # run.py (train → forecast → write → validate → score), actuals.py
+│  ├─ export/             # dashboard JSON, demo sample, map layer
+│  ├─ explain/            # Featherless briefings (text only, never a model input)
+│  └─ automation/         # n8n alert replay
+├─ tests/                 # leakage tests and code audits (run with pytest)
+├─ app/                   # local Streamlit fallback dashboard (shows spot: never deploy)
+├─ app_demo_sample/       # demo data for the dashboards
+├─ automation/            # n8n workflow export
+├─ scoreboard/            # team scoreboard: log every September and August score here
+├─ reports/               # evaluation report, demo script, slides outline, figures
+├─ docs/                  # plan, TL;DR, results log, QUICKSTART
+├─ experiments/lab/       # Abdo's experiment harness (separate leaderboard)
+├─ external_data/         # processed external tables (committed)
+├─ submissions/           # submission files
+├─ lumi/, evidence/, recovery/   # cluster jobs and tuning-run evidence
 ├─ results/               # model outputs, git-ignored
 └─ starter_package/       # organisers' data, committed (private repo)
 ```
-
-Planned additions: `src/models/` (quantile and probability models), `src/explain/`, `api/`, `app/`, `automation/`, `reports/`.
 
 ## Deliverables checklist
 
