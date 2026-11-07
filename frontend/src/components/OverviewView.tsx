@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
@@ -10,7 +10,6 @@ import { ChanceDots } from "./Bits";
 import { BACK, H, TimeChart, TimeLegend } from "./TimeChart";
 import { TimeBar } from "./TimeBar";
 import { PeriodStrip } from "./PeriodStrip";
-import { useSmoothRange } from "@/lib/useSmooth";
 import { alertKey } from "./AlertList";
 import { QuarterTable } from "./QuarterTable";
 import { Hindsight } from "./Hindsight";
@@ -25,32 +24,43 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
 }) {
   const [panel, setPanel] = useState<{ kind: "alert"; a: Alert } | { kind: "quarter"; s: number } | { kind: "all" } | null>(null);
   const [zones, setZones] = useState(false);
-  // the graph window: "now" sits at BACK of the width. Gestures move "now" in whole forecast hours (the
-  // remainder is kept for the next event); the window then glides to its new place, so motion stays smooth.
+  // The review moment ("now") moves in 15-minute steps, one per data point: forecast hour i plus qOff quarter-hours
+  // (0..3). The forecast shown is the newest one (hour i's) from the quarter-hour at "now" on; at the next full hour
+  // the newer forecast takes over. Scrolling, dragging and the period strip all move in these steps, "now" sits at
+  // BACK of the graph window, and nothing ever rests between two quarter-hours: no glide, no snap afterwards.
   const [span, setSpan] = useState(16 * H);
-  const iRef = useRef(i); iRef.current = i;
-  const rest = useRef(0);
+  const [qOff, setQOff] = useState(0);
   const n = p.origins.length;
+  const pos = useRef(0); pos.current = 4 * i + qOff;   // window position, in quarter-hours from the first forecast hour
+  const acc = useRef(0);                                // scroll or drag not yet worth a whole quarter-hour (ms)
+  const goQ = useCallback((q: number) => {
+    const nq = Math.max(0, Math.min(4 * (n - 1) + 3, Math.round(q)));
+    pos.current = nq;
+    setI(Math.floor(nq / 4));
+    setQOff(nq % 4);
+  }, [n, setI]);
   const pan = useCallback((ms: number) => {
     setPlaying(false);
-    rest.current += ms;
-    const k = Math.trunc(rest.current / H);
-    if (k === 0) return;
-    rest.current -= k * H;
-    const ni = Math.max(0, Math.min(n - 1, iRef.current + k));
-    if (ni === 0 || ni === n - 1) rest.current = 0;
-    iRef.current = ni;
-    setI(ni);
-  }, [n, setI, setPlaying]);
-  const jump = useCallback((ms: number) => {
+    acc.current += ms;
+    const k = Math.trunc(acc.current / Q_MS);
+    if (k !== 0) { acc.current -= k * Q_MS; goQ(pos.current + k); }
+  }, [goQ, setPlaying]);
+  const panEnd = useCallback(() => { acc.current = 0; }, []);
+  // hour and day buttons: whole hours, keeping the quarter-hour
+  const setHour = useCallback((v: number) => { acc.current = 0; goQ(4 * v + (pos.current % 4)); }, [goQ]);
+  // a click on the period strip centres the window there
+  const jumpTo = useCallback((ms: number) => {
     setPlaying(false);
-    rest.current = 0;
-    setI(Math.max(0, Math.min(n - 1, Math.round((ms - reviewMs(p, 0)) / H))));
-  }, [n, p, setI, setPlaying]);
-  const T = reviewMs(p, i);
-  const view = useSmoothRange([T - BACK * span, T + (1 - BACK) * span], 75, 31 * 24 * H);
+    acc.current = 0;
+    goQ((ms - (0.5 - BACK) * span - reviewMs(p, 0)) / Q_MS);
+  }, [goQ, p, span, setPlaying]);
+  useEffect(() => { acc.current = 0; setQOff(0); }, [p]);
+  useEffect(() => { if (playing) { acc.current = 0; setQOff(0); } }, [playing]);
+  const center = reviewMs(p, i) + qOff * Q_MS;
+  const view: [number, number] = [center - BACK * span, center + (1 - BACK) * span];
   const [details, setDetails] = useState(false);
-  const alerts = useMemo(() => sortedAlerts(p, i), [p, i]);
+  // items whose window has already passed by "now" are no longer worth checking
+  const alerts = useMemo(() => sortedAlerts(p, i).filter((a) => a.b >= qOff), [p, i, qOff]);
   const major = alerts.filter((a) => a.level === "high" || a.kind === "spike_high" || a.kind === "spike_low");
   const focus = panel?.kind === "alert" ? panel.a : null;
   const o = p.origins[i];
@@ -63,10 +73,9 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
       <WorthChips lang={lang} alerts={alerts} major={major} win={win}
         onOpen={(a) => setPanel({ kind: "alert", a })} onAll={() => setPanel({ kind: "all" })} />
 
-      <section aria-label={t(lang, "chartTitle")} className="rounded-2xl border border-rule bg-sheet/60 px-4 pb-4 pt-4 shadow-[0_1px_2px_rgba(20,34,51,0.04)] sm:px-6">
-        <TimeBar p={p} i={i} setI={(v) => { rest.current = 0; setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} compact />
-        <div className="mt-3"><PeriodStrip p={p} i={i} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
-        <div className="mb-2 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
+      <section aria-label={t(lang, "chartTitle")} className="rounded-xl border border-rule bg-sheet/50 px-4 pb-3 pt-4 sm:px-5">
+        <TimeBar p={p} i={i} setI={setHour} lang={lang} playing={playing} setPlaying={setPlaying} timeline={false} offset={qOff * Q_MS} compact />
+        <div className="mb-1 mt-4 flex flex-wrap items-center justify-between gap-3 pr-[150px]">
           <TimeLegend lang={lang} />
           <button type="button" onClick={() => setZones(!zones)} aria-pressed={zones}
             className={`rounded-md border px-3 py-1 text-[13px] font-semibold transition-colors duration-150 ${zones ? "border-bank bg-bank text-white" : "border-rule bg-sheet text-bank"}`}>
@@ -75,11 +84,14 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
         </div>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TimeChart p={p} i={i} win={view} lang={lang} focus={focus} zones={zones} span={span}
-            onPan={pan} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
-            onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
+            onPan={pan} onPanEnd={panEnd} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
+            onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} nowOffset={qOff * Q_MS} />
         </div>
+        {/* Frank's period strip (from his newer version d2a0d19), under the graph and lined up with its plot area */}
+        <div className="mb-2 mt-1"><PeriodStrip p={p} i={i} now={center} view={view} lang={lang} onPan={pan} onPanEnd={panEnd} onJump={jumpTo} /></div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />
+          <span className="text-[12.5px] text-ink-3">{t(lang, "tcHint")}</span>
         </div>
       </section>
 

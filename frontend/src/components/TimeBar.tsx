@@ -6,14 +6,19 @@ import { alertWeights, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { dateShort, dayLong, hhmm, hourOf, type Lang } from "@/lib/time";
 
-export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false }: {
+export function TimeBar({ p, i, setI, lang, playing, setPlaying, win, compact = false, timeline = true, offset = 0 }: {
   p: Period; i: number; setI: (i: number) => void; lang: Lang; playing: boolean; setPlaying: (v: boolean) => void;
-  compact?: boolean;
+  win?: [number, number]; compact?: boolean;
+  /** false: hide the whole-period slider (the Overview has the period strip under the graph instead) */
+  timeline?: boolean;
+  /** the review moment in 15-minute steps past forecast hour i (ms); the forecast is still hour i's */
+  offset?: number;
 }) {
   const n = p.origins.length;
   const T = reviewMs(p, i);
   const cutoff = p.t0 + p.cutoff[i] * 60_000;
-  const age = Math.round((T - cutoff) / 60_000);
+  const R = T + offset;                       // the review moment
+  const age = Math.round((R - cutoff) / 60_000);
   const weights = useMemo(() => alertWeights(p), [p]);
   const maxW = Math.max(1, ...weights);
   const go = (d: number) => setI(Math.max(0, Math.min(n - 1, i + d)));
@@ -26,6 +31,11 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false
     return out;
   }, [p, n]);
 
+  // the window the main graph shows, as a box on the whole-period strip
+  const t0 = reviewMs(p, 0), t1 = reviewMs(p, n - 1);
+  const fr = (ms: number) => Math.max(0, Math.min(1, (ms - t0) / (t1 - t0)));
+  const box = win ? { l: fr(win[0]) * 100, w: Math.max(0.6, (fr(win[1]) - fr(win[0])) * 100) } : null;
+
   const btn = "inline-flex h-10 w-10 items-center justify-center rounded-md border border-rule bg-sheet text-ink-2 transition-[color,transform] duration-150 ease-out hover:text-bank active:scale-[0.96] disabled:opacity-40";
 
   return (
@@ -34,8 +44,8 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false
         <div>
           {!compact && <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-2"><Clock size={14} strokeWidth={2} />{t(lang, "reviewTime")}</p>}
           <p className={`num font-bold leading-tight text-ink ${compact ? "text-[22px]" : "text-[30px]"}`}>
-            <span className="capitalize">{dayLong(T, lang)}</span>{" "}
-            <span className="text-bank">{hhmm(T, lang)}</span>
+            <span className="capitalize">{dayLong(R, lang)}</span>{" "}
+            <span className="text-bank">{hhmm(R, lang)}</span>
           </p>
           <p className="num text-[13.5px] text-ink-2">
             {t(lang, "made")} {hhmm(T, lang)}, {t(lang, "newest", { t: hhmm(cutoff, lang), m: age })}
@@ -54,7 +64,11 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false
         </div>
       </div>
 
-      {!compact && <div className="relative mt-4" ref={track}>
+      {timeline && <div className={`relative ${compact ? "mt-2" : "mt-4"}`} ref={track}>
+        {box && (
+          <span aria-hidden className="pointer-events-none absolute top-0 z-[1] h-[54px] rounded-[5px] border-2 border-bank/75 bg-bank/[0.07] transition-[left,width] duration-100 ease-out"
+            style={{ left: `${box.l}%`, width: `${box.w}%` }} />
+        )}
         {/* how much was worth checking, hour by hour: the bars line up with the slider */}
         <svg className="block h-[30px] w-full" viewBox={`0 0 ${n} 30`} preserveAspectRatio="none" aria-hidden>
           {weights.map((w, k) => w > 0 && (
