@@ -1,0 +1,28 @@
+{
+  "owner": "Abdo",
+  "model": "h_int4ss",
+  "period": "fold_b",
+  "scorer": "official",
+  "mae": 27.153922,
+  "pinball": 6.164288,
+  "spike_brier": 0.063886,
+  "direction_brier": 0.421853,
+  "coverage": 0.84787,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "Abdo's history-mode INT4 model on its own (trained Mar 2025 onwards)",
+  "notes": "Rescored by Frank's session from Abdo's committed August file.",
+  "forecast_file": "brainstorming-abdo:submissions/foldb_h_int4ss.csv",
+  "branch": "brainstorming-abdo",
+  "commit": "2b4e84e",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T15:19:12Z"
+}
