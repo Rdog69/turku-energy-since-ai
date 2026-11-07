@@ -6,6 +6,17 @@
 
 Sources: "README" is the organisers' starter-package README (section numbers as in the file); `availability.csv` is the package's table of publication delays.
 
+## Status, 7 Nov evening
+
+| Question | Status |
+|---|---|
+| Pre-June data (Q1 below) | **Answered:** allowed (organisers' Q&A announcement). |
+| Fingrid API history = today's corrected values, not first-published ones | **Asked** by Frank. |
+| Weather-run delays (8 h ECMWF, 5 h ICON-EU) | **Decided, not asked:** both are longer than the delays actually measured (7.1 h for ECMWF by Abdo; 3.9 h for ICON-EU in Open-Meteo's metadata, 6 Nov), so they're conservative. |
+| Fingrid real-time surplus/deficit (198, 186) | **Decided, not asked:** it is measured real-time data like wind (181), so the package's own rule for measured Fingrid data applies: 30 min after the quarter, rounded up to the hour (`availability.csv`). The 60-min rule belongs to the imbalance price, which is computed after the fact. Same revision caveat as all API history. |
+| Sharing spot-based outputs | **Decided:** forecasts, scores and charts can be shown. The raw Nord Pool spot series itself stays out of public places (README §9). |
+| Submission details, dashboard requirements | **Not asked:** handled by the team. |
+
 ---
 
 ## A. The big ones (they change the model)
