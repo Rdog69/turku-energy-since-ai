@@ -64,6 +64,11 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 
 **Team candidate (7 Nov evening): ½ `v7_rt` + ½ Abdo's `h_int4ss`**, equal weights on all eight outputs. Officially scored: Sep 40.19 / 11.07 / 0.0840 / 0.3799, Aug 27.05 / 6.22 / 0.0648 / 0.4202. That is 36.7 % / 29.0 % better than the baseline (average 32.8 %, the best on the team scoreboard). Files and checksums are in `submissions/MANIFEST.md`.
 
+**Round 9 (7 Nov night), post-processing the team blend, chosen by cross-fit (fit on one month, check on the other):**
+- **Per-output blend weights** (median, band, spikes, direction; Abdo's share 0–1): dropped. September wants about 50/50 or more of ours, August more of Abdo's, for the median, band and spikes alike. Only direction at 0.6 beats 50/50 in both months (−0.05 % / −0.29 %), and the weight fitted on August (0.7) loses on September.
+- **Narrowing the band** (the original idea, coverage 81–82 %): pinball gets worse in both months. The band is lopsided, not too wide: 5–8 % of prices fall below P10 and 11–13 % above P90.
+- **Kept: P90 stretched ×1.15 away from P50**, P10 untouched. Pinball −0.34 % (Sep) / −1.02 % (Aug); fitted on one month, it improves the other (Aug-fit 1.15 → Sep −0.34 %; Sep-fit 1.125 → Aug −0.98 %). Weighted: 36.74 % / 29.15 % vs baseline (average 32.9 %, was 32.8 %). Moving P10 as well looked better in August only.
+
 **Final vs baseline (`v7_rt` alone):** MAE −39 % (66.20 → 40.64), pinball −54 % (24.18 → 11.20), spike Brier −24 % (0.1132 → 0.0855), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %).
 
 ⚠ About 41 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).

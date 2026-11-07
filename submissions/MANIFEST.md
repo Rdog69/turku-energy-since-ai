@@ -2,9 +2,27 @@
 
 The exact files behind every number we report, so anyone can check them.
 
-## Team candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`
+## Team candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`, P90 stretched ×1.15
 
-The best model on the team scoreboard: 32.8 % better than the organisers' baseline, weighted by points and averaged over September (36.7 %) and August (29.0 %).
+The best model on the team scoreboard: 32.9 % better than the organisers' baseline, weighted by points and averaged over September (36.7 %) and August (29.1 %).
+
+| | |
+|---|---|
+| Recipe | The equal-weight blend below, then `p90 = p50 + 1.15 × (p90 − p50)`; every other column unchanged (`submissions/tools/stretch_p90.py`; the blend itself: `submissions/tools/blend_period.py`) |
+| Why | In both months too many prices land above the blend's P90 (11–13 % instead of 10 %), while P10 is fine. Factor chosen by cross-fit: fitted on August (best 1.15) it improves September pinball by 0.34 %; fitted on September (best 1.125) it improves August by 0.98 %. The test month was never used |
+| Effect | Pinball 11.065 → 11.027 (Sep), 6.217 → 6.153 (Aug). MAE, spike and direction identical. Coverage of P10–P90 rises to 0.835 / 0.853 (not scored) |
+
+| File | Period | SHA-256 | Score (organisers' `score.py` 0.1.1): MAE / pinball / spike Brier / direction Brier |
+|---|---|---|---|
+| `blend_hi15_validation.csv` | 7 Sep – 4 Oct 2026 | `4aa95884edc0de2d0b3d5b4e0b4aa00adb222ea2e978b4bbdb20f487c6e609d2` | 40.1938 / 11.0270 / 0.0840 / 0.3799 (coverage 0.835) |
+| `blend_hi15_august.csv` | August 2026 | `7ccabb306f01f4fdc7a71edd124f093cf63cd8aa3dba584d58cb1bae90c9a2ff` | 27.0461 / 6.1530 / 0.0648 / 0.4202 (coverage 0.853) |
+| `blend_hi15_test.csv` | 5 Oct – 1 Nov 2026 (the submission) | `cfc5066113e107a7387f52073a93e1eeb99a09de5c6649f087212c7cd792779c` | Not scored by us. `validate_submission.py`: 26,920 rows, 0 errors, 0 warnings |
+
+To submit, rename `blend_hi15_test.csv` to `forecast_backtest.csv`; the bytes must keep the hash above.
+
+## Previous candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss` (no stretch)
+
+32.8 % better than the baseline (September 36.7 %, August 29.0 %).
 
 | | |
 |---|---|
@@ -20,7 +38,7 @@ The best model on the team scoreboard: 32.8 % better than the organisers' baseli
 
 To submit, rename `blend_v7_rt_h_int4ss_test.csv` to `forecast_backtest.csv`; the bytes must keep the hash above.
 
-## Fallback: `v7_rt` alone
+## Second fallback: `v7_rt` alone
 
 | | |
 |---|---|
