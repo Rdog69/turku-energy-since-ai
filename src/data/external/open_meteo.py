@@ -20,7 +20,7 @@ import sys
 
 import pandas as pd
 
-from .common import PERIODS, POINTS, Http, ceil_hour, json_loads, write
+from .common import CACHE, PERIODS, POINTS, Http, ceil_hour, json_loads, write
 
 SINGLE = "https://single-runs-api.open-meteo.com/v1/forecast"
 ERA5 = "https://archive-api.open-meteo.com/v1/archive"
@@ -49,7 +49,17 @@ def fetch_runs(model: str, period: str, hours, fc_hours: int) -> pd.DataFrame:
                                  "timezone": "GMT"}, cache_key=f"{model}/{r.replace(':', '')}.json")
         if body is None:
             continue
-        data = json_loads(body)
+        try:
+            data = json_loads(body)
+        except ValueError:            # truncated response got cached: drop it and fetch again once
+            (http_cache := CACHE / "open_meteo" / f"{model}/{r.replace(':', '')}.json").unlink(missing_ok=True)
+            body = http.get(SINGLE, {"latitude": ",".join(lats), "longitude": ",".join(lons), "hourly": ",".join(VARS),
+                                     "models": model, "run": r, "forecast_hours": fc_hours, "wind_speed_unit": "ms",
+                                     "timezone": "GMT"}, cache_key=f"{model}/{r.replace(':', '')}.json")
+            try:
+                data = json_loads(body)
+            except (ValueError, TypeError):
+                print(f"  {model} {r}: unreadable response twice, skipped"); continue
         data = data if isinstance(data, list) else [data]
         for name, loc in zip(names, data):
             h = pd.DataFrame(loc["hourly"])

@@ -12,6 +12,9 @@ Spec keys (all optional except name/features):
   half_life_days  recency weights (null = none)
   causal          0..0.3: average with the forecast for the same delivery from the previous origin, ramped over steps 4-16
   calibrate       true/false (default true)
+  short_features  feature sets used ONLY in bands ending at step <= 8 (needs `bands`); pooled model excludes them
+  calib           "eb50": probs' EB-shrunk Platt for spikes + multiplicative width (default: models.calibrate)
+  cal_days        calibration window in days (default 14; only used with calib)
 Everything goes through run_experiment -> leak-checked features, both folds, shared leaderboard.
 """
 from __future__ import annotations
@@ -56,19 +59,25 @@ def resolve(names):
     return fns
 
 
-def band_post(fns, bands, model, target, hgb, calibrate=True):
-    """Like structure.band_post, but with the experiment's own feature set."""
+def band_post(fns, bands, model, target, hgb, calibrate=True, calib=None, cal_days=14, short_fns=(), short_max=8):
+    """Like structure.band_post, but with the experiment's own feature set.
+    short_fns: extra feature sets used ONLY by bands ending at or before step `short_max` (Frank's finding:
+    real-time data helps hours 1-2 and is noise later)."""
     from .data import Data, build_base
     from .models import calibrate as _cal, fit_predict
+    if calib == "eb50":
+        from .calib_eb import calibrate_eb
+        _cal = calibrate_eb
     from .run import features
     from .features.structure import fold_of, _fix, KEYS
 
     def post(pred, va, X_va):
         f = fold_of(va)
         base = build_base()
-        X = features(fns, base, Data())
+        X0 = features(fns, base, Data())
+        XS = features(list(fns) + list(short_fns), base, Data()) if short_fns else X0
         tr = base[(base[f"fold{f}"] == "train") & base.gap.notna()]
-        cut = tr.delivery.max() - pd.Timedelta(days=14)
+        cut = tr.delivery.max() - pd.Timedelta(days=cal_days)
         inner_all, cal_all = tr[tr.origin < cut - pd.Timedelta(hours=10)], tr[tr.origin >= cut]
         vrows = pd.DataFrame({"step": va["step"].to_numpy(), "spot": X_va["spot"].to_numpy()}, index=va.index)
         out = {k: np.asarray(v, float).copy() for k, v in pred.items()}
@@ -76,7 +85,8 @@ def band_post(fns, bands, model, target, hgb, calibrate=True):
             trb = tr[tr.step.between(a, b)]
             mv = vrows.step.between(a, b).to_numpy()
             vab = vrows[mv]
-            pb = fit_predict(X.loc[trb.index], trb, X_va.loc[vab.index], vab, model=model, target=target, hgb=hgb)
+            X = XS if (short_fns and b <= short_max) else X0
+            pb = fit_predict(X.loc[trb.index], trb, X.loc[vab.index], vab, model=model, target=target, hgb=hgb)
             if calibrate:
                 inn, cal = inner_all[inner_all.step.between(a, b)], cal_all[cal_all.step.between(a, b)]
                 pc = fit_predict(X.loc[inn.index], inn, X.loc[cal.index], cal, model=model, target=target, hgb=hgb)
@@ -87,16 +97,41 @@ def band_post(fns, bands, model, target, hgb, calibrate=True):
     return post
 
 
+def pool_post(fns, model, target, hgb, cal_days):
+    """EB calibration of the pooled model (replaces run_experiment's built-in calibrate step)."""
+    from .data import Data, build_base
+    from .calib_eb import calibrate_eb
+    from .models import fit_predict
+    from .run import features
+    from .features.structure import fold_of
+
+    def post(pred, va, X_va):
+        f = fold_of(va)
+        base = build_base()
+        X = features(fns, base, Data())
+        tr = base[(base[f"fold{f}"] == "train") & base.gap.notna()]
+        cut = tr.delivery.max() - pd.Timedelta(days=cal_days)
+        inner, cal = tr[tr.origin < cut - pd.Timedelta(hours=10)], tr[tr.origin >= cut]
+        pc = fit_predict(X.loc[inner.index], inner, X.loc[cal.index], cal, model=model, target=target, hgb=hgb)
+        vr = pd.DataFrame({"step": va["step"].to_numpy(), "spot": X_va["spot"].to_numpy()}, index=va.index)
+        return calibrate_eb(pc, cal, pred, vr)
+    return post
+
+
 def run_spec(spec: dict):
     from .run import run_experiment
     from .features.structure import chain, causal_post, ramp, recency
     names = list(dict.fromkeys(["package"] + list(spec["features"])))
     fns = resolve(names)
+    short_fns = resolve([n for n in spec.get("short_features", []) if n not in names])
     model, target = spec.get("model", "mixture"), spec.get("target", "gap")
     hgb, cal = spec.get("hgb") or None, spec.get("calibrate", True)
+    calib, cal_days = spec.get("calib"), int(spec.get("cal_days", 14))
     posts = []
+    if calib == "eb50" and cal:
+        posts.append(pool_post(fns, model, target, hgb, cal_days))
     if spec.get("bands"):
-        posts.append(band_post(fns, [tuple(b) for b in spec["bands"]], model, target, hgb, cal))
+        posts.append(band_post(fns, [tuple(b) for b in spec["bands"]], model, target, hgb, cal, calib, cal_days, short_fns))
     if spec.get("hist_blend"):
         sys.path.insert(0, ".")
         from experiments.lab.exp_history import blend_post
@@ -106,7 +141,7 @@ def run_spec(spec: dict):
     hl = spec.get("half_life_days")
     notes = "loop spec: " + json.dumps({k: v for k, v in spec.items() if k not in ("name", "agent")}, sort_keys=True)
     return run_experiment(spec["name"], agent=spec.get("agent", "fl-loop"), feature_fns=fns, model=model, target=target,
-                          calibrate=cal, hgb=hgb, weight_fn=recency(hl) if hl else None,
+                          calibrate=cal and calib != "eb50", hgb=hgb, weight_fn=recency(hl) if hl else None,
                           post=chain(*posts) if posts else None, notes=notes[:900])
 
 

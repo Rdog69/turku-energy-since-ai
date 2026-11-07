@@ -52,3 +52,4 @@ submissions/score_*/
 
 # loop console logs
 experiments/lab/_loop_run*.txt
+experiments/lab/_post_run*.txt

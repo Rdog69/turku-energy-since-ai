@@ -92,6 +92,16 @@ def validate(spec: dict) -> dict:
             lo, hi = HGB_KEYS[k]
             h[k] = type(lo)(min(max(v, lo), hi)) if not isinstance(lo, float) else float(min(max(v, lo), hi))
         out["hgb"] = h
+    if spec.get("short_features"):
+        for f in spec["short_features"]:
+            if f not in REGISTRY:
+                raise ValueError(f"unknown feature set {f}")
+        out["short_features"] = list(spec["short_features"])
+    for k in ("calib",):
+        if spec.get(k) == "eb50":
+            out[k] = "eb50"
+    if spec.get("cal_days") in (14, 21, 28, 42):
+        out["cal_days"] = int(spec["cal_days"])
     if spec.get("bands"):
         bands = [[int(a), int(b)] for a, b in spec["bands"]]
         assert all(1 <= a <= b <= 40 for a, b in bands) and len(bands) <= 5
@@ -129,7 +139,8 @@ def build_prompt(n: int) -> str:
 ## Spec options
 `model` mixture|direct; `target` gap|price; `hgb` overrides among {list(HGB_KEYS)} (ranges enforced);
 `bands` up to 5 step bands [[a,b],...] refit separately; `hist_blend` 0-0.9; `causal` 0-0.3;
-`half_life_days` 20-400 or null; `calibrate` true/false.
+`half_life_days` 20-400 or null; `calibrate` true/false; `short_features` [feature sets used ONLY in bands ending
+at step <= 8, needs `bands`]; `calib` "eb50" (probs' spike-calibration fix) or omit; `cal_days` 14|21|28|42.
 
 ## Leaderboard (score = points-weighted % improvement vs REF mixture, averaged over folds A and B; higher is better)
 {top.to_csv(index=False)}
