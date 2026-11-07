@@ -103,7 +103,7 @@ flowchart LR
    - **15-minute day-ahead products** from 1 Oct 2025 (hourly before);
    - the **June 2026 rule**, so the model can tell eras apart.
 
-**Result:** training on Mar 2025 – Oct 2026 improved **both** models in **both** check months, most of all the uncertainty band. Frank's pinball improved by about 6 %. Abdo's August pinball improved from 6.59 to 6.16 and September MAE from 41.37 to 40.51.
+**Result:** training on Mar 2025 – Oct 2026 improved **both** models in **both** check months, most of all the uncertainty band. Frank's pinball improved by about 6 %. Abdo's September MAE went from 41.52 to 40.55 (official scorer) and August pinball from 6.59 to 6.16.
 
 ## 7. Model 1: Frank's `v7_rt`
 
@@ -155,12 +155,12 @@ flowchart LR
 - **LightGBM:** 7 leaves, at least 300 rows per leaf, 350 trees, learning rate 0.04, 80 % row and feature subsampling, 3 seeds.
 - **Calibration on the last 14 days before the forecast period:**
   - per horizon band, a width factor for P10 and P90 (minimising pinball);
-  - Platt maps for the spike and direction probabilities;
-  - everything shrunk toward "no change" when evidence is thin (m0 = 50).
+  - Platt maps for the spike probabilities, shrunk toward "no change" when those days held few spikes (m0 = 50);
+  - a Platt map for the up/down probability.
 - **Smoothing:** a light blend with the previous hour's forecast for the same quarters (weight 0.2), so forecasts don't jump hour to hour.
 - **Training:** every hourly origin from Mar 2025 to the cutoff. Labels from the last 2 hours before the cutoff are left out, because those prices were not yet published.
 
-**Inputs (117 features):**
+**Inputs (108 features):**
 
 | Group (count) | Features |
 |---|---|
