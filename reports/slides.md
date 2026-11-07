@@ -65,7 +65,8 @@ $$\longrightarrow \text{mFRR Balancing Activation} \longrightarrow \text{Asymmet
 | **Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | -35.0% MAE, -47.0% Pinball |
 | **Fingrid RT Wind Error + Step Bands** | 41.81 | 12.01 | 0.0907 | 0.3895 | -36.8% MAE, -50.3% Pinball |
 | **Dual-NWP + Learned Wind (v4_n50)** | 41.08 | 11.88 | 0.0871 | 0.3899 | -37.9% MAE, -50.9% Pinball |
-| **Grand Champion Ensemble** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **🏆 Best Overall (-38.1% MAE, -51.3% Pinball)** |
+| **Grand Champion V1 (Static Fusion)** | 40.95 | 11.77 | 0.0865 | 0.3818 | -38.1% MAE, -51.3% Pinball |
+| **Grand Champion V2 (Horizon-Banded)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **🏆 Best Overall (-38.5% MAE, 80.0% Cov)** |
 
 * **Short Horizon (Steps 1–4):** MAE drops to **36.90 €/MWh** (powered by Fingrid real-time nowcasting).
 * **Long Horizon (Steps 37–40):** Stable at **42.79 €/MWh** anchored by day-ahead fundamentals.

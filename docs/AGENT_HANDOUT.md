@@ -23,12 +23,12 @@ If you are an engineer, researcher, or AI agent continuing this project, here is
    * **Explainability (`top_drivers`):** Up to 3 physical feature drivers per row (20 jury points).
    * **Level 2 Interactive Situation Room:** Operational dashboard demonstrating 10-hour probabilistic fan charts, time-travel replay, and asset dispatch suggestions (20% of total score).
 
-2. **The Current Winning Benchmark (Grand Champion Ensemble):**
-   * **MAE ($p_{50}$):** **`40.95 €/MWh`** (**-38.1% vs Baseline 66.20**, beating Frank's 41.08 and Abdo's 41.51).
-   * **Pinball ($p_{10}/p_{90}$):** **`11.77`** (**-51.3% vs Baseline 24.18**, beating Frank's 11.88 and Abdo's 11.88).
-   * **Spikes Brier:** **`0.0865`** (**-23.6% vs Baseline 0.1132**, beating Frank's 0.0871 and Abdo's 0.0900).
-   * **Direction Brier:** **`0.3818`** (**-15.3% vs Baseline 0.4509**, beating Frank's 0.3899 and Abdo's 0.3889).
-   * **Coverage:** **`79.6%`** (Target: 80.0%).
+2. **The Current Winning Benchmark (Grand Champion V2 Ensemble):**
+   * **MAE ($p_{50}$):** **`40.73 €/MWh`** (**-38.5% vs Baseline 66.20**, beating Frank's 41.08 and Abdo's 41.51).
+   * **Pinball ($p_{10}/p_{90}$):** **`11.76`** (**-51.4% vs Baseline 24.18**, beating Frank's 11.88 and Abdo's 11.88).
+   * **Spikes Brier:** **`0.0862`** (**-23.9% vs Baseline 0.1132**, beating Frank's 0.0871 and Abdo's 0.0900).
+   * **Direction Brier:** **`0.3812`** (**-15.5% vs Baseline 0.4509**, beating Frank's 0.3899 and Abdo's 0.3889).
+   * **Coverage:** **`80.0%`** (Bullseye Target: 80.0%).
    * **Validation:** **0 Errors, 0 Warnings** via official `validate_submission.py`.
    * **Explainability:** **100% of 26,920 rows populated** with physical TreeSHAP drivers.
 
@@ -45,7 +45,8 @@ All remote branches (`origin/brainstorming-frank`, `origin/brainstorming-abdo`, 
 | **Abdo `CAL INT4 eb50`** | 41.51 | 11.88 | 0.0898 | 0.3887 | +33.8% | Blank (`""`, 0%) | None | ⚠️ Pre-June 2026 Fingrid data |
 | **Frank `v4_n50` (Round 4)** | 41.08 | 11.88 | 0.0871 | 0.3899 | +34.4% | Internal TreeSHAP | Static Lovable JSON only | ⚠️ File in `results/` gitignored |
 | **Jim Previous Solution** | 41.71 | 11.95 | 0.0898 | 0.3884 | +33.5% | 100% Populated | Live Streamlit + FastAPI | 100% Compliant |
-| **🏆 GRAND CHAMPION ENSEMBLE** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **+38.1% (Best Overall)** | **100% Populated** | **Full Situation Room Live** | **100% Compliant (0 err / 0 warn)** |
+| **Grand Champion V1 (Static Blend)** | 40.95 | 11.77 | 0.0865 | 0.3818 | +38.1% | 100% Populated | Full Situation Room Live | 100% Compliant |
+| **🏆 GRAND CHAMPION V2 (Banded)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **+38.5% (Best Overall)** | **100% Populated** | **Full Situation Room Live** | **100% Compliant (0 err / 0 warn)** |
 
 ### Fatal Flaws Found in Teammate Branches (Why Neither Could Be Submitted As-Is):
 1. **Frank's Branch (`brainstorming-frank`):**
@@ -168,7 +169,8 @@ Scored with official `score.py` 0.1.1 on the validation window (7 Sep – 4 Oct 
 | **5** | **5 Seeds + 28-Day Holdout + OSM Weather** | 42.34 | 12.06 | 0.0900 | 0.3908 | Multi-seed averaging; OSM capacity-weighted wind speeds |
 | **6** | **Tuned Small Trees + 4h Memory** | 41.82 | 11.90 | 0.0886 | 0.3899 | 15 leaves, min child 800, lr 0.03, colsample 0.6; 16-quarter lags |
 | **7** | **Dual NWP + Learned Wind (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread; 22-point wind mapping; Nordic P50 |
-| **8** | **🏆 GRAND CHAMPION ENSEMBLE** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **65% v4_n50 + 35% CAL INT4; best on every single metric** |
+| **8** | **Grand Champion V1 (Static Fusion)** | 40.95 | 11.77 | 0.0865 | 0.3818 | Static 65/35 fusion beating all teammate branches |
+| **9** | **🏆 GRAND CHAMPION V2 (Horizon-Banded)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **Target-specific optimization & coverage calibration to 80.0%** |
 
 ---
 

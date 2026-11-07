@@ -1,6 +1,7 @@
 """MedianFrom must take only P50 and the drivers from the median model."""
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -43,3 +44,21 @@ def test_rejects_mixed_weather_weighting():
     m = MedianFrom(base=Fake(5.0, "", capacity_weighted=True), median=Fake(6.0, "", capacity_weighted=False))
     with pytest.raises(ValueError):
         _ = m.capacity_weighted
+
+
+def test_submission_file_integrity():
+    """Verify that forecast_backtest.csv in repo root satisfies all hackathon requirements."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    sub_path = root / "forecast_backtest.csv"
+    assert sub_path.exists(), "forecast_backtest.csv missing!"
+    df = pd.read_csv(sub_path)
+    assert len(df) == 26920, f"Expected 26920 rows, got {len(df)}"
+    assert (df["p10"] <= df["p50"]).all(), "Monotonicity violated: p10 > p50"
+    assert (df["p50"] <= df["p90"]).all(), "Monotonicity violated: p50 > p90"
+    dir_sum = df["p_up"] + df["p_down"] + df["p_none"]
+    assert np.allclose(dir_sum, 1.0, atol=1e-4), "Direction probabilities do not sum to 1.0"
+    assert (df["p_spike_high"] + df["p_spike_low"] <= 1.0001).all(), "Spike probabilities sum > 1.0"
+    assert not df["top_drivers"].str.strip().eq("").any(), "Empty top_drivers found!"
+    assert (pd.to_datetime(df["data_cutoff_utc"]) <= pd.to_datetime(df["forecast_origin_utc"])).all(), "Causality violated!"
+

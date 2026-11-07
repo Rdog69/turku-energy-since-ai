@@ -49,3 +49,21 @@ def test_assert_no_leakage_detects_leak(sample_long_data):
     filtered = sample_long_data[sample_long_data["first_usable_origin_utc"] <= pd.Timestamp(origin)]
     assert_no_leakage(filtered, origin)
 
+
+def test_training_window_compliance():
+    """Verify that training data strictly respects the hackathon window: 1 June - 4 Oct 2026."""
+    from src.data.load import load_long_all
+    from src.data.availability import build_index
+    from src.backtest.run import training_table
+    from src import config
+
+    long = load_long_all()
+    index = build_index(long)
+    train = training_table(long, index, config.TRAIN_CUTOFF)
+
+    # Hard asserts: 100% of training data must be within 1 June - 4 Oct 2026
+    assert train["delivery"].min() >= pd.Timestamp("2026-06-01T00:00:00Z"), "Training data starts before 1 June 2026!"
+    assert train["y_first_usable"].max() <= pd.Timestamp("2026-10-04T21:00:00Z"), "Training data leaks into test period!"
+    assert train["origin"].max() <= pd.Timestamp("2026-10-04T21:00:00Z"), "Training origin leaks into test period!"
+
+

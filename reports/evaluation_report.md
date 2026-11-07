@@ -75,13 +75,15 @@ Every feature group and architectural improvement was evaluated on the official 
 | **5. Mixture + CatBoost Blend** | 42.88 | 12.80 | 0.0965 | 0.4244 | 60/40 blend captures center & dampens spikes. |
 | **6. Fingrid RT Wind Error + Step Bands + Autumn Prior** | 41.81 | 12.01 | 0.0907 | 0.3895 | Real-time plan error nowcasting + seasonal prior. |
 | **7. Dual-NWP + Learned Wind Curve (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread + 22-point wind map + Nordic P50. |
-| **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **🏆 Best Overall Score (-38.1% MAE, -51.3% Pinball).** |
+| **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | 40.95 | 11.77 | 0.0865 | 0.3818 | Static 65/35 fusion beating all teammate branches. |
+| **9. Grand Champion V2 (Horizon-Banded Ensemble)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **🏆 New All-Time Best (Coverage: 80.0%, -38.5% MAE, -51.4% Pinball).** |
 
 ### Net Score Improvement Over Baseline:
-* **Accuracy (MAE):** Reduced by **25.25 €/MWh (-38.14%)**
-* **Calibration (Pinball):** Reduced by **12.41 (-51.32%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-23.59%**
-* **Balancing Direction (Brier):** Improved by **-15.32%**
+* **Accuracy (MAE):** Reduced by **25.47 €/MWh (-38.48%)**
+* **Calibration (Pinball):** Reduced by **12.42 (-51.37%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-23.85%**
+* **Balancing Direction (Brier):** Improved by **-15.46%**
+* **Interval Coverage:** Calibrated to **80.01%** (exact competition target)
 
 ---
 

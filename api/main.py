@@ -156,17 +156,17 @@ def get_validation_metrics():
             "mean_spike_brier": 0.1132,
             "direction_brier": 0.4509,
         },
-        "grand_champion_ensemble": {
-            "mae": 40.95,
-            "mean_pinball": 11.77,
-            "mean_spike_brier": 0.0865,
-            "direction_brier": 0.3818,
+        "grand_champion_v2": {
+            "mae": 40.73,
+            "mean_pinball": 11.76,
+            "mean_spike_brier": 0.0862,
+            "direction_brier": 0.3812,
         },
         "improvements": {
-            "mae_reduction_pct": 38.1,
-            "pinball_loss_reduction_pct": 51.3,
-            "spike_brier_improvement_pct": 23.6,
-            "direction_brier_improvement_pct": 15.3,
+            "mae_reduction_pct": 38.5,
+            "pinball_loss_reduction_pct": 51.4,
+            "spike_brier_improvement_pct": 23.9,
+            "direction_brier_improvement_pct": 15.5,
         },
     }
 
