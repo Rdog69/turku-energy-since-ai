@@ -1,0 +1,1 @@
+{"name": "P2 W6+ss lgb cal21", "features": ["package", "ifs_rev", "wind_err", "ifs_now", "wind_hat", "spot_shape"], "model": "mixture", "hgb": {"max_leaf_nodes": 15, "min_samples_leaf": 400, "max_iter": 150}, "calib": "eb50", "cal_days": 21, "causal": 0.2, "engine": "lgb"}

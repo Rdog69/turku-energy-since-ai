@@ -116,8 +116,15 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
     rows = rows.assign(spot=at_delivery(data.series("pkg", "fi_spot_price"), rows).to_numpy())
     assert rows.spot.notna().all(), "spot missing for some submission rows"
 
+    from . import models as _M
+    _hgb_learners = (_M._reg, _M._clf)
     preds = []
     for sp in specs:
+        if sp.get("engine") == "lgb":          # LightGBM learners (bagging + seeds), as in combo.run_spec
+            from .combo import use_lgb
+            use_lgb(sp.get("lgb"))
+        else:
+            _M._reg, _M._clf = _hgb_learners
         m, t, c = model, target, cal
         hgb = sp.get("hgb") or None
         if sp:

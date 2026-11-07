@@ -1,0 +1,4 @@
+{"p50":   [["m_int4ss_lgb7", 1], ["m_weather_bands", 1]],
+ "q":     [["m_int1ss_lgb21", 2], ["m_w6ss_lgb21", 2], ["m_lead_rt2", 1], ["m_wx_b3_cal28", 1]],
+ "spike": [["m_w6ss_lgb_b3", 1], ["m_lead_rt2", 1]],
+ "dir":   [["m_int4ss_lgb7", 4], ["m_rtwx_b3", 1], ["frank", 1]]}
