@@ -17,9 +17,9 @@
 | 1 | Starter package: Fingrid, ENTSO-E, Nord Pool spot, calendar | **Used** | CC BY 4.0 (Fingrid, ENTSO-E); Nord Pool spot is licensed data, see section 8 |
 | 2 | Fingrid Open Data, real-time 3-min: wind (181), nuclear (188), frequency (177), consumption (193) | **Used** (steps 1–8 only) | CC BY 4.0 |
 | 3 | Open-Meteo Single Runs: ECMWF IFS 0.25° (`ecmwf_ifs025`), main period | **Used** | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 ☐ |
-| 4 | Fingrid real-time, other datasets (192, 194, 198, 186, 191, 209) | Fetched, not used yet | CC BY 4.0 |
-| 5 | Fingrid "extra" series (BRP plans, wind capacity, mFRR bids, …) | Fetched, not used yet | CC BY 4.0 |
-| 6 | Open-Meteo: ICON-EU, MET Nordic runs | ICON-EU single runs 25 May - 2 Nov 2026 (00/06/12/18 UTC, 647 of 648 runs; 11 Jun 06 UTC missing), first usable = init + 5 h, in `external_data/open_meteo/icon_eu.parquet`; used by `split_all_icon` (fold A gain, small). MET Nordic: no data, not used | CC BY 4.0 |
+| 4 | Fingrid real-time, other datasets: surplus/deficit (198, 186), production (192), hydro (191); also 194, 209 | **Used** (198, 186, 192, 191; steps 1–8 only, final model `split_all_rt_icon`); 194 and 209 not used | CC BY 4.0 |
+| 5 | Fingrid "extra" series (BRP plans, wind capacity, mFRR bids, …) | **Used:** BRP production plans (242), for the plan error in steps 1–8. Others fetched, not used | CC BY 4.0 |
+| 6 | Open-Meteo: ICON-EU, MET Nordic runs | ICON-EU single runs 25 May - 2 Nov 2026 (00/06/12/18 UTC, 647 of 648 runs; 11 Jun 06 UTC missing), first usable = init + 5 h, in `external_data/open_meteo/icon_eu.parquet`; used by `split_all_icon` and the final model `split_all_rt_icon` (small gain on both folds). MET Nordic: no data, not used | CC BY 4.0 |
 | 7 | ERA5 reanalysis (via Open-Meteo) | Fetched, not used yet | Copernicus licence (attribution) ☐ |
 | 8 | Nord Pool UMM outage messages | Fetched, not used yet | ☐ public REMIT data; terms unconfirmed |
 | 9 | FMI 10-min observations | Fetched, not used yet | CC BY 4.0 |
@@ -72,9 +72,11 @@ The two families overlap on purpose (both fetch Fingrid wind, nuclear, frequency
 | Table | `external_data/fingrid/fingrid_rt.parquet` |
 | Status | **Used by `split_all`** |
 
-Abdo's family also fetched six more real-time datasets into `rt_main.csv.gz` and `rt_last_autumn.csv.gz` (same 30-min rule, `RT_DELAY`, env `FINGRID_RT_DELAY_MIN`): production (192), net import/export (194), **surplus/deficit against the confirmed exchange plan (198)**, its cumulative form (186), hydro (191), power system state (209). Status: **fetched, not used yet** (candidate "real-time imbalance" features).
+Abdo's family also fetched six more real-time datasets into `rt_main.csv.gz` and `rt_last_autumn.csv.gz` (same 30-min rule, `RT_DELAY`, env `FINGRID_RT_DELAY_MIN`): production (192), net import/export (194), **surplus/deficit against the confirmed exchange plan (198)**, its cumulative form (186), hydro (191), power system state (209). Status: 198, 186, 192 and 191 are **used** by the live-imbalance features (`RT_IMBALANCE_COLUMNS` in `src/features/build.py`, short model only, final model `split_all_rt_icon`); 194 and 209 are not used (209 is constant).
 
-## 4. Fingrid extra series and package-series history (fetched, not used yet)
+## 4. Fingrid extra series and package-series history (mostly fetched, not used)
+
+Only 242 (BRP production plans) is used: the plan error is measured production (192) minus the plan for the same quarter. Everything else in this section is not used.
 
 `src/data/external/fingrid.py`; files `extra_main.csv.gz`, `extra_last_autumn.csv.gz`, `package_history.csv.gz`.
 
@@ -104,7 +106,7 @@ Never used: Fingrid's continuously updated forecasts (245 wind, 241 production).
 | Table | `external_data/open_meteo/ecmwf_ifs025.parquet` |
 | Status | **Used by `split_all`**, for all 40 steps |
 
-Abdo's family (`src/data/external/open_meteo.py`) can also fetch IFS, ICON-EU and MET Nordic runs for seven wind clusters plus Helsinki, with 8 variables. Delays there: IFS 8 h, ICON-EU 5 h, MET Nordic 2 h (measured 7.1 / 3.9 / 0.8 h). In the repo only `runs_ecmwf_ifs_last_autumn.csv.gz` exists (pre-June: **not used until approved**); the ICON-EU table `icon_eu.parquet` is committed (5 h rule, used only by the `*_icon` models); no MET Nordic table (**not used**). Note: Frank's `PUBLICATION_DELAY` has MET Nordic at 3 h, Abdo's at 2 h; neither is used by the model.
+Abdo's family (`src/data/external/open_meteo.py`) can also fetch IFS, ICON-EU and MET Nordic runs for seven wind clusters plus Helsinki, with 8 variables. Delays there: IFS 8 h, ICON-EU 5 h, MET Nordic 2 h (measured 7.1 / 3.9 / 0.8 h). In the repo only `runs_ecmwf_ifs_last_autumn.csv.gz` exists (pre-June: **not used until approved**); the ICON-EU table `icon_eu.parquet` is committed (5 h rule, used by the `*_icon` models, including the final `split_all_rt_icon`); no MET Nordic table (**not used**). Note: Frank's `PUBLICATION_DELAY` has MET Nordic at 3 h, Abdo's at 2 h; neither is used by the model.
 
 **ERA5 reanalysis** (`archive-api`, `era5_main.csv.gz`, `era5_last_autumn.csv.gz`): actual weather at the same points, available about 5 days late (`first_usable_origin_utc = valid time + 6 days`). Intended for fitting mappings only (wind speed to wind power), never as a forecast-time feature. Status: **fetched, not used yet**.
 

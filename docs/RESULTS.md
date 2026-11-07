@@ -21,10 +21,14 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `split_all_icon`: `split_all` + ICON-EU wind index, ICON revision vs. day-ahead run, ECMWF-vs-ICON wind spread (both models, short and long) | + Fingrid RT + 2 weather models | **42.14** | **12.06** | 0.807 | 0.0923 | **0.3995** | Fold A: MAE −0.39, pinball −0.03, direction −0.012 vs `split_all`; spike Brier +0.0002 (noise). Small, consistent gain; coverage −0.007. |
 | 7 Nov | `split_all_icon` (**fold B**, August, cutoff 1 Aug) | + Fingrid RT + 2 weather models | **28.11** | **6.99** | 0.758 | **0.0738** | **0.4445** | Fold B vs `split_all` (28.41 / 7.10 / 0.766 / 0.0750 / 0.4491): better on MAE, pinball, both Briers; coverage −0.008. Same sign as fold A, so the ICON gain is not a one-window fluke, though small. |
 | 7 Nov | `split_all_rt` on **fold B** (August, trained on Jun-Jul only) | + Fingrid 198/186/192/242/191 | 28.41 | 7.10 | 0.765 | 0.0732 | 0.4480 | Fold B. `split_all` reference: 28.41 / 7.10 / 0.766 / 0.0750 / 0.4491. Spikes -0.0018 and direction -0.0011 (same sign as fold A), MAE and pinball unchanged. Hour 1: MAE 25.04, spikes 0.0628, direction 0.3895; hour 2: 26.66, 0.0658, 0.4289. |
+| 7 Nov | `split_all` on **fold B** (reference) | + Fingrid RT + weather | 28.41 | 7.10 | 0.766 | 0.0750 | 0.4491 | Fold B reference for every later comparison. |
+| 7 Nov | `split_all_pcal`: `split_all` with pooled calibration (3 rolling 14-day holdouts) | + Fingrid RT + weather | 42.34 | 12.01 | 0.765 | 0.0907 | 0.3969 | Fold A: better on all four metrics, but coverage drops to 0.765. Fold B: 28.67 / 7.14 / 0.782 / 0.0738 / 0.4559, so **worse** MAE, pinball and direction. **Rejected** (must beat the reference on both folds). |
+| 7 Nov | **`split_all_rt_icon`**: ICON-EU in both models + live imbalance in the short model (`split_all_icon` + `split_all_rt`) | + Fingrid RT + 198/186/192/242/191 + 2 weather models | **42.14** | 12.06 | 0.808 | 0.0922 | **0.3978** | Fold A. vs `split_all`: MAE −0.39, pinball −0.03, direction −0.0033, spikes +0.0001 (noise). vs `split_all_icon`: same MAE and pinball, direction −0.0017. |
+| 7 Nov | **`split_all_rt_icon`** (**fold B**) | same | **28.02** | **6.97** | 0.760 | 0.0741 | 0.4443 | Fold B. vs `split_all`: better on all four metrics (MAE −0.39, pinball −0.13, spikes −0.0009, direction −0.0048). vs `split_all_icon`: MAE −0.09, pinball −0.02. **Final model.** |
 
-**Best vs baseline:** MAE −36 % (66.20 → 42.53), pinball −50 % (24.18 → 12.09), spike Brier −19 % (0.1132 → 0.0921), direction Brier −11 % (0.4509 → 0.4011).
+**Final model (`split_all_rt_icon`) vs baseline, fold A:** MAE −36 % (66.20 → 42.14), pinball −50 % (24.18 → 12.06), spike Brier −19 % (0.1132 → 0.0922), direction Brier −12 % (0.4509 → 0.3978).
 
-⚠ Choosing the best of 11 variants on the validation period makes these numbers somewhat optimistic. The test period will tell.
+⚠ Choosing the best of 16 variants on the validation period makes these numbers somewhat optimistic. Requiring every change to win on fold B (August) as well limits this, but the test period will tell.
 
 ### What each step added (for the reasoning chain)
 
@@ -34,6 +38,7 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | → LightGBM + calibration + product spikes (package) | −1.1 | −2.6 | −0.0193 | −0.0360 |
 | → + weather runs | −0.1 | −0.3 | −0.0007 | −0.0060 |
 | → + Fingrid real-time, first 2 h only | −0.6 | −0.1 | −0.0011 | −0.0077 |
+| → + second weather model (ICON-EU) + live imbalance, first 2 h | −0.39 | −0.03 | +0.0001 | −0.0033 |
 
 ## Takeaways so far
 
@@ -50,3 +55,6 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 - Coverage of all seven new features is 100 % in the training, validation and test windows (the series have no gaps).
 - **A second weather model helps a little.** ICON-EU (runs 25 May - 2 Nov, usable 5 h after init) added to ECMWF: fold A MAE 42.53 -> 42.14, direction Brier 0.4011 -> 0.3995, pinball 12.09 -> 12.06. The gain is small (about 1 %), spike Brier is unchanged and coverage drops 0.007, so the model-spread idea (wider band when the models disagree) is only weakly visible in pinball.
 - Fold B confirms the direction of the fold-A result: the live-imbalance features leave MAE and pinball unchanged and improve the spike Brier (0.0750 to 0.0732) and the direction Brier (0.4491 to 0.4480) slightly. Real, but small; it is not the reason to expect a big jump on the test period.
+- **Pooled calibration is not robust.** Averaging the calibration over three rolling 14-day holdouts improved every fold-A metric but made fold B worse on MAE, pinball and direction, and pulled fold-A coverage down to 0.765. The single last-14-days holdout stays.
+- **Final model: `split_all_rt_icon`.** It is the only variant that beats `split_all` on both folds on MAE, pinball and direction (spike Brier is flat on fold A, better on fold B). Each added group gives about 1 %; together they compound only slightly, which fits the picture that the package already captures most of what is predictable.
+- **Test run of `split_all_rt_icon`** (trained on everything published by 5 Oct 00:00): passes `validate_submission.py`, 26,920 rows, every `data_cutoff_utc` at or before its origin. The learned P90 offsets are +18 €/MWh (short model) and +38 to +44 (long model), wider than on validation, so the calibration risk above still applies.
