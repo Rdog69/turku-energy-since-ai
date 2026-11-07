@@ -21,12 +21,15 @@ function writePref(k: string, v: string) {
 }
 
 export default function App() {
-  const [lang, setLangState] = useState<Lang>(() => readPref("tasehinta.lang", ["en", "fi"] as const, "en"));
-  const [periodId, setPeriodId] = useState<string>(() => PERIOD_IDS[0]);
+  // deep links: ?lang=fi&view=production&period=test open the page there (for sharing and screenshots)
+  const q = new URLSearchParams(window.location.search);
+  const pick = <T extends string>(k: string, ok: readonly T[]): T | null => { const v = q.get(k) as T | null; return v && ok.includes(v) ? v : null; };
+  const [lang, setLangState] = useState<Lang>(() => pick("lang", ["en", "fi"] as const) ?? readPref("tasehinta.lang", ["en", "fi"] as const, "en"));
+  const [periodId, setPeriodId] = useState<string>(() => pick("period", PERIOD_IDS) ?? PERIOD_IDS[0]);
   const p = PAYLOAD.periods[periodId];
   const [i, setI] = useState(() => defaultHour(p));
   const [playing, setPlaying] = useState(false);
-  const [view, setViewState] = useState<View>(() => readPref("tasehinta.view", VIEWS, "overview"));
+  const [view, setViewState] = useState<View>(() => pick("view", VIEWS) ?? readPref("tasehinta.view", VIEWS, "overview"));
   const setView = (v: View) => { setViewState(v); writePref("tasehinta.view", v); };
 
   const setLang = (l: Lang) => { setLangState(l); writePref("tasehinta.lang", l); };
