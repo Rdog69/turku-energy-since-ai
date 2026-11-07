@@ -6,9 +6,9 @@ import { alertWeights, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { dateShort, dayLong, hhmm, hourOf, type Lang } from "@/lib/time";
 
-export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false }: {
+export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false, at }: {
   p: Period; i: number; setI: (i: number) => void; lang: Lang; playing: boolean; setPlaying: (v: boolean) => void;
-  compact?: boolean;
+  compact?: boolean; at?: number;
 }) {
   const n = p.origins.length;
   const T = reviewMs(p, i);
@@ -34,8 +34,8 @@ export function TimeBar({ p, i, setI, lang, playing, setPlaying, compact = false
         <div>
           {!compact && <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-2"><Clock size={14} strokeWidth={2} />{t(lang, "reviewTime")}</p>}
           <p className={`num font-bold leading-tight text-ink ${compact ? "text-[22px]" : "text-[30px]"}`}>
-            <span className="capitalize">{dayLong(T, lang)}</span>{" "}
-            <span className="text-bank">{hhmm(T, lang)}</span>
+            <span className="capitalize">{dayLong(at ?? T, lang)}</span>{" "}
+            <span className="text-bank">{hhmm(at ?? T, lang)}</span>
           </p>
           <p className="num text-[13.5px] text-ink-2">
             {t(lang, "made")} {hhmm(T, lang)}, {t(lang, "newest", { t: hhmm(cutoff, lang), m: age })}

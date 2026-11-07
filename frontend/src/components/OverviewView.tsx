@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, TrendingDown, TrendingUp, X } from "lucide-react";
+import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, RotateCcw, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
 import { STEPS, driverTokens, forecastAt, hourRuns, hourSummary, known, qMs, reviewMin, reviewMs, sortedAlerts, windowDrivers } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
@@ -25,29 +25,40 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
 }) {
   const [panel, setPanel] = useState<{ kind: "alert"; a: Alert } | { kind: "quarter"; s: number } | { kind: "all" } | null>(null);
   const [zones, setZones] = useState(false);
-  // the graph window: "now" sits at BACK of the width. Gestures move "now" in whole forecast hours (the
-  // remainder is kept for the next event); the window then glides to its new place, so motion stays smooth.
+  // the graph window: "now" sits at BACK of the width. Gestures move "now" in 15-minute steps (the remainder is
+  // kept for the next event); the window then glides there. Forecasts exist every full hour, so at hh:15 the
+  // graph shows the hh:00 forecast from hh:15 on: the latest one available at that moment.
   const [span, setSpan] = useState(16 * H);
+  const [q, setQ] = useState(0);              // quarter-hours past the forecast hour (0-3)
   const iRef = useRef(i); iRef.current = i;
+  const qRef = useRef(q); qRef.current = q;
   const rest = useRef(0);
   const n = p.origins.length;
+  const maxQ = (n - 1) * 4 + 3;
+  const goQuarter = useCallback((total: number) => {
+    const tq = Math.max(0, Math.min(maxQ, total));
+    const ni = Math.floor(tq / 4), nq = tq % 4;
+    iRef.current = ni; qRef.current = nq;
+    setI(ni); setQ(nq);
+    return tq;
+  }, [maxQ, setI]);
   const pan = useCallback((ms: number) => {
     setPlaying(false);
     rest.current += ms;
-    const k = Math.trunc(rest.current / H);
+    const k = Math.trunc(rest.current / Q_MS);
     if (k === 0) return;
-    rest.current -= k * H;
-    const ni = Math.max(0, Math.min(n - 1, iRef.current + k));
-    if (ni === 0 || ni === n - 1) rest.current = 0;
-    iRef.current = ni;
-    setI(ni);
-  }, [n, setI, setPlaying]);
+    rest.current -= k * Q_MS;
+    const want = iRef.current * 4 + qRef.current + k;
+    if (goQuarter(want) !== want) rest.current = 0;
+  }, [goQuarter, setPlaying]);
   const jump = useCallback((ms: number) => {
     setPlaying(false);
     rest.current = 0;
-    setI(Math.max(0, Math.min(n - 1, Math.round((ms - reviewMs(p, 0)) / H))));
-  }, [n, p, setI, setPlaying]);
-  const T = reviewMs(p, i);
+    goQuarter(Math.round((ms - reviewMs(p, 0)) / Q_MS));
+  }, [goQuarter, p, setPlaying]);
+  const reset = () => { setPlaying(false); rest.current = 0; goQuarter((n - 1) * 4); setSpan(16 * H); setZones(false); setPanel(null); };
+  const atLatest = i === n - 1 && q === 0 && span === 16 * H && !zones;
+  const T = reviewMs(p, i) + q * Q_MS;
   const view = useSmoothRange([T - BACK * span, T + (1 - BACK) * span], 75, 31 * 24 * H);
   const [details, setDetails] = useState(false);
   const alerts = useMemo(() => sortedAlerts(p, i), [p, i]);
@@ -64,8 +75,7 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
         onOpen={(a) => setPanel({ kind: "alert", a })} onAll={() => setPanel({ kind: "all" })} />
 
       <section aria-label={t(lang, "chartTitle")} className="rounded-2xl border border-rule bg-sheet/60 px-4 pb-4 pt-4 shadow-[0_1px_2px_rgba(20,34,51,0.04)] sm:px-6">
-        <TimeBar p={p} i={i} setI={(v) => { rest.current = 0; setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} compact />
-        <div className="mt-3"><PeriodStrip p={p} i={i} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
+        <TimeBar p={p} i={i} at={T} setI={(v) => { rest.current = 0; setQ(0); setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} compact />
         <div className="mb-2 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
           <TimeLegend lang={lang} />
           <button type="button" onClick={() => setZones(!zones)} aria-pressed={zones}
@@ -74,11 +84,20 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
           </button>
         </div>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <TimeChart p={p} i={i} win={view} lang={lang} focus={focus} zones={zones} span={span}
+          <TimeChart p={p} i={i} tNow={T} win={view} lang={lang} focus={focus} zones={zones} span={span}
             onPan={pan} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
             onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-h-[20px] justify-end">
+          {!atLatest && (
+            <button type="button" onClick={reset}
+              className="-mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-3 transition-colors duration-150 hover:text-bank">
+              <RotateCcw size={13} strokeWidth={2} />{t(lang, "tcReset")}
+            </button>
+          )}
+        </div>
+        <div className="mt-1"><PeriodStrip p={p} tNow={T} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />
         </div>
       </section>

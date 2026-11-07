@@ -3,7 +3,7 @@ import { scaleLinear } from "d3-scale";
 import { area, curveMonotoneX, curveStepAfter, line } from "d3-shape";
 import { Maximize2, MousePointerClick, Move, ZoomIn, ZoomOut } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
-import { STEPS, forecastAt, known, qMs, reviewMin, reviewMs } from "@/lib/model";
+import { STEPS, forecastAt, known, qMs, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { Q_MS, dateShort, hhmm, hourOf, type Lang } from "@/lib/time";
 import { tickStep } from "@/lib/useZoom";
@@ -13,7 +13,7 @@ const H_MS = 3600_000;
 export const H = H_MS;
 export const BACK = 0.375; // share of the window left of "now"
 const M = { l: 134, r: 96, t: 42 };
-const PLOT_H = 268, DIR_GAP = 24, DIR_H = 24, RISK_GAP = 30, RISK_HALF = 30, AXIS_H = 36;
+const PLOT_H = 268, DIR_GAP = 50, READ_H = 30, DIR_H = 24, RISK_GAP = 30, RISK_HALF = 30, AXIS_H = 36;
 const HI_THR = 0.4, LO_THR = 0.5; // the alert thresholds for high- and low-price risk
 
 const fmt0 = (v: number) => Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
@@ -28,8 +28,8 @@ const grow = (origin: "top" | "bottom", v: number): React.CSSProperties => ({
  * "now" travels with the view, so nothing published after it is ever shown. Left of now: what was known.
  * Right: the forecast made at now. The window and the price axis glide instead of jumping.
  */
-export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onResetZoom, span, onQuarter }: {
-  p: Period; i: number; win: [number, number]; lang: Lang; focus: Alert | null; zones: boolean;
+export function TimeChart({ p, i, tNow, win, lang, focus, zones, onPan, onZoom, onResetZoom, span, onQuarter }: {
+  p: Period; i: number; tNow: number; win: [number, number]; lang: Lang; focus: Alert | null; zones: boolean;
   onPan: (ms: number) => void; onZoom: (factor: number) => void; onResetZoom: () => void;
   span: number; onQuarter: (s: number) => void;
 }) {
@@ -69,9 +69,12 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const T = reviewMs(p, i);
-  const Tmin = reviewMin(p, i);
+  // "now" can sit between forecast hours (15-minute steps); the forecast shown is the latest made by then
+  const T = tNow;
+  const Tmin = Math.round((T - p.t0) / 60_000);
   const o = p.origins[i];
+  const q0 = Math.max(0, Math.min(3, Math.round((T - reviewMs(p, i)) / Q_MS)));
+  const madeAt = reviewMs(p, i);
   const F = useMemo(() => forecastAt(p, i), [p, i]);
   // the forecast made an hour earlier, for the same quarter-hours (dynamics: did the risk rise or fall?)
   const prev = useMemo(() => (i > 0 && p.origins[i - 1] === o - 4 ? forecastAt(p, i - 1) : null), [p, i, o]);
@@ -85,14 +88,14 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
     for (let gi = g0; gi <= g1; gi++) {
       out.push({
         gi, t: qMs(p, gi),
-        y: gi < o ? known(p.imb, p.imb_fu, gi, Tmin) : null,
+        y: gi < o + q0 ? known(p.imb, p.imb_fu, gi, Tmin) : null,
         spot: known(p.spot, p.spot_fu, gi, Tmin),
-        dir: gi < o ? known(p.dir, p.dir_fu, gi, Tmin) : null,
+        dir: gi < o + q0 ? known(p.dir, p.dir_fu, gi, Tmin) : null,
       });
     }
     return out;
-  }, [p, g0, g1, o, Tmin]);
-  const fut = useMemo(() => F.p50.map((_, s) => ({ t: qMs(p, o + s) + Q_MS / 2, s })), [F, p, o]);
+  }, [p, g0, g1, o, q0, Tmin]);
+  const fut = useMemo(() => F.p50.map((_, s) => ({ t: qMs(p, o + s) + Q_MS / 2, s })).filter((d) => d.s >= q0), [F, p, o, q0]);
   const lastPub = useMemo(() => [...past].reverse().find((d) => d.y !== null) ?? null, [past]);
 
   // price axis: computed from what is visible, then glides to it (no jumping while scrolling)
@@ -137,11 +140,19 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
   const xH = x(horizonEnd);
   const cell = (gi: number) => [x(qMs(p, gi)), x(qMs(p, gi + 1))] as const;
   const inPlot = (px: number) => px >= M.l && px <= W - M.r;
-  const hs = hover !== null && hover >= o && hover < o + STEPS ? hover - o : null;
-  const hp = hover !== null ? past.find((d) => d.gi === hover) : undefined;
+  const hs = hover !== null && hover >= o + q0 && hover < o + STEPS ? hover - o : null;
   const endS = fut.reduce((acc, d) => (x(d.t) <= W - M.r ? d.s : acc), -1);
+  // keep the right-hand labels apart when the expected price and the day-ahead price end close together
+  const spotNudge = (() => {
+    const ls = [...past].reverse().find((d) => d.spot !== null && x(d.t) <= W - M.r)?.spot;
+    if (endS < 0 || ls === null || ls === undefined) return 0;
+    const dy = y(ls) - y(F.p50[endS]);
+    return Math.abs(dy) < 15 ? (dy >= 0 ? 15 - dy : -15 - dy) : 0;
+  })();
+  const rs = hs ?? (fut.length ? fut[0].s : null);   // readout: hovered forecast quarter, else the next one
+  const rp = hover !== null && hs === null ? past.find((d) => d.gi === hover) : undefined;
   const lastSpot = [...past].reverse().find((d) => d.spot !== null && x(d.t) <= W - M.r)?.spot ?? null;
-  const prevLabel = hhmm(T - H_MS, lang);
+  const prevLabel = hhmm(madeAt - H_MS, lang);
 
   // drag pans; a press without movement on a forecast quarter opens its detail
   const drag = useRef<{ x: number; last: number; moved: boolean } | null>(null);
@@ -170,7 +181,7 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
     setDragging(false);
     if (!d || d.moved) return;
     const gi = Math.floor((x.invert(toPx(e)) - p.t0) / Q_MS);
-    if (gi >= o && gi < o + STEPS) onQuarter(gi - o);
+    if (gi >= o + q0 && gi < o + STEPS) onQuarter(gi - o);
   }
 
   const cursor = dragging ? "cursor-grabbing" : hs !== null ? "cursor-pointer" : "cursor-grab";
@@ -234,7 +245,7 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
           {/* bridge from the last published price to the forecast's first quarter: one continuous story */}
           {lastPub && lastPub.y !== null && (
             <>
-              <line x1={x(lastPub.t + Q_MS)} y1={y(lastPub.y)} x2={x(fut[0].t)} y2={y(F.p50[0])} stroke="hsl(var(--ink-3))" strokeWidth={1.3} strokeDasharray="2 3" />
+              <line x1={x(lastPub.t + Q_MS)} y1={y(lastPub.y)} x2={x(fut[0].t)} y2={y(F.p50[fut[0].s])} stroke="hsl(var(--ink-3))" strokeWidth={1.3} strokeDasharray="2 3" />
               <circle cx={x(lastPub.t + Q_MS)} cy={y(lastPub.y)} r={3.6} fill="hsl(var(--sheet))" stroke="hsl(var(--ink))" strokeWidth={2} />
             </>
           )}
@@ -247,6 +258,7 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
               fill={d.dir > 0 ? "hsl(var(--verm))" : d.dir < 0 ? "hsl(var(--teal))" : "hsl(var(--rule))"} fillOpacity={0.35} />;
           })}
           {F.pu.map((pu, s) => {
+            if (s < q0) return null;
             const [a, b] = cell(o + s);
             const w = Math.max(1, b - a - 0.8);
             const dim = focus && (s < focus.a || s > focus.b) ? 0.4 : 1;
@@ -272,6 +284,7 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
               fill={hiS ? "hsl(var(--verm))" : "hsl(var(--teal))"} fillOpacity={0.35} />;
           })}
           {F.hi.map((hi, s) => {
+            if (s < q0) return null;
             const lo = F.lo[s];
             const [a, b] = cell(o + s);
             const w = Math.max(1, b - a - 0.8);
@@ -294,6 +307,32 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
           {xH < W - M.r - 100 && <text x={xH + 10} y={M.t + 16} className="fill-ink-3 text-[11.5px]">{t(lang, "tcBeyond")}</text>}
           {hover !== null && <line x1={x(qMs(p, hover) + Q_MS / 2)} x2={x(qMs(p, hover) + Q_MS / 2)} y1={M.t} y2={axisY} stroke="hsl(var(--ink))" strokeOpacity={0.25} />}
         </g>
+
+        {/* readout: one line under the price graph for the quarter under the pointer (else the next one) */}
+        <foreignObject x={M.l} y={M.t + PLOT_H + 8} width={W - M.l - M.r} height={READ_H}>
+          <div className="num flex h-full items-center gap-x-4 overflow-hidden whitespace-nowrap rounded-lg border border-rule bg-sheet px-3 text-[12.5px] text-ink-2">
+            {rp ? (
+              <>
+                <span className="font-semibold text-ink">{hhmm(rp.t, lang)}–{hhmm(rp.t + Q_MS, lang)}</span>
+                <span className="rounded-full bg-paper px-2 py-0.5 text-[11px] text-ink-3">{t(lang, "tcKnown")}</span>
+                <span>{t(lang, "realised")} <b className="text-ink">{rp.y === null ? t(lang, "tcNotYet") : `${fmt0(rp.y)} €/MWh`}</b></span>
+                <span>{t(lang, "tcDayAhead")} {rp.spot === null ? "–" : `${fmt0(rp.spot)} €/MWh`}</span>
+                {rp.dir !== null && <span>{t(lang, "direction")}: {t(lang, rp.dir > 0 ? "up" : rp.dir < 0 ? "down" : "none")}</span>}
+              </>
+            ) : rs !== null ? (
+              <>
+                <span className="font-semibold text-ink">{hhmm(qMs(p, o + rs), lang)}–{hhmm(qMs(p, o + rs + 1), lang)}</span>
+                <span className="rounded-full bg-bank/10 px-2 py-0.5 text-[11px] text-bank">{hs === null ? t(lang, "tcNext") : t(lang, "tcForecast")}</span>
+                <span>{t(lang, "tcExpected")} <b className="text-ink">{fmt0(F.p50[rs])} €/MWh</b></span>
+                <span>{t(lang, "tcRange")} {fmt0(F.p10[rs])}–{fmt0(F.p90[rs])}</span>
+                <span><span className="text-verm">{t(lang, "up")} {pct(F.pu[rs])}</span> · <span className="text-teal">{t(lang, "down")} {pct(F.pd[rs])}</span></span>
+                <span className="text-verm">{t(lang, "tcHiShort")} {pct(F.hi[rs])}<Delta v={F.hi[rs]} prev={prevAt("hi", rs)} /></span>
+                <span className="text-teal">{t(lang, "tcLoShort")} {pct(F.lo[rs])}<Delta v={F.lo[rs]} prev={prevAt("lo", rs)} /></span>
+                <span className="ml-auto inline-flex items-center gap-1 font-semibold text-bank"><MousePointerClick size={13} strokeWidth={2} />{t(lang, "tcClick")}</span>
+              </>
+            ) : null}
+          </div>
+        </foreignObject>
 
         {/* now pill (outside the clip so it is never cut) */}
         {xT >= M.l && xT <= W - M.r && (
@@ -322,11 +361,11 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
         {/* right: direct labels */}
         {endS >= 0 && (
           <g className="text-[12.5px] font-semibold">
-            <text x={Math.min(W - M.r + 8, x(fut[endS].t) + 8)} y={y(F.p50[endS])} dy="0.32em" className="fill-bank">{t(lang, "tcExpected")}</text>
-            <text x={Math.min(W - M.r + 8, x(fut[endS].t) + 8)} y={y(F.p90[endS])} dy="0.32em" className="fill-ink-3 font-normal">{t(lang, "tcRangeTop")}</text>
+            <text x={Math.min(W - M.r + 8, x(qMs(p, o + endS) + Q_MS / 2) + 8)} y={y(F.p50[endS])} dy="0.32em" className="fill-bank">{t(lang, "tcExpected")}</text>
+            <text x={Math.min(W - M.r + 8, x(qMs(p, o + endS) + Q_MS / 2) + 8)} y={y(F.p90[endS])} dy="0.32em" className="fill-ink-3 font-normal">{t(lang, "tcRangeTop")}</text>
           </g>
         )}
-        {lastSpot !== null && <text x={W - M.r + 8} y={y(lastSpot)} dy="0.32em" className="fill-ink-2 text-[12.5px]">{t(lang, "tcDayAhead")}</text>}
+        {lastSpot !== null && <text x={W - M.r + 8} y={y(lastSpot) + spotNudge} dy="0.32em" className="fill-ink-2 text-[12.5px]">{t(lang, "tcDayAhead")}</text>}
 
         {/* time axis */}
         <line x1={M.l} x2={W - M.r} y1={axisY} y2={axisY} stroke="hsl(var(--ink-3))" strokeWidth={0.75} />
@@ -339,43 +378,11 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onZoom, onRese
         ))}
       </svg>
 
-      {hover !== null && !dragging && (hs !== null || hp) && (
-        <div className="pointer-events-none absolute top-12 z-10 min-w-[224px] rounded-xl border border-rule bg-sheet/95 px-3.5 py-3 text-[13px] shadow-[0_10px_30px_-12px_rgba(20,34,51,0.45)] backdrop-blur-sm"
-          style={{ left: Math.min(W - 240, Math.max(0, x(qMs(p, hover)) + 18)) }}>
-          <div className="num mb-1.5 flex items-center justify-between gap-3 font-semibold text-ink">
-            <span>{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] ${hs !== null ? "bg-bank/10 text-bank" : "bg-paper text-ink-3"}`}>{t(lang, hs !== null ? "tcForecast" : "tcKnown")}</span>
-          </div>
-          {hs === null && hp && (
-            <>
-              <Row k={t(lang, "realised")} v={hp.y === null ? (hover < o ? t(lang, "tcNotYet") : "–") : `${fmt0(hp.y)} €/MWh`} strong />
-              <Row k={t(lang, "sSpot")} v={hp.spot === null ? "–" : `${fmt0(hp.spot)} €/MWh`} />
-              {hp.dir !== null && <Row k={t(lang, "direction")} v={t(lang, hp.dir > 0 ? "up" : hp.dir < 0 ? "down" : "none")} />}
-            </>
-          )}
-          {hs !== null && (
-            <>
-              <Row k={t(lang, "sMedian")} v={`${fmt0(F.p50[hs])} €/MWh`} strong />
-              <Row k={t(lang, "sBand")} v={`${fmt0(F.p10[hs])} – ${fmt0(F.p90[hs])}`} />
-              {hp?.spot !== null && hp?.spot !== undefined && <Row k={t(lang, "sSpot")} v={`${fmt0(hp.spot)} €/MWh`} />}
-              <div className="mt-2 flex h-2 overflow-hidden rounded-full">
-                <span className="bg-verm" style={{ width: `${F.pu[hs] * 100}%` }} /><span className="bg-rule" style={{ width: `${F.pn[hs] * 100}%` }} /><span className="bg-teal" style={{ width: `${F.pd[hs] * 100}%` }} />
-              </div>
-              <div className="num mt-1 flex justify-between text-[12px]"><span className="text-verm">{t(lang, "up")} {pct(F.pu[hs])}</span><span className="text-teal">{t(lang, "down")} {pct(F.pd[hs])}</span></div>
-              <Risk label={t(lang, "highRisk")} v={F.hi[hs]} prev={prevAt("hi", hs)} cls="text-verm" since={prevLabel} lang={lang} />
-              <Risk label={t(lang, "lowRisk")} v={F.lo[hs]} prev={prevAt("lo", hs)} cls="text-teal" since={prevLabel} lang={lang} />
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-bank px-2 py-1 text-[11.5px] font-semibold text-white">
-                <MousePointerClick size={13} strokeWidth={2} />{t(lang, "tcClick")}
-              </div>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
-function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+export function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return (
     <div className={`flex justify-between gap-4 ${strong ? "font-semibold text-ink" : "text-ink-2"}`}>
       <span>{k}</span><span className="num">{v}</span>
@@ -383,7 +390,12 @@ function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   );
 }
 
-function Risk({ label, v, prev, cls, since, lang }: { label: string; v: number; prev: number | null; cls: string; since: string; lang: Lang }) {
+function Delta({ v, prev }: { v: number; prev: number | null }) {
+  const d = prev === null ? 0 : Math.round((v - prev) * 100);
+  return d === 0 ? null : <span className="ml-1 text-[11px] text-ink-3">{d > 0 ? "▲" : "▼"}{Math.abs(d)}</span>;
+}
+
+export function Risk({ label, v, prev, cls, since, lang }: { label: string; v: number; prev: number | null; cls: string; since: string; lang: Lang }) {
   const d = prev === null ? null : Math.round((v - prev) * 100);
   return (
     <div className={`num mt-0.5 flex justify-between gap-4 ${cls}`}>

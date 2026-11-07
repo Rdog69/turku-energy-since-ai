@@ -169,6 +169,11 @@ const en: Dict = {
   level_medium: "watch",
   level_info: "info",
   // united overview page
+  tcRange: "Range",
+  tcHiShort: "High risk",
+  tcLoShort: "Low risk",
+  tcReset: "Back to latest",
+  tcNext: "Next",
   tcNow: "Now",
   tcRisk: "Spike risk",
   tcHigh: "High ↑",
@@ -376,6 +381,11 @@ const fi: Dict = {
   level_medium: "seuraa",
   level_info: "tieto",
   // yhdistetty yleisnäkymä
+  tcRange: "Väli",
+  tcHiShort: "Korkea riski",
+  tcLoShort: "Matala riski",
+  tcReset: "Takaisin uusimpaan",
+  tcNext: "Seuraava",
   tcNow: "Nyt",
   tcRisk: "Piikkiriski",
   tcHigh: "Korkea ↑",
