@@ -89,6 +89,11 @@ DRIVER_LABELS = {
     "spike_lo_share_96": "Share of low spikes, last 24 h", "gap_max_16": "Highest gap to spot, last 4 h",
     "gap_min_16": "Lowest gap to spot, last 4 h", "dir_yday": "Direction at this time yesterday",
     "gap_yday": "Gap to spot at this time yesterday",
+    "rt_imb": "Measured surplus/deficit now (MW)", "rt_imb_last4": "Measured surplus/deficit, last hour (MW)",
+    "rt_imb_chg_1h": "Surplus/deficit change in 1 h (MW)", "rt_imb_cum": "Cumulative surplus/deficit (MWh)",
+    "rt_imb_cum_chg_1h": "Cumulative surplus/deficit change in 1 h",
+    "thr_up": "Last mFRR up price above spot + 50", "thr_down": "Last mFRR down price below spot − 50",
+    "last_mfrr_up_price": "Last mFRR up price", "last_mfrr_down_price": "Last mFRR down price",
 }
 
 LEVERS = {

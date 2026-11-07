@@ -49,6 +49,10 @@ DATASETS = {
     89: ("fg_flow_se3_rt", "MW"),      # FI-SE3 transmission
     180: ("fg_flow_ee_rt", "MW"),      # FI-EE transmission
     187: ("fg_flow_no_rt", "MW"),      # FI-NO transmission
+    # Measured real-time surplus/deficit (net import vs confirmed exchange plan), and its cumulative
+    # value: measured data like the rest, so the same 30-min rule (package availability.csv).
+    198: ("fg_imb_rt", "MW"),
+    186: ("fg_imb_cum_rt", "MW"),
 }
 # Deliberately NOT used without the organisers' OK: 397 "Calculated imbalance", 22/251 last
 # activated bid prices, 400-402 real-time mFRR prices. They are near-copies of the target that the

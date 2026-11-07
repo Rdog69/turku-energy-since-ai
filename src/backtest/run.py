@@ -37,7 +37,8 @@ def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool =
                icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
                wind_hat: bool = False, town_solar: bool = False, town_temp: bool = False,
                history: bool = False, history_flag: bool = False, history_every: int = config.HISTORY_EVERY_H,
-               history_weight: float = 1.0, runs: bool = False, history_rt: bool = False) -> HorizonSplit:
+               history_weight: float = 1.0, runs: bool = False, history_rt: bool = False,
+               rt3: bool = False, thr: bool = False) -> HorizonSplit:
     """final_capw plus optional round-3/4/5/6 changes. tuned: x = none, l = long model, b = both models.
 
     bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
@@ -54,7 +55,8 @@ def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool =
                   use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
                   use_wind_hat=wind_hat, use_town_solar=town_solar, use_town_temp=town_temp,
                   use_history=history, history_flag=history_flag, history_every=history_every,
-                  history_weight=history_weight, use_runs=runs, history_rt=history_rt)
+                  history_weight=history_weight, use_runs=runs, history_rt=history_rt,
+                  use_rt3=rt3, use_thr=thr)
     short_kw = dict(use_fingrid=True, use_fingrid2=True, params=params(tuned == "b"), **common)
     if bands4:
         short = HorizonSplit(name=f"{name}_short", split_step=4,
@@ -169,6 +171,11 @@ MODELS = {
     "v7_runs": lambda: _v4_hybrid("v7_runs", history=True, history_flag=True, runs=True),
     # v6_hf with Fingrid real-time series on the history rows too (Mar 2025 - May 2026).
     "v7_rt": lambda: _v4_hybrid("v7_rt", history=True, history_flag=True, history_rt=True),
+    # Round 8 on top of v7_rt: Fingrid surplus/deficit 198/186 in the short model; spike-threshold
+    # distances from the newest mFRR prices; both.
+    "v8_imb": lambda: _v4_hybrid("v8_imb", history=True, history_flag=True, history_rt=True, rt3=True),
+    "v8_thr": lambda: _v4_hybrid("v8_thr", history=True, history_flag=True, history_rt=True, thr=True),
+    "v8_both": lambda: _v4_hybrid("v8_both", history=True, history_flag=True, history_rt=True, rt3=True, thr=True),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,

@@ -309,6 +309,20 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         per_origin["rt_nuclear"] = nuc
         per_origin["rt_nuclear_change_6h"] = nuc - nuc_6h
 
+    if "fg_imb_rt" in index:
+        # Measured surplus/deficit (Fingrid 198) and its cumulative value (186): the most direct live
+        # sign of the regulation direction. Kept out of data_cutoff so older models' files don't change.
+        n_ts = len(latest_ts)
+        imb_now = latest_pair("fg_imb_rt")
+        per_origin["rt_imb"] = imb_now
+        per_origin["rt_imb_last4"] = latest_pair("fg_imb_rt", lags=range(4))
+        per_origin["rt_imb_chg_1h"] = imb_now - latest_pair("fg_imb_rt", lags=(4,))
+        if "fg_imb_cum_rt" in index:
+            cum = latest_pair("fg_imb_cum_rt")
+            per_origin["rt_imb_cum"] = cum
+            per_origin["rt_imb_cum_chg_1h"] = cum - latest_pair("fg_imb_cum_rt", lags=(4,))
+        del latest_ts[n_ts:]
+
     # data_cutoff_utc: the newest *measured* quarter used (never a day-ahead or calendar row,
     # whose timestamps are in the future). Always < origin.
     newest = np.max(np.vstack(latest_ts), axis=0)
@@ -317,6 +331,10 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     f = f.merge(per_origin, left_on="origin", right_index=True, how="left")
     f["age_q"] = f["imb_age_q"] + f["step"] - 1   # quarters between latest known gap and delivery
+    # Distance to the spike thresholds: if the newest mFRR up (down) price held at this delivery
+    # quarter, how far above (below) spot +50 (-50) would the price be. Positive = a spike.
+    f["thr_up"] = f["last_mfrr_up_price"] - f["spot"] - SPIKE_MARGIN
+    f["thr_down"] = f["spot"] - f["last_mfrr_down_price"] - SPIKE_MARGIN
 
     if weather is not None:
         f = add_weather(f, index, weather)
@@ -384,6 +402,12 @@ FINGRID_RT2_COLUMNS = [
 
 # Longer memory: 4-hour averages beat the newest quarter at every horizon (training data, 7 Nov).
 MEMORY_COLUMNS = ["mean_gap_last16", "mean_dir_last16"]
+
+# Fingrid real-time surplus/deficit (198, 186): short model only, like the other real-time series.
+FINGRID_RT3_COLUMNS = ["rt_imb", "rt_imb_last4", "rt_imb_chg_1h", "rt_imb_cum", "rt_imb_cum_chg_1h"]
+
+# Distance from the newest mFRR prices to the spike thresholds.
+THRESH_COLUMNS = ["thr_up", "thr_down", "last_mfrr_up_price", "last_mfrr_down_price"]
 
 NORDIC_COLUMNS = [f"om_{a}_wind_{k}" for a in NORDIC_AREAS for k in ("idx", "rev")] + ["om_nordic_wind_rev"]
 

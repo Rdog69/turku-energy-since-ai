@@ -57,7 +57,14 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | `v7_all` | Every hourly history origin (3× the history rows) | 40.64 | 11.15 | – | 0.0846 | 0.3858 | Dropped: +0.51 % / −0.68 %; August spikes 3.2 % worse. |
 | **`v7_rt`** | Fingrid real-time series on the history rows too (all 14 ids, Mar 2025 – May 2026, same 30-min rule) | **40.64** | 11.20 | 0.787 | **0.0855** | 0.3892 | **Submitted model.** +0.02 % / +0.19 %: a near tie that wins both months (MAE better in 3/4 and 3/5 weeks). |
 
-**Final vs baseline:** MAE −39 % (66.20 → 40.64), pinball −54 % (24.18 → 11.20), spike Brier −24 % (0.1132 → 0.0855), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %).
+**Round 8 (7 Nov), on top of `v7_rt`, weighted by points (Sep / Aug):**
+- **`v8_imb`, Fingrid real-time surplus/deficit (198, 186) in the hours 1–2 model** (30-min rule, history rows included): +0.01 % / −0.01 %. No effect; our other real-time series already carry the signal. Dropped.
+- **`v8_thr`, distance from the newest mFRR up/down prices to the spike thresholds (spot ± 50)**: −0.03 % / −0.80 %. August spikes got 2.8 % worse. Dropped.
+- **`v8_both`**: −0.03 % / −0.79 %. Dropped.
+
+**Team candidate (7 Nov evening): ½ `v7_rt` + ½ Abdo's `h_int4ss`**, equal weights on all eight outputs. Officially scored: Sep 40.19 / 11.07 / 0.0840 / 0.3799, Aug 27.05 / 6.22 / 0.0648 / 0.4202. That is 36.7 % / 29.0 % better than the baseline (average 32.8 %, the best on the team scoreboard). Files and checksums are in `submissions/MANIFEST.md`.
+
+**Final vs baseline (`v7_rt` alone):** MAE −39 % (66.20 → 40.64), pinball −54 % (24.18 → 11.20), spike Brier −24 % (0.1132 → 0.0855), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %).
 
 ⚠ About 41 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
 
