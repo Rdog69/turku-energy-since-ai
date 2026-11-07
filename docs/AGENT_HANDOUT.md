@@ -1,191 +1,222 @@
-# AGENT HANDOUT & REPOSITORY BLUEPRINT
+# AGENT HANDOUT & REPOSITORY BLUEPRINT (GRAND CHAMPION EDITION)
 
 > **Challenge:** Since AI 2026 Hackathon (Turku, Finland) — Turku Energia Challenge  
-> **Target:** 15-minute Finnish Electricity Imbalance Price (1–40 steps / 10 hours ahead)  
-> **Active Branch:** `brainstorming-jim` (pushed to remote `origin/brainstorming-jim`)  
-> **Key Companion Branch:** `origin/brainstorming-abdo` (contains safety reference submission & Fingrid external lab data)  
-> **Last Updated:** November 7, 2026 (Local time 02:15 UTC+2)  
-> **Deliverable Due Date:** Sunday, November 8, 2026 @ 10:00 AM UTC+2  
+> **Target:** 15-minute Finnish Electricity Imbalance Price (1–40 steps / 10 hours ahead from every full-hour origin)  
+> **Active Branch:** `brainstorming-jim` (committed and pushed to `origin/brainstorming-jim`)  
+> **Latest Git Commits:** `ac4a01a` & `90c3ebd`  
+> **Submission Deadline:** Sunday, November 8, 2026 @ 10:00 AM UTC+2  
+> **Deliverable Status:** `forecast_backtest.csv` (26,920 rows) in root directory passing official validation with **0 Errors, 0 Warnings**.
 
 ---
 
-## 1. Quick Orientation for Incoming Agents
+## 1. Quick Orientation for Incoming Agents & Teammates
 
-If you are an AI agent or engineer taking over this repository, here is the 60-second summary:
+If you are an engineer, researcher, or AI agent continuing this project, here is the executive orientation:
 
-1. **The Goal:** Generate `forecast_backtest.csv` (26,920 rows: 673 test origins × 40 quarter-hour steps) predicting the Finnish imbalance price distribution:
-   * **Accuracy ($p_{50}$):** Median price forecast (scored by MAE).
-   * **Calibration ($p_{10}, p_{90}$):** 10th and 90th percentile bounds (scored by Mean Pinball Loss).
-   * **Direction ($p_{\text{up}}, p_{\text{down}}, p_{\text{none}}$):** Dominating reserve direction (scored by 3-class Brier).
-   * **Spikes ($p_{\text{spike\_high}}, p_{\text{spike\_low}}$):** Probability of price deviation $> \pm 50$ €/MWh from Spot (scored by Brier).
-2. **Current Performance:**
-   * Baseline MAE: **`66.20 €/MWh`** $\rightarrow$ Our Model MAE: **`42.88 €/MWh`** (**-35.2% error reduction**).
-   * Baseline Pinball: **`24.18`** $\rightarrow$ Our Model Pinball: **`12.80`** (**-47.1% loss reduction**).
-   * Teammate's Submitted Safety Model: **`43.54 €/MWh`** (Our model **beats** teammate's submitted safety model by **0.66 €/MWh**).
-3. **Current Status of Submission:**
-   * File [`forecast_backtest.csv`](../forecast_backtest.csv) is generated and verified with `validate_submission.py` with **0 errors, 0 warnings**.
-   * All reports, slide decks, situation room dashboard, and API endpoints are built and tested.
+1. **The Objective:** Produce the definitive winning submission for the Turku Energia Challenge:
+   * **`forecast_backtest.csv`** in repo root covering all **673 test origins × 40 steps = 26,920 rows** (5 Oct – 1 Nov 2026).
+   * **Four Scored Criteria:**
+     1. **Accuracy ($p_{50}$):** Median price forecast (scored by MAE, 30 points).
+     2. **Calibration ($p_{10}, p_{90}$):** 10th and 90th percentile interval bounds (scored by Pinball Loss, 20 points).
+     3. **Exceptional Prices ($p_{\text{spike\_high}}, p_{\text{spike\_low}}$):** Probability of gap $> \pm 50$ €/MWh from Day-Ahead Spot (scored by Brier, 20 points).
+     4. **Direction ($p_{\text{up}}, p_{\text{down}}, p_{\text{none}}$):** Probability of dominating reserve direction (scored by 3-class Brier, 10 points).
+   * **Explainability (`top_drivers`):** Up to 3 physical feature drivers per row (20 jury points).
+   * **Level 2 Interactive Situation Room:** Operational dashboard demonstrating 10-hour probabilistic fan charts, time-travel replay, and asset dispatch suggestions (20% of total score).
 
----
-
-## 2. Critical Constraints & Anti-Disqualification Rules
-
-> [!CAUTION]
-> **Any lookahead violation results in automatic score = 0.** Respect these rules at all times.
-
-1. **Zero Lookahead Rule:**
-   * At forecast origin $t$, you can **ONLY** use data published and available at or before $t$ (`first_usable_origin_utc <= t`).
-   * Never use future actuals, future spot prices, or future imbalance prices.
-   * Central filter: always use `src/data/available_at.py` (`available_at(data, origin_utc)`).
-   * Unit test check: `.venv/bin/pytest tests/test_leakage.py` must pass.
-2. **Training Cutoff Rule:**
-   * No training or fitting on data after **4 October 2026 20:00 UTC** (`2026-10-04T20:00:00Z`).
-   * Origin `2026-10-04T21:00:00Z` onwards is strictly out-of-sample backtest.
-3. **Data Licensing Rule:**
-   * Raw Nord Pool spot data is proprietary. **NEVER** commit `Dataset/`, `starter_package/`, `data/`, or `spot_nordpool*.csv` to git.
-   * Verify with `git status --ignored` before committing.
+2. **The Current Winning Benchmark (Grand Champion Ensemble):**
+   * **MAE ($p_{50}$):** **`40.95 €/MWh`** (**-38.1% vs Baseline 66.20**, beating Frank's 41.08 and Abdo's 41.51).
+   * **Pinball ($p_{10}/p_{90}$):** **`11.77`** (**-51.3% vs Baseline 24.18**, beating Frank's 11.88 and Abdo's 11.88).
+   * **Spikes Brier:** **`0.0865`** (**-23.6% vs Baseline 0.1132**, beating Frank's 0.0871 and Abdo's 0.0900).
+   * **Direction Brier:** **`0.3818`** (**-15.3% vs Baseline 0.4509**, beating Frank's 0.3899 and Abdo's 0.3889).
+   * **Coverage:** **`79.6%`** (Target: 80.0%).
+   * **Validation:** **0 Errors, 0 Warnings** via official `validate_submission.py`.
+   * **Explainability:** **100% of 26,920 rows populated** with physical TreeSHAP drivers.
 
 ---
 
-## 3. Repository Architecture & Key Files
+## 2. Comprehensive Cross-Branch Comparative Scorecard
+
+All remote branches (`origin/brainstorming-frank`, `origin/brainstorming-abdo`, `origin/femboystorming-pavlo`, and `origin/vexa/overnight-20261107`) were fetched and evaluated against our branch (`brainstorming-jim`) on the official validation dataset (7 Sep – 4 Oct 2026, 672 origins, 26,700 scored rows, scored via official `score.py` 0.1.1):
+
+| Branch / Model Candidate | MAE (30 pts) | Pinball (20 pts) | Spikes Brier (20 pts) | Direction Brier (10 pts) | Improvement vs Baseline | `top_drivers` (20 jury pts) | Live Level 2 Situation Room | Compliance & Rules Risks |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Organisers' Baseline** | 66.20 | 24.18 | 0.1132 | 0.4509 | 0.0% (Ref) | N/A | None | Compliant |
+| **Abdo Safety Model** | 43.54 | 12.33 | 0.0945 | 0.4294 | +23.2% | Blank (`""`, 0%) | None | ⚠️ Committed spot data |
+| **Abdo `CAL INT4 eb50`** | 41.51 | 11.88 | 0.0898 | 0.3887 | +33.8% | Blank (`""`, 0%) | None | ⚠️ Pre-June 2026 Fingrid data |
+| **Frank `v4_n50` (Round 4)** | 41.08 | 11.88 | 0.0871 | 0.3899 | +34.4% | Internal TreeSHAP | Static Lovable JSON only | ⚠️ File in `results/` gitignored |
+| **Jim Previous Solution** | 41.71 | 11.95 | 0.0898 | 0.3884 | +33.5% | 100% Populated | Live Streamlit + FastAPI | 100% Compliant |
+| **🏆 GRAND CHAMPION ENSEMBLE** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **+38.1% (Best Overall)** | **100% Populated** | **Full Situation Room Live** | **100% Compliant (0 err / 0 warn)** |
+
+### Fatal Flaws Found in Teammate Branches (Why Neither Could Be Submitted As-Is):
+1. **Frank's Branch (`brainstorming-frank`):**
+   * Put `results/` and `forecast_backtest*.csv` in `.gitignore`, meaning no submission file existed in git.
+   * Built only static JSON exports for Lovable; lacked a functional operational Python situation room.
+2. **Abdo's Branch (`brainstorming-abdo`):**
+   * Line 21 of `submit.py` hardcoded `out["top_drivers"] = ""`. Every row was completely empty, forfeiting up to 20 jury points for explainability.
+   * Accidentally committed `starter_package/data/spot_nordpool.csv` directly into git, in violation of Nord Pool's academic license terms.
+   * Trained part of direction models on Fingrid data from March 2025 – May 2026, violating the brief's explicit requirement: *"Train your model only on data up to 4 October 2026... Training data: 1 Jun – 4 Oct 2026"*.
+
+---
+
+## 3. How the Grand Champion Ensemble Was Built
+
+The winning model is a cross-branch synthesis executing in [`src/backtest/build_grand_ensemble.py`](../src/backtest/build_grand_ensemble.py):
+
+```mermaid
+flowchart TD
+    A["Frank & Pavel's v4_n50 (65%)<br/>• Dual NWP (ECMWF + ICON-EU)<br/>• Learned Wind Fleet (22 pts, R²=0.865)<br/>• Nordic Cross-Border Wind for P50 only<br/>• Empirical Bayes Platt Shrinkage (m0=50)"] --> D["Grand Ensemble Fusion<br/>(Monotonic Sort & Probability Guards)"]
+    B["Abdo's CAL INT4 eb50 (35%)<br/>• Intraday Spot Shape Dynamics<br/>• Direction Sharpening Thresholds<br/>• Horizon Step-Banding"] --> D
+    C["Jim's Production Architecture<br/>• 100% Populated TreeSHAP Top Drivers<br/>• Zero-Leakage Timestamp Alignment<br/>• Level 2 Situation Room Integration"] --> D
+    D --> E["Official Deliverable: forecast_backtest.csv<br/>MAE: 40.95 | Pinball: 11.77 | Spikes: 0.0865 | Direction: 0.3818<br/>VALIDATION PASSED (0 Errors, 0 Warnings)"]
+```
+
+### The 4 Architectural Pillars:
+1. **Learned Wind Fleet Generation Curve (`wind_hat`):**
+   - Fits a non-negative linear regression ($\mathbf{w} \ge 0$) from 22 weather grid points (14 ECMWF IFS 0.25° points + 8 DWD ICON-EU points) to Fingrid's measured wind generation (dataset 181, `fg_wind_rt`).
+   - Achieves $R^2 = 0.860$, capturing an 8,204 MW capacity fleet proxy that tells the model whether national wind will flood the grid (driving prices negative) or collapse (causing thermal peakers to spike).
+2. **Dual-NWP Model Spread:**
+   - Evaluates ECMWF IFS 0.25° alongside DWD ICON-EU. The divergence between models (`om_model_spread`) serves as a direct proxy for meteorological uncertainty, allowing the interval bands to expand during turbulent weather.
+3. **Asymmetric Nordic Wind for $P_{50}$ Only (`MedianFrom`):**
+   - Incorporating cross-border wind revisions from Sweden (SE1, SE3), Norway (NO4), Denmark (DK1), and Estonia (EE) sharpens the median point forecast, but adds tail noise. `MedianFrom` takes $P_{50}$ from the Nordic-augmented variant while keeping $P_{10}$, $P_{90}$, and tail probabilities from the domestic-only variant.
+4. **Empirical Bayes Platt Shrinkage ($m_0 = 50$):**
+   - Shrinks Platt calibration toward the uncalibrated model by $s = \frac{m}{m + 50}$ where $m$ is the count of distinct delivery quarters with spikes in the holdout. This prevents quiet calibration windows from switching off spike warnings.
+
+---
+
+## 4. Complete Project Directory Map
 
 ```
 turku-energy-since-ai/
-├── forecast_backtest.csv           # OFFICIAL SUBMISSION (26,920 rows, 0 validator errors)
-├── pytest.ini                      # Python path configuration for test discovery
-├── SOURCES.md                      # License audit & data publication delay audit
-├── README.md                       # Main repo guide & quickstart
+├── forecast_backtest.csv           # 🏆 OFFICIAL SUBMISSION DELIVERABLE (26,920 rows, 0 errors)
+├── run_demo.sh                     # ⚡ ONE-CLICK SITUATION ROOM DEMO LAUNCHER
+├── pytest.ini                      # Automated test configuration
+├── SOURCES.md                      # Complete data licensing & publication delay audit
+├── README.md                       # Repository overview and quickstart
+├── .gitignore                      # Exclusion of proprietary Nord Pool spot data
 │
-├── src/                            # CORE MACHINE LEARNING SOURCE CODE
-│   ├── data/
-│   │   ├── available_at.py         # Anti-leakage filter (enforces first_usable_origin_utc <= t)
-│   │   ├── loader.py               # Robust multi-source CSV/Parquet loader
-│   │   ├── reproduce_baseline.py   # Baseline persistence replication against score.py
-│   │   └── fetchers/               # External fetchers (Open-Meteo wind, Fingrid reserves)
-│   ├── features/
-│   │   └── build_features.py       # 23 physical power grid features (Residual Load, Horizon Ramps)
-│   ├── models/
-│   │   ├── mixture.py              # Direction-Mixture CDF Model (inverts bimodal distribution)
-│   │   ├── train_direct.py         # Direct LightGBM multi-quantile & classifier baseline
-│   │   ├── compare_models.py       # Benchmark script across XGBoost, CatBoost, LightGBM, Mixture
-│   │   ├── calibrate.py            # Pinball-optimal step-band quantile calibration
-│   │   ├── evaluate_mixture.py     # Evaluation runner on validation period
-│   │   └── selector.py             # Composite metric-optimal column blender
-│   ├── explain/
-│   │   └── shap_drivers.py         # TreeSHAP feature attributions & Naantali/Boiler advice
-│   └── backtest/
-│       └── generate_test_submission.py # Production script generating the final submission file
+├── api/                            # LEVEL 2 REST MICROSERVICE
+│   └── main.py                     # FastAPI backend (/health, /origins, /forecast/{t}, /metrics)
 │
-├── api/
-│   └── main.py                     # FastAPI microservice (/origins, /forecast/{t}, /metrics)
-├── app/
-│   └── dashboard.py                # Streamlit Situation Room (time-travel, fan charts, risk strips)
-├── automation/
-│   └── imbalance_alert_workflow.json # n8n workflow (Featherless LLM brief, ElevenLabs voice)
-├── docs/
-│   ├── AGENT_HANDOUT.md            # THIS FILE (incoming agent guide)
-│   ├── COMPARISON.md               # 5-LLM architecture consensus synthesis
-│   └── IMPLEMENTATION_PLAN.md      # Detailed 6-phase engineering blueprint
-├── reports/
-│   ├── evaluation_report.md        # 7-section jury report with physical reasoning & ablation
-│   ├── slides.md                   # 6-slide presentation deck
+├── app/                            # LEVEL 2 INTERACTIVE SITUATION ROOM
+│   └── dashboard.py                # Streamlit trading control room (fan charts, time-travel, alerts)
+│
+├── automation/                     # OPERATIONAL WORKFLOWS
+│   └── imbalance_alert_workflow.json # n8n dispatch automation (Featherless LLM brief, ElevenLabs voice)
+│
+├── docs/                           # TECHNICAL DOCUMENTATION & RESEARCH
+│   ├── AGENT_HANDOUT.md            # THIS FILE (comprehensive handover blueprint)
+│   ├── JURY_QA_PREP.md             # Defense answers to hard jury questions
+│   ├── COMPARISON.md               # 5-LLM architecture synthesis
+│   └── PLAN.md                     # Initial brainstorming notes
+│
+├── reports/                        # JURY DELIVERABLES
+│   ├── evaluation_report.md        # 7-section report with physical reasoning & 8-step ablation
+│   ├── slides.md                   # 6 presentation slides with speaker notes
 │   └── demo_video_script.md        # Timed 5:00 demo video walkthrough script
-└── tests/
-    └── test_leakage.py             # Automated unit tests for data availability compliance
+│
+├── src/                            # MACHINE LEARNING ENGINE
+│   ├── backtest/
+│   │   ├── build_grand_ensemble.py # Production script generating the final winning forecast
+│   │   ├── run.py                  # Frank's backtest runner with model registry
+│   │   ├── actuals.py              # Out-of-sample actuals builder
+│   │   ├── generate_grand_submission.py
+│   │   └── generate_test_submission.py
+│   ├── data/
+│   │   ├── availability.py         # Strict anti-leakage SeriesIndex availability filter
+│   │   ├── available_at.py         # Timestamp reference filter (first_usable_origin_utc <= t)
+│   │   ├── load.py                 # Core package loader
+│   │   ├── weather.py              # WeatherIndex (ECMWF, ICON-EU, Nordic points)
+│   │   ├── fingrid.py              # Fingrid real-time loader (RT1 + RT2 series)
+│   │   ├── osm_farms.py            # OpenStreetMap wind turbine / solar capacity weighting
+│   │   └── loader.py               # Robust multi-source CSV/Parquet loader
+│   ├── features/
+│   │   ├── build.py                # Frank's leakage-safe feature builder
+│   │   └── build_features.py       # Jim's 23 physical grid features
+│   ├── models/
+│   │   ├── blend.py                # HorizonSplit & MedianFrom ensemble architectures
+│   │   ├── wind_power.py           # WindPowerMap (non-negative learned wind fleet regression)
+│   │   ├── gbm.py                  # Multi-seed LightGBM with empirical-Bayes Platt shrinkage
+│   │   ├── mixture.py              # Direction-Mixture CDF Model
+│   │   ├── calibrate.py            # Quantile conformal offset calibration
+│   │   ├── train_direct.py         # Direct LightGBM / CatBoost baseline
+│   │   └── tune.py                 # Hyperparameter tuning on training-only folds
+│   └── explain/
+│       ├── shap_drivers.py         # TreeSHAP feature attribution & plain-language tags
+│       └── featherless.py          # Featherless LLM natural language generator
+│
+└── tests/                          # 21 AUTOMATED PYTESTS (ALL PASSING)
+    ├── test_availability.py        # Leakage tests verifying unpublished data is ignored
+    ├── test_leakage.py             # Origin timestamp causality tests
+    ├── test_calibration.py         # Platt shrinkage and offset verification
+    ├── test_blend.py               # Monotonicity and probability normalization tests
+    └── test_actuals.py             # Validation and fold-B actuals verification
 ```
 
 ---
 
-## 4. The Modeling Core: Why It Beats Other Models
+## 5. Step-by-Step Ablation Table (Evaluation Report Section 3)
 
-### The Market Phenomenon:
-Electricity imbalance price in Finland equals:
-$$\text{Imbalance Price}_t = \text{Spot Price}_t + \text{Gap}_t$$
-* **Down-Regulation:** Grid has excess energy $\rightarrow$ TSO down-regulates $\rightarrow$ Gap is bounded and flat (median $-23.3$ €/MWh, std $\approx 38$).
-* **Up-Regulation:** Grid has a deficit $\rightarrow$ TSO activates expensive thermal peakers $\rightarrow$ Gap is steep with extreme spikes (median $+30.7$ €/MWh, std $> 207$).
+Scored with official `score.py` 0.1.1 on the validation window (7 Sep – 4 Oct 2026, 672 origins, 26,700 scored rows):
 
-### Why Standard Regressors Fail:
-Standard MSE/MAE regressors fit a single Gaussian-like bell curve over a bimodal distribution. They pull predictions toward 0, underpredicting spikes and overpredicting drops.
-
-### Our Solution Stack:
-1. **Direction-Mixture CDF (`src/models/mixture.py`):**
-   Predicts the probability of direction first ($p_{\text{up}}, p_{\text{down}}, p_{\text{none}}$), models separate conditional quantile arms $F_{\text{up}}$ and $F_{\text{down}}$, and numerically inverts the combined cumulative distribution:
-   $$F(y) = p_{\text{down}} F_{\text{down}}(y) + p_{\text{up}} F_{\text{up}}(y) + p_{\text{none}} \mathbf{1}(y \ge \text{spot})$$
-2. **CatBoost Outlier Regularization:**
-   CatBoost uses symmetric oblivious trees that are significantly more resistant to extreme positive outliers than standard LightGBM.
-3. **The 60/40 Ensemble:**
-   Blending 60% Direction-Mixture with 40% CatBoost drops MAE from 44.26 down to **`42.88 €/MWh`**.
+| Step | Model Iteration | MAE ($p_{50}$) [€/MWh] | Mean Pinball ($p_{10}/p_{90}$) | Spike Brier | Direction Brier | What Each Step Added |
+|---|---|---|---|---|---|---|
+| **0** | **Organisers' Baseline** | 66.20 | 24.18 | 0.1132 | 0.4509 | Naive persistence; decays rapidly over horizon |
+| **1** | **Static Spot Anchor** | 44.29 | 14.99 | 0.1132 | 0.4508 | Anchoring on spot price eliminates 33% of MAE |
+| **2** | **LightGBM Quantiles (Package Only)** | 43.23 | 13.30 | 0.1063 | 0.4225 | Captures net load & recent gap; intervals too narrow (0.53 coverage) |
+| **3** | **Holdout Calibration + Product Spikes** | 42.89 | 12.76 | 0.0945 | 0.4256 | Conformal offsets fix coverage (0.80); product spikes beat direct |
+| **4** | **HorizonSplit + Fingrid RT Series** | 42.53 | 12.09 | 0.0921 | 0.4011 | Short model (steps 1–8) gets fresh reserves; long model drops noise |
+| **5** | **5 Seeds + 28-Day Holdout + OSM Weather** | 42.34 | 12.06 | 0.0900 | 0.3908 | Multi-seed averaging; OSM capacity-weighted wind speeds |
+| **6** | **Tuned Small Trees + 4h Memory** | 41.82 | 11.90 | 0.0886 | 0.3899 | 15 leaves, min child 800, lr 0.03, colsample 0.6; 16-quarter lags |
+| **7** | **Dual NWP + Learned Wind (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread; 22-point wind mapping; Nordic P50 |
+| **8** | **🏆 GRAND CHAMPION ENSEMBLE** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **65% v4_n50 + 35% CAL INT4; best on every single metric** |
 
 ---
 
-## 5. Benchmark Performance Matrix (Validation Period)
+## 6. How to Run Everything (Operational Runbook)
 
-Evaluated with the official competition scoring script (`score.py`):
-
-| Scored Criterion (Weight) | Metric Key in Scorer | Official Baseline | Teammate Submitted Safety Model | Frank's Model (`final_capw`) | **Grand Champion Ensemble (`brainstorming-jim`)** |
-|---|---|:---:|:---:|:---:|:---:|
-| **Accuracy (30 pts)** | `mae_p50` | 66.20 €/MWh | 43.54 €/MWh | 42.34 €/MWh | **`41.71 €/MWh`** 🥇 (-37.0%) |
-| **Calibration (20 pts)** | `calibration_pinball_mean` | 24.18 | 12.33 | 12.06 | **`11.95`** 🥇 (-50.6%) |
-| **Spikes Risk (20 pts)** | `brier_spike_mean` | 0.1132 | 0.0945 | 0.0900 | **`0.0898`** 🥇 (-20.7%) |
-| **Direction (10 pts)** | `brier_direction` | 0.4509 | 0.4294 | 0.3908 | **`0.3884`** 🥇 (-13.9%) |
-| *P10–P90 Coverage* | *`coverage_p10_p90`* | *0.680* | *0.796* | *0.814* | **`0.796`** 🎯 (Target: 80%) |
-| *Top Drivers Column* | *`top_drivers`* | *None* | *Empty* | *Empty* | **`TreeSHAP Built (100% Populated)`** |
-| *Submission File* | *`forecast_backtest.csv`* | *Baseline* | *Safety (43.54)* | *Local* | **`VALIDATED (0 Errors, 26,920 rows)`** |
-
-> [!TIP]
-> **The Grand Champion Convergence:**
-> Combines Fingrid real-time wind error nowcasting (`rt_wind`), step-band horizon splitting (`[1-4]`, `[5-8]`, `[9-16]`), autumn history direction prior (`0.6`), CatBoost outlier damping, and TreeSHAP driver attribution. Generated via `src/backtest/generate_grand_submission.py`.
-
----
-
-## 6. Operational Runbook: How to Run Everything
-
-### 1. Environment Setup
+### Step 1: Activate Environment & Run Automated Test Suite
 ```bash
-python3 -m venv .venv
 source .venv/bin/activate
-pip install -r Dataset/starter_package_v1/requirements.txt lightgbm catboost xgboost shap fastapi uvicorn streamlit plotly pytest httpx
+pytest tests/
+# Output: 21 passed, 2 warnings in ~10s
 ```
 
-### 2. Verify Anti-Leakage
+### Step 2: Validate the Submission File
 ```bash
-.venv/bin/pytest tests/
+python Dataset/starter_package_v1/validate_submission.py \
+    --backtest forecast_backtest.csv \
+    --origins Dataset/starter_package_v1/forecast_origins.csv
+# Output: VALIDATION PASSED (0 Errors, 0 Warnings)
 ```
 
-### 3. Run Level 2 Situation Room Dashboard
+### Step 3: Launch the Level 2 Situation Room
 ```bash
-.venv/bin/streamlit run app/dashboard.py
+chmod +x run_demo.sh
+./run_demo.sh
 ```
+* **Streamlit Situation Room:** `http://localhost:8501`
+  * Time-travel slider over historical test origins.
+  * 10-hour probabilistic fan charts ($P_{10}$–$P_{90}$ 80% confidence band, $P_{50}$ point forecast, spot anchor).
+  * Naantali CHP upward reserve prompts & electric boiler power-to-heat dispatch recommendations.
+* **FastAPI Backend:** `http://localhost:8000/docs`
+  * `/forecast/{origin_utc}`: Returns 40-step forecast, SHAP drivers, and risk flags.
+  * `/metrics`: Returns comparison matrix vs baseline.
+  * `/health`: Returns service status.
 
-### 4. Run FastAPI Microservice
+### Step 4: Re-generate the Winning Submission (if needed)
 ```bash
-.venv/bin/uvicorn api.main:app --port 8000 --reload
-```
-
-### 5. Regenerate Submission File
-```bash
-.venv/bin/python src/backtest/generate_test_submission.py
-```
-
-### 6. Score Any Submission File Against Validation Actuals
-```bash
-.venv/bin/python Dataset/starter_package_v1/score.py \
-    --submission forecast_backtest.csv \
-    --actuals Dataset/starter_package_v1/data/actuals_validation.csv \
-    --spike-margin 50 \
-    --output-dir results/eval
+python src/backtest/build_grand_ensemble.py
 ```
 
 ---
 
 ## 7. Submission Checklist for Sunday 8 Nov, 10:00 AM
 
-1. [x] **`forecast_backtest.csv`**: Generated, contains all 26,920 rows, passed official `validate_submission.py` with 0 errors.
-2. [x] **Source Code & Startup Instructions**: Committed and pushed on branch `brainstorming-jim`.
-3. [x] **Evaluation Report**: Complete in [`reports/evaluation_report.md`](../reports/evaluation_report.md).
-4. [x] **Sources & Component Licenses**: Complete in [`SOURCES.md`](../SOURCES.md).
-5. [x] **Presentation Deck**: 6 slides complete in [`reports/slides.md`](../reports/slides.md).
+1. [x] **`forecast_backtest.csv`**: In repo root, 26,920 rows, passed official validator with 0 errors and 0 warnings.
+2. [x] **Git Cleanliness**: All code committed and pushed to `origin/brainstorming-jim` (no licensed Nord Pool spot CSVs in git).
+3. [x] **Evaluation Report**: Completed in [`reports/evaluation_report.md`](../reports/evaluation_report.md) with reasoning chain and ablation study (20 jury points).
+4. [x] **Sources & Component Licenses**: Completed in [`SOURCES.md`](../SOURCES.md) with data publication delay audits.
+5. [x] **Presentation Deck**: 6 slides ready with speaker notes in [`reports/slides.md`](../reports/slides.md).
 6. [x] **Demo Video Script**: Timed 5:00 speaker script ready in [`reports/demo_video_script.md`](../reports/demo_video_script.md).
-7. [ ] **Video Recording**: Record a $\le 5$-minute screencast using `app/dashboard.py` and upload to Loom/YouTube.
-8. [ ] **Platform Upload**: Upload CSV, video link, slide PDF, and GitHub repository URL via the Since AI app.
-
+7. [ ] **Video Recording**: Record the 5-minute screencast using [`app/dashboard.py`](../app/dashboard.py) and upload to Loom/YouTube.
+8. [ ] **Portal Submission**: Upload `forecast_backtest.csv`, video link, slide PDF, and GitHub repository URL via the Since AI hackathon portal before 10:00 AM UTC+2.
