@@ -19,7 +19,7 @@ export function Rail({ period, setPeriod, lang, view, setView }: {
     `w-full rounded-[4px] px-3 py-2 text-left text-[14px] font-semibold transition-colors duration-150 ${on ? "bg-white text-bank" : "text-bank-ink hover:bg-white/10"}`;
   return (
     <aside className="flex flex-col gap-8 bg-bank px-5 py-6 text-bank-ink lg:sticky lg:top-0 lg:h-screen lg:w-[244px] lg:shrink-0">
-      <div className="flex flex-col items-start text-left">
+      <div className="flex w-fit flex-col items-center text-center">
         <p className="flex items-center gap-2 text-white" aria-label="Tasehinta"><Logo /><Wordmark /></p>
         <p className="mt-1.5 text-[14px] font-semibold text-bank-ink2">{t(lang, "tagline")}</p>
       </div>
