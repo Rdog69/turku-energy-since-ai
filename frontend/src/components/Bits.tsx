@@ -43,3 +43,19 @@ export function DriverChip({ token, lang }: { token: string; lang: Lang }) {
     </span>
   );
 }
+
+export type Res = "q" | "h";
+
+/** 15 min / 1 h switch */
+export function ResToggle({ res, setRes, lang, t }: { res: Res; setRes: (r: Res) => void; lang: Lang; t: (l: Lang, k: string) => string }) {
+  return (
+    <div role="radiogroup" aria-label={t(lang, "res")} className="inline-flex rounded-md border border-rule bg-sheet p-0.5">
+      {(["q", "h"] as Res[]).map((r) => (
+        <button key={r} type="button" role="radio" aria-checked={res === r} onClick={() => setRes(r)}
+          className={`num rounded-[4px] px-2.5 py-1 text-[13px] font-semibold transition-colors duration-150 ${res === r ? "bg-bank text-white" : "text-ink-2 hover:text-ink"}`}>
+          {t(lang, r === "q" ? "res15" : "res1h")}
+        </button>
+      ))}
+    </div>
+  );
+}

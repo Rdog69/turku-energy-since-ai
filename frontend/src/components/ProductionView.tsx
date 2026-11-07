@@ -6,12 +6,17 @@ import { t } from "@/lib/i18n";
 import { hhmm, type Lang } from "@/lib/time";
 import { ChartLegend, FanChart } from "./FanChart";
 import { HourTip } from "./HourTip";
+import { ResToggle, type Res } from "./Bits";
 import { QuarterTable } from "./QuarterTable";
 
 /** For the production shift supervisor: when the grid needs more or less power, and where flexibility could pay. */
 export function ProductionView({ p, i, lang, periodKey }: { p: Period; i: number; lang: Lang; periodKey: string }) {
   const [details, setDetails] = useState(false);
-  const hs = useMemo(() => hourSummary(p, i), [p, i]);
+  const hs = useMemo(() => hourSummary(p, i), [p, i]);       // hours drive the headline and the checks
+  const [res, setRes] = useState<Res>("q");
+  const bars = useMemo(() => hourSummary(p, i, res === "q" ? 1 : 4), [p, i, res]);
+  const bsize = res === "q" ? 1 : 4;
+  const bat = (k: number) => hhmm(qMs(p, o + bsize * k), lang);
   const o = p.origins[i];
   const at = (h: number) => hhmm(qMs(p, o + 4 * h), lang);
   const pctMax = (a: number, b: number, key: "pu" | "lo" | "hi") => Math.round(Math.max(...hs.slice(a, b + 1).map((x) => x[key])) * 100);
@@ -43,26 +48,31 @@ export function ProductionView({ p, i, lang, periodKey }: { p: Period; i: number
       <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_380px]">
         <section aria-labelledby="p-bars">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-            <h2 id="p-bars" className="text-[18px] font-bold text-ink">{t(lang, "pTitle")}</h2>
+            <span className="flex items-center gap-3">
+              <h2 id="p-bars" className="text-[18px] font-bold text-ink">{t(lang, "pTitle")}</h2>
+              <ResToggle res={res} setRes={setRes} lang={lang} t={t} />
+            </span>
             <span className="flex gap-4 text-[13px] text-ink-2">
               <span className="inline-flex items-center gap-1.5"><CircleArrowUp size={15} strokeWidth={2} className="text-verm" />{t(lang, "pUpLbl")}</span>
               <span className="inline-flex items-center gap-1.5"><CircleArrowDown size={15} strokeWidth={2} className="text-teal" />{t(lang, "pDownLbl")}</span>
             </span>
           </div>
-          <ol className="grid grid-cols-10 gap-1.5">
-            {hs.map((x) => (
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <ol className={res === "q" ? "grid min-w-[640px] grid-cols-[repeat(40,minmax(0,1fr))] gap-[2px]" : "grid grid-cols-10 gap-1.5"}>
+            {bars.map((x) => (
               <li key={x.h}>
-                <HourTip text={`${at(x.h)}–${at(x.h + 1)}: ${t(lang, "up")} ${Math.round(x.pu * 100)} %, ${t(lang, "down")} ${Math.round(x.pd * 100)} %`}>
+                <HourTip text={`${bat(x.h)}–${bat(x.h + 1)}: ${t(lang, "up")} ${Math.round(x.pu * 100)} %, ${t(lang, "down")} ${Math.round(x.pd * 100)} %`}>
                   <span className="flex flex-col" style={{ height: BAR }}>
                     <span className="bg-verm/80" style={{ height: x.pu * BAR }} />
                     <span className="bg-rule" style={{ height: Math.max(0, 1 - x.pu - x.pd) * BAR }} />
                     <span className="bg-teal/80" style={{ height: x.pd * BAR }} />
                   </span>
                 </HourTip>
-                <span className="num mt-1 block text-center text-[12.5px] text-ink-3">{at(x.h)}</span>
+                <span className={`num mt-1 block text-[12px] text-ink-3 ${res === "h" ? "text-center" : ""}`}>{res === "h" || x.h % 4 === 0 ? bat(x.h) : ""}</span>
               </li>
             ))}
           </ol>
+          </div>
         </section>
 
         <section aria-labelledby="p-opp">

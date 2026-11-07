@@ -3,6 +3,12 @@ import type { Lang } from "./time";
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  zoomIn: "Zoom in",
+  zoomOut: "Zoom out",
+  zoomReset: "Show everything",
+  res: "Resolution",
+  res1h: "1 h",
+  res15: "15 min",
   hHigh: "High prices likely",
   hLow: "Low prices likely",
   hCalm: "Calm next 10 hours",
@@ -41,7 +47,7 @@ const en: Dict = {
   sHigh: "Watch out: {a}–{b} the price may jump far above the day-ahead price.",
   sLow: "Heads up: {a}–{b} the price may drop far below the day-ahead price.",
   sChance: "About {p} in 10 chance.",
-  sNext10: "The next 10 hours, hour by hour",
+  sNext10: "The next 10 hours",
   sNormal: "normal",
   sWatch: "watch",
   sRisk: "risk",
@@ -165,6 +171,12 @@ const en: Dict = {
 };
 
 const fi: Dict = {
+  zoomIn: "Lähennä",
+  zoomOut: "Loitonna",
+  zoomReset: "Näytä kaikki",
+  res: "Tarkkuus",
+  res1h: "1 h",
+  res15: "15 min",
   hHigh: "Korkeat hinnat todennäköisiä",
   hLow: "Matalat hinnat todennäköisiä",
   hCalm: "Rauhallista seuraavat 10 tuntia",
@@ -201,7 +213,7 @@ const fi: Dict = {
   sHigh: "Huomio: {a}–{b} hinta voi nousta selvästi vuorokausihinnan yläpuolelle.",
   sLow: "Huomio: {a}–{b} hinta voi laskea selvästi vuorokausihinnan alapuolelle.",
   sChance: "Noin {p}/10 todennäköisyys.",
-  sNext10: "Seuraavat 10 tuntia tunneittain",
+  sNext10: "Seuraavat 10 tuntia",
   sNormal: "normaali",
   sWatch: "seuraa",
   sRisk: "riski",

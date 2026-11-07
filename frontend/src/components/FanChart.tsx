@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { scaleLinear } from "d3-scale";
 import { area, curveMonotoneX, curveStepAfter, line } from "d3-shape";
 import type { Alert, Period } from "@/data/types";
 import { STEPS, forecastAt, known, qMs, reviewMin, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { Q_MS, dateShort, hhmm, hourOf, type Lang } from "@/lib/time";
+import { ZoomControls, tickStep, useBind, useDragPan, useZoom } from "@/lib/useZoom";
 
 const H_MS = 3600_000;
 const PAST_H = 6;
 const FUT_H = 10;
-const M = { l: 52, r: 78, t: 30 };
+const M = { l: 52, r: 78, t: 46 };
 const PLOT_H = 300;
 const RIB_GAP = 30, RIB_H = 24, RISK_GAP = 34, RISK_HALF = 30, AXIS_H = 34;
 
@@ -37,6 +38,12 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
   const Tmin = reviewMin(p, i);
   const o = p.origins[i];
   const F = useMemo(() => forecastAt(p, i), [p, i]);
+  const uid = useId().replace(/:/g, "");
+  const svgRef = useRef<SVGSVGElement>(null);
+  const z = useZoom([T - PAST_H * H_MS, T + FUT_H * H_MS], 45 * 60_000, { l: M.l, r: M.r, w: W });
+  useBind(svgRef, z);
+  const dp = useDragPan(svgRef, z, W);
+  const [d0, d1] = z.domain;
 
   const ribY = M.t + PLOT_H + RIB_GAP;
   const riskY = ribY + RIB_H + RISK_GAP; // top of the high-risk half
@@ -44,7 +51,7 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
   const axisY = simple ? M.t + PLOT_H + 10 : baseY + RISK_HALF + 10;
   const H = axisY + AXIS_H;
 
-  const x = useMemo(() => scaleLinear().domain([T - PAST_H * H_MS, T + FUT_H * H_MS]).range([M.l, W - M.r]), [T, W]);
+  const x = useMemo(() => scaleLinear().domain([d0, d1]).range([M.l, W - M.r]), [d0, d1, W]);
   const xT = x(T);
 
   // what was known at the review time
@@ -60,14 +67,17 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
   const fut = useMemo(() => F.p50.map((_, s) => ({ t: qMs(p, o + s) + Q_MS / 2, s })), [F, p, o]);
 
   const y = useMemo(() => {
-    const core: number[] = [...F.p10, ...F.p90];
-    past.forEach((d) => { if (d.spot !== null) core.push(d.spot - 60, d.spot + 60); });
+    const vis = (t: number) => t >= d0 - Q_MS && t <= d1 + Q_MS;
+    const core: number[] = [];
+    F.p10.forEach((_, s) => { if (vis(qMs(p, o + s) + Q_MS / 2)) core.push(F.p10[s], F.p90[s]); });
+    past.forEach((d) => { if (d.spot !== null && vis(d.t)) core.push(d.spot - (simple ? 20 : 60), d.spot + (simple ? 20 : 60)); });
+    if (core.length === 0) core.push(...F.p10, ...F.p90);
     const lo = Math.min(...core), hi = Math.max(...core), span = hi - lo;
-    const real = past.filter((d) => d.y !== null).map((d) => d.y as number);
+    const real = past.filter((d) => d.y !== null && vis(d.t)).map((d) => d.y as number);
     const yMin = Math.max(Math.min(lo, ...real), lo - 0.8 * span);
     const yMax = Math.min(Math.max(hi, ...real), hi + 0.8 * span);
     return scaleLinear().domain([yMin, yMax]).range([M.t + PLOT_H, M.t]).nice(6).clamp(true);
-  }, [F, past]);
+  }, [F, past, d0, d1, p, o, simple]);
 
   const band = area<{ t: number; s: number }>().x((d) => x(d.t)).y0((d) => y(F.p10[d.s])).y1((d) => y(F.p90[d.s])).curve(curveMonotoneX);
   const med = line<{ t: number; s: number }>().x((d) => x(d.t)).y((d) => y(F.p50[d.s])).curve(curveMonotoneX);
@@ -80,14 +90,19 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
   const minusLine = step((d) => (d.spot === null ? null : d.spot - 50))(past);
 
   // time axis: every full hour, labels every second hour, the date at midnight
-  const hours: number[] = [];
-  for (let h = Math.ceil((T - PAST_H * H_MS) / H_MS) * H_MS; h <= T + FUT_H * H_MS; h += H_MS) hours.push(h);
+  const tstep = tickStep(d1 - d0);
+  const minor = Math.max(Q_MS, tstep / 2);
+  const ticks: { t: number; major: boolean }[] = [];
+  for (let h = Math.ceil(d0 / minor) * minor; h <= d1; h += minor) ticks.push({ t: h, major: Math.round(h / minor) % Math.round(tstep / minor) === 0 });
 
   const cellX = (s: number) => [x(qMs(p, o + s)), x(qMs(p, o + s + 1))] as const;
   const focusRect = focus ? [cellX(focus.a)[0], cellX(focus.b)[1]] : null;
   const focusFill = focus?.kind === "spike_high" ? "hsl(var(--verm-soft))" : focus?.kind === "spike_low" ? "hsl(var(--teal-soft))" : "hsl(var(--accent))";
 
   const lastSpot = past[past.length - 1]?.spot ?? null;
+  const roomLeft = xT - M.l > 170;
+  const labX = roomLeft ? xT - 12 : M.l + 4;
+  const labAnchor = roomLeft ? "end" : "start";
   const hs = hover !== null && hover >= o && hover < o + STEPS ? hover - o : null;
   const hp = hover !== null ? past.find((d) => Math.floor((d.t - p.t0) / Q_MS) === hover) : undefined;
 
@@ -102,18 +117,23 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
 
   return (
     <div ref={wrap} className="relative w-full select-none">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}
-        onPointerMove={onMove} onPointerLeave={() => setHover(null)} className="block touch-none">
+      <div className="absolute right-0 top-0 z-[2]">
+        <ZoomControls z={z} span={spanLabel(d1 - d0)}
+          labels={{ in: t(lang, "zoomIn"), out: t(lang, "zoomOut"), reset: t(lang, "zoomReset") }} />
+      </div>
+      <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={summary}
+        onPointerDown={dp.onPointerDown} onPointerUp={dp.onPointerUp} onDoubleClick={dp.onDoubleClick}
+        onPointerMove={(e) => { if (!dp.onPointerMoveDrag(e)) onMove(e); }} onPointerLeave={() => setHover(null)}
+        className={`block touch-none ${z.zoomed ? (dp.dragging ? "cursor-grabbing" : "cursor-grab") : ""}`}>
+        <defs><clipPath id={`plot-${uid}`}><rect x={M.l} y={0} width={W - M.l - M.r} height={H} /></clipPath></defs>
+        <g clipPath={`url(#plot-${uid})`}>
         {/* forecast period sits on the lighter sheet, as a projection does in a bulletin */}
         <rect x={xT} y={M.t} width={W - M.r - xT} height={axisY - M.t} fill="hsl(var(--sheet))" />
         {focusRect && <rect x={focusRect[0]} y={M.t} width={focusRect[1] - focusRect[0]} height={axisY - M.t} fill={focusFill} />}
 
         {/* y grid */}
         {y.ticks(6).map((v) => (
-          <g key={v}>
-            <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke="hsl(var(--rule))" strokeWidth={v === 0 ? 1.2 : 0.75} />
-            <text x={M.l - 8} y={y(v)} dy="0.32em" textAnchor="end" className="num fill-ink-3 text-[12px]">{fmt0(v)}</text>
-          </g>
+          <line key={v} x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke="hsl(var(--rule))" strokeWidth={v === 0 ? 1.2 : 0.75} />
         ))}
 
         {/* spike thresholds and spot */}
@@ -139,6 +159,11 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
           </g>
         )}
 
+        </g>
+        {y.ticks(6).map((v) => (
+          <text key={v} x={M.l - 8} y={y(v)} dy="0.32em" textAnchor="end" className="num fill-ink-3 text-[12px]">{fmt0(v)}</text>
+        ))}
+
         {/* right-hand labels */}
         {lastSpot !== null && (
           <g className="text-[12px]">
@@ -148,6 +173,7 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
           </g>
         )}
 
+        <g clipPath={`url(#plot-${uid})`}>
         {/* review line */}
         <line x1={xT} x2={xT} y1={M.t - 14} y2={axisY} stroke="hsl(var(--bank))" strokeWidth={1.5} />
         <text x={xT + 6} y={M.t - 16} className="fill-bank text-[13px] font-semibold">{hhmm(T, lang)}</text>
@@ -155,8 +181,8 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
 
         {!simple && (<>
         {/* balancing direction ribbon */}
-        <text x={xT - 12} y={ribY + RIB_H / 2} dy="0.32em" textAnchor="end" className="fill-ink-2 text-[13px] font-semibold">{t(lang, "direction")}</text>
-        <g className="text-[11px]">
+        <text x={labX} y={roomLeft ? ribY + RIB_H / 2 : ribY - 8} dy="0.32em" textAnchor={labAnchor} className="fill-ink-2 text-[13px] font-semibold">{t(lang, "direction")}</text>
+        <g className="text-[11px]" opacity={roomLeft ? 1 : 0}>
           <rect x={xT - 150} y={ribY + RIB_H + 6} width={9} height={9} fill="hsl(var(--verm))" fillOpacity={0.8} />
           <text x={xT - 137} y={ribY + RIB_H + 14} className="fill-ink-3">{t(lang, "up")}</text>
           <rect x={xT - 104} y={ribY + RIB_H + 6} width={9} height={9} fill="hsl(var(--rule))" />
@@ -178,8 +204,8 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
         })}
 
         {/* spike risk: high above the line, low below */}
-        <text x={xT - 12} y={riskY + RISK_HALF / 2} dy="0.32em" textAnchor="end" className="fill-verm text-[13px] font-semibold">{t(lang, "highRisk")}</text>
-        <text x={xT - 12} y={baseY + RISK_HALF / 2} dy="0.32em" textAnchor="end" className="fill-teal text-[13px] font-semibold">{t(lang, "lowRisk")}</text>
+        <text x={labX} y={roomLeft ? riskY + RISK_HALF / 2 : riskY - 8} dy="0.32em" textAnchor={labAnchor} className="fill-verm text-[13px] font-semibold">{t(lang, "highRisk")}</text>
+        <text x={roomLeft ? labX : W - M.r - 4} y={roomLeft ? baseY + RISK_HALF / 2 : riskY - 8} dy="0.32em" textAnchor="end" className="fill-teal text-[13px] font-semibold">{t(lang, "lowRisk")}</text>
         <line x1={xT} x2={W - M.r} y1={baseY} y2={baseY} stroke="hsl(var(--ink-3))" strokeWidth={0.75} />
         <line x1={xT} x2={W - M.r} y1={baseY - 0.4 * RISK_HALF} y2={baseY - 0.4 * RISK_HALF} stroke="hsl(var(--verm))" strokeOpacity={0.5} strokeDasharray="3 3" />
         <line x1={xT} x2={W - M.r} y1={baseY + 0.5 * RISK_HALF} y2={baseY + 0.5 * RISK_HALF} stroke="hsl(var(--teal))" strokeOpacity={0.5} strokeDasharray="3 3" />
@@ -199,17 +225,15 @@ export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
 
         </>)}
 
-        {/* time axis */}
-        {hours.map((h) => {
-          const hr = hourOf(h);
-          return (
-            <g key={h}>
-              <line x1={x(h)} x2={x(h)} y1={axisY} y2={axisY + (hr % 2 === 0 ? 6 : 3)} stroke="hsl(var(--ink-3))" />
-              {hr % 2 === 0 && <text x={x(h)} y={axisY + 18} textAnchor="middle" className="num fill-ink-3 text-[12px]">{hhmm(h, lang)}</text>}
-              {hr === 0 && <text x={x(h)} y={axisY + 32} textAnchor="middle" className="fill-ink-2 text-[12px] font-semibold">{dateShort(h, lang)}</text>}
-            </g>
-          );
-        })}
+        </g>
+        {/* time axis: 2 h, 1 h, 30 or 15 min labels depending on the zoom */}
+        {ticks.map(({ t: h, major }) => (
+          <g key={h}>
+            <line x1={x(h)} x2={x(h)} y1={axisY} y2={axisY + (major ? 6 : 3)} stroke="hsl(var(--ink-3))" />
+            {major && <text x={x(h)} y={axisY + 18} textAnchor="middle" className="num fill-ink-3 text-[12px]">{hhmm(h, lang)}</text>}
+            {major && hourOf(h) === 0 && new Date(h).getUTCMinutes() === 0 && <text x={x(h)} y={axisY + 32} textAnchor="middle" className="fill-ink-2 text-[12px] font-semibold">{dateShort(h, lang)}</text>}
+          </g>
+        ))}
         <line x1={M.l} x2={W - M.r} y1={axisY} y2={axisY} stroke="hsl(var(--ink-3))" strokeWidth={0.75} />
 
         {/* hover crosshair */}
@@ -246,6 +270,12 @@ function Row({ k, v, strong }: { k: string; v: number | null | undefined; strong
       <span>{k}</span><span className="num">{v === null || v === undefined ? "–" : fmt0(v)}</span>
     </div>
   );
+}
+
+function spanLabel(ms: number) {
+  const m = Math.round(ms / 60_000);
+  const h = Math.floor(m / 60), r = m % 60;
+  return h ? (r ? `${h} h ${r} min` : `${h} h`) : `${r} min`;
 }
 
 function labels(lang: Lang, simple: boolean) {
