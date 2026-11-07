@@ -19,12 +19,8 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `split_all_rt`: `split_all` + live-imbalance features (Fingrid 198/186 surplus/deficit, production vs BRP plan, hydro change) in the short model only | + Fingrid 198/186/192/242/191 | 42.52 | 12.07 | 0.815 | 0.0918 | 0.4005 | Fold A. Small, consistent gain, all at steps 1-8 (long model identical). Hour 1: MAE 38.46 (was 38.52), direction 0.3431 (0.3471), spikes 0.0816 (0.0837). Hour 2: 41.05 / 0.3875 (41.07 / 0.3892). |
 | 7 Nov | `split_all_rt_lean`: same, only `rt_sd_mean4`, `rt_plan_err`, `rt_plan_err_mean4`, `rt_hydro_change_1h` | same | 42.52 | 12.07 | 0.816 | 0.0920 | 0.4007 | Fold A. Same overall as `split_all_rt`; hour 1 slightly worse (direction 0.3469), hour 2 slightly better (MAE 40.97, direction 0.3848). No reason to prefer it. |
 | 7 Nov | `split_all_icon`: `split_all` + ICON-EU wind index, ICON revision vs. day-ahead run, ECMWF-vs-ICON wind spread (both models, short and long) | + Fingrid RT + 2 weather models | **42.14** | **12.06** | 0.807 | 0.0923 | **0.3995** | Fold A: MAE −0.39, pinball −0.03, direction −0.012 vs `split_all`; spike Brier +0.0002 (noise). Small, consistent gain; coverage −0.007. |
-| 7 Nov | `split_all_icon` (**fold B**, August, cutoff 1 Aug) | + Fingrid RT + 2 weather models | **28.11** | **6.99** | 0.758 | **0.0738** | **0.4445** | Fold B vs `split_all` (28.41 / 7.10 / 0.766 / 0.0750 / 0.4491): better on MAE, pinball, both Briers; coverage −0.008. Same sign as fold A, so the ICON gain is not a one-window fluke, though small. |
-| 7 Nov | `split_all_rt` on **fold B** (August, trained on Jun-Jul only) | + Fingrid 198/186/192/242/191 | 28.41 | 7.10 | 0.765 | 0.0732 | 0.4480 | Fold B. `split_all` reference: 28.41 / 7.10 / 0.766 / 0.0750 / 0.4491. Spikes -0.0018 and direction -0.0011 (same sign as fold A), MAE and pinball unchanged. Hour 1: MAE 25.04, spikes 0.0628, direction 0.3895; hour 2: 26.66, 0.0658, 0.4289. |
-| 7 Nov | `split_all` on **fold B** (reference) | + Fingrid RT + weather | 28.41 | 7.10 | 0.766 | 0.0750 | 0.4491 | Fold B reference for every later comparison. |
-| 7 Nov | `split_all_pcal`: `split_all` with pooled calibration (3 rolling 14-day holdouts) | + Fingrid RT + weather | 42.34 | 12.01 | 0.765 | 0.0907 | 0.3969 | Code removed when Frank's branch was merged (his calibration kept). Fold A: better on all four metrics, but coverage drops to 0.765. Fold B: 28.67 / 7.14 / 0.782 / 0.0738 / 0.4559, so **worse** MAE, pinball and direction. **Rejected** (must beat the reference on both folds). |
+| 7 Nov | `split_all_pcal`: `split_all` with pooled calibration (3 rolling 14-day holdouts) | + Fingrid RT + weather | 42.34 | 12.01 | 0.765 | 0.0907 | 0.3969 | Code removed when Frank's branch was merged (his calibration kept). Fold A: better on all four metrics, but coverage drops to 0.765. Fold B (row in the August table below): **worse** MAE, pinball and direction. **Rejected** (must beat the reference on both folds). |
 | 7 Nov | **`split_all_rt_icon`**: ICON-EU in both models + live imbalance in the short model (`split_all_icon` + `split_all_rt`) | + Fingrid RT + 198/186/192/242/191 + 2 weather models | **42.14** | 12.06 | 0.808 | 0.0922 | **0.3978** | Fold A. vs `split_all`: MAE −0.39, pinball −0.03, direction −0.0033, spikes +0.0001 (noise). vs `split_all_icon`: same MAE and pinball, direction −0.0017. |
-| 7 Nov | **`split_all_rt_icon`** (**fold B**) | same | **28.02** | **6.97** | 0.760 | 0.0741 | 0.4443 | Fold B. vs `split_all`: better on all four metrics (MAE −0.39, pinball −0.13, spikes −0.0009, direction −0.0048). vs `split_all_icon`: MAE −0.09, pinball −0.02. **Best of Pavlo's branch** (before Frank's rounds 3–6 were merged; `v6_hf` is better on both folds). |
 | 7 Nov | `split_all_rt2`: + 10 more Fingrid RT series in the short model (hydro, electric boilers, net import, flows, CHP) | + Fingrid RT2 | 42.62 | 12.12 | 0.815 | 0.0912 | 0.4000 | Better spikes and direction, slightly worse MAE. |
 | 7 Nov | `split_all_seeds`: `split_all` with 5-seed averaging | same | 42.44 | 12.14 | 0.810 | 0.0917 | 0.3998 | |
 | 7 Nov | `split_all_rt2_seeds`: both | + Fingrid RT2 | 42.37 | 12.09 | 0.813 | 0.0913 | 0.3983 | Beats `split_all` in 3/4 weeks on MAE, 4/4 spikes, 3/4 direction, 2/4 pinball. |
@@ -67,7 +63,12 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 
 | Model | MAE | Pinball | Coverage | Brier spikes | Brier direction |
 |---|---|---|---|---|---|
-| `split_all` | 28.39 | 7.10 | 0.764 | **0.0731** | 0.4461 |
+| `split_all` (Frank's run) | 28.39 | 7.10 | 0.764 | **0.0731** | 0.4461 |
+| `split_all` (Pavlo's run, reference for the rows below) | 28.41 | 7.10 | 0.766 | 0.0750 | 0.4491 |
+| `split_all_rt` (Pavlo) | 28.41 | 7.10 | 0.765 | 0.0732 | 0.4480 |
+| `split_all_icon` (Pavlo) | 28.11 | 6.99 | 0.758 | 0.0738 | 0.4445 |
+| `split_all_rt_icon` (Pavlo) | 28.02 | 6.97 | 0.760 | 0.0741 | 0.4443 |
+| `split_all_pcal` (Pavlo, rejected) | 28.67 | 7.14 | 0.782 | 0.0738 | 0.4559 |
 | `final_capw` | 29.53 | 7.34 | 0.761 | 0.0882 | 0.4562 |
 | `v3_bm` | 28.38 | 7.11 | 0.738 | 0.0768 | 0.4492 |
 | `v3_bmi` | 28.32 | **7.01** | 0.732 | 0.0758 | 0.4458 |
@@ -83,6 +84,12 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | `v6_h` | 27.77 | **6.57** | 0.771 | 0.0684 | 0.4390 |
 | **`v6_hf` (submitted)** | **27.74** | 6.59 | 0.770 | **0.0680** | **0.4388** |
 
+- **Pavlo's August runs** (rows marked Pavlo; run 7 Nov before Frank's rounds 3–6 were merged, cutoff 1 Aug, trained on Jun–Jul only):
+  - **`split_all` (reference):** the fold-B reference for every later comparison of Pavlo's variants.
+  - **`split_all_rt`** (+ Fingrid 198/186/192/242/191 in the short model): spikes −0.0018 and direction −0.0011 vs the reference (same sign as September), MAE and pinball unchanged. Hour 1: MAE 25.04, spikes 0.0628, direction 0.3895; hour 2: 26.66, 0.0658, 0.4289.
+  - **`split_all_icon`** (+ ICON-EU, both models; + Fingrid RT + 2 weather models): better than the reference on MAE, pinball and both Briers; coverage −0.008. Same sign as September, so the ICON gain is not a one-window fluke, though small.
+  - **`split_all_rt_icon`** (ICON-EU in both models + live imbalance in the short model): better than the reference on all four metrics (MAE −0.39, pinball −0.13, spikes −0.0009, direction −0.0048); vs `split_all_icon`: MAE −0.09, pinball −0.02. **Best of Pavlo's branch** (`v6_hf` is better on both folds).
+  - **`split_all_pcal`** (pooled calibration over 3 rolling 14-day holdouts): better on every September metric but **worse** on August MAE, pinball and direction, so rejected (a change must beat the reference on both folds).
 - **Same fold as the teammates:** `final_capw` reproduces Abdo's August numbers exactly (29.53 / 7.34 / 0.0882 / 0.4562), and `split_all` is within 0.02 MAE of Pavlo's (28.41).
 - **ICON holds:** `v3_bmi` vs `v3_bm` is better on all four metrics (+0.8 % weighted by points). ICON was chosen on September only, so this is a clean check.
 - **Round 3 holds against `final_capw`:** better in all 5 weeks on all four metrics (+6.9 % weighted). Not fully independent: the tuning folds (26 Jul – 6 Sep) overlap August.
