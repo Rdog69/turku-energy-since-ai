@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, RotateCcw, TrendingDown, TrendingUp, X } from "lucide-react";
+import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
 import { STEPS, driverTokens, forecastAt, hourRuns, hourSummary, known, qMs, reviewMin, reviewMs, sortedAlerts, windowDrivers } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
@@ -56,8 +56,6 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
     rest.current = 0;
     goQuarter(Math.round((ms - reviewMs(p, 0)) / Q_MS));
   }, [goQuarter, p, setPlaying]);
-  const reset = () => { setPlaying(false); rest.current = 0; goQuarter((n - 1) * 4); setSpan(16 * H); setZones(false); setPanel(null); };
-  const atLatest = i === n - 1 && q === 0 && span === 16 * H && !zones;
   const T = reviewMs(p, i) + q * Q_MS;
   const view = useSmoothRange([T - BACK * span, T + (1 - BACK) * span], 75, 31 * 24 * H);
   const [details, setDetails] = useState(false);
@@ -88,15 +86,7 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
             onPan={pan} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
             onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
         </div>
-        <div className="flex min-h-[20px] justify-end">
-          {!atLatest && (
-            <button type="button" onClick={reset}
-              className="-mt-1 inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-3 transition-colors duration-150 hover:text-bank">
-              <RotateCcw size={13} strokeWidth={2} />{t(lang, "tcReset")}
-            </button>
-          )}
-        </div>
-        <div className="mt-1"><PeriodStrip p={p} tNow={T} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
+        <div className="mt-2"><PeriodStrip p={p} tNow={T} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />
         </div>
