@@ -17,6 +17,17 @@
 | 4:20–4:38 | **8. Close.** Back to the situation room, live view, one slow pan across the fan chart and the alert strip. Then three bullets: "10 h forecast every hour", "80 % band that holds", "Spike risk, hours ahead, with a reason". | "What Turku Energia gets: a ten-hour view every hour, with an uncertainty band that holds and spike risk hours ahead, explained in one sentence. Next step: outage messages, winter history, and — with your plant data — advice that knows your capacity." |
 | 4:38–4:43 | **9. End card.** Team name, repo, "Turku Energia × Since AI 2026". Music fades. | "Thank you." |
 
+## Option B (no spot on screen) for scenes 1–2
+
+Same timing and message as Option A (0:08–0:40 and 0:40–1:12). The chart shows only the gap (imbalance price minus spot), so no spot value or line is drawn. Draw it from the gap data only, as imbalance minus spot computed offline, and never plot or print the spot series itself.
+
+| Time | Scene and screen | Narration |
+|---|---|---|
+| 0:08–0:40 | **1B. Hook — one picture.** Full-screen chart from the test period: the gap as a stepped line around a flat zero line. Above zero is shaded warm and labelled "up-regulation"; below zero is shaded cool and labelled "down-regulation". Two faint bands at +50 and −50 €/MWh are labelled "spike zone". The y-axis shows the gap in €/MWh only. | "Every 15 minutes, Finland settles its imbalance at a price. The day-ahead market has already set a price for that hour. This line shows how far the settled price lands from it. Zero means no surprise. Most of the time it stays close to zero. Then it jumps — up when the grid is short, down when it has too much power. Past the faint bands, more than fifty euros away, we call it a spike. Those jumps are the money. They're also what every trading plan is exposed to." |
+| 0:40–1:12 | **2B. Key idea.** Same chart. The distance of the line from zero is highlighted and labelled "the gap". Slide in the equation: `imbalance price = spot + gap`, with "spot" greyed out and no number next to it. Then a green check: "spot known for all 40 steps, at every origin". | "So here's our main idea. We don't forecast the price. We forecast the gap — the distance from the day-ahead price. At every forecast origin, that day-ahead price is already published for the next ten hours. What we don't know is how wrong the day-ahead plan will be. That's the gap. One framing choice, and it cuts our error by a third — before any machine learning." |
+
+Scenes 4–6 are unchanged. The fan chart in scene 4 still draws spot as a line; switch it to a gap-to-spot view as well if Option B is used throughout (see the production note).
+
 ---
 
 ## Production notes
@@ -26,6 +37,7 @@
 - **Miss, Tue 15 Sep 05:00 local** (origin 2026-09-15T02:00Z). P10–P90 gap about −105 to +50 for the whole morning, spike-high risk 0.02–0.09. Realised gap +276 at 06:00, +473 at 06:15, about +1,770 at 06:30–06:45. Inputs at the origin were between the 10th and 77th percentile of the validation period (wind error, frequency, live imbalance, plan error, ICON revision). Same event as Case 2 in `reports/case_studies.md`.
 - Note: if the team wants consistency, re-check both moments and the alert numbers below on the submitted model's validation forecasts (`python -m src.export.dashboard --model <submitted model> --period validation`). Which file is submitted (`v6_hf` or `team5050`) is a team decision.
 - Alert numbers: the alert rule in `reports/alerts_tuning.md` (block spike risk up at least 0.20 to at least 0.30) fires 2.2 times a day for `split_all_rt_icon`, and 61 % of alerts were followed by a high spike in that hour (base rate 19.5 %).
+- **Option B is the safe choice until the organisers answer Q11** (`QUESTIONS.md`: may the video show real forecast and spot values). It draws only the gap, so it does not show licensed data. Use Option A only after a yes.
 - ⚠ **Spot on screen.** Scenes 1–2 and the fan chart draw spot as a line. The repo rule is to never plot spot values (Nord Pool licence). Before publishing the video, either ask the organisers whether a spot line without axis values is allowed, or draw the gap to spot only.
 - Both moments should be in the same viewing session, so the time-travel slider move in scene 5 is a single continuous drag.
 - Every number read aloud comes from `docs/RESULTS.md` or the notes above (validation period). The organisers have not published test-period scores, so none are quoted.

@@ -4,6 +4,8 @@
 
 **Short on time? Ask Q1, Q2, Q3 and Q4.**
 
+**Status (7 Nov):** Q1 is answered: yes, pre-June aFRR and mFRR price data may be used (announcement of 7 Nov, see Q1). Every other question is still open; neither this file nor `docs/RESULTS.md` records an answer to them. Q14 is new.
+
 Sources: "README" is the organisers' starter-package README (section numbers as in the file); `availability.csv` is the package's table of publication delays.
 
 ---
@@ -83,6 +85,13 @@ Sources: "README" is the organisers' starter-package README (section numbers as 
 
 **Ask:** "README §8 says to use commercial cross-border flows only as realised values. Does that rule out day-ahead scheduled flows, which are known after the D-1 auction just like the spot price?"
 
+### Q14. Fingrid history downloaded after the fact: revised values
+
+**Ask:** "We downloaded the Fingrid real-time series for the backtest after the events. If Fingrid revised values after first publication, our backtest saw the revised values, not the ones that were available at each origin, and we cannot verify the vintages. Is that acceptable? And is the live API's first-published value what you would score a submission against?"
+
+- **Why:** Source: the limitations in `reports/evaluation_report.md` and the leakage review noted in our docs. It touches every real-time feature, so it is a code-review risk.
+- **Now:** we use only the 30-minute delay rule (Q3) and cannot check vintages. Fingrid's continuously updated forecasts (245, 241) are not used for the same reason.
+
 ---
 
 ## C. Licensed spot data and what we may show
@@ -102,6 +111,14 @@ Sources: "README" is the organisers' starter-package README (section numbers as 
 ### Q13. "Delete after the event": what exactly?
 
 **Ask:** "README §9 says not to share the Nord Pool data further, not to upload it to public repositories, and to delete it after the event. Does the deletion also cover copies in a private team repository's git history? For the source-code deliverable: we leave all package files out and expect reviewers to use their own copy of the package. Is that right?"
+
+- **Files that hold or derive from spot (committed, from `reports/repo_hygiene.md`; this is what "delete" would cover):**
+  - `starter_package/data/` (`spot_nordpool.csv`, `inputs.csv`, `inputs.parquet`, `actuals_validation.csv`, `quality_report.csv`, `quality_report.md`)
+  - `external_data/elering/fi_spot_history.csv.gz`
+  - `external_data/history/pkg_history.csv.gz`
+  - `submissions/` (forecast and validation files; their absolute prices are spot plus a forecast gap, so they are derived)
+  - `app_demo_sample/` has a synthetic spot curve and is not on the list.
+  - Also outside git: `results/` (git-ignored) holds spot in the dashboard export.
 
 ---
 
