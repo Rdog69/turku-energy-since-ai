@@ -149,9 +149,30 @@ def add_wind_hat(f: pd.DataFrame, index: dict[str, SeriesIndex], wind_map) -> pd
     return f
 
 
+def add_towns(f: pd.DataFrame, index: dict[str, SeriesIndex], towns) -> pd.DataFrame:
+    """Town weather (src/data/weather.load_towns): solar radiation and temperature, and how much the
+    newest usable run revised them since Fingrid published its day-ahead solar and consumption
+    forecasts. Same availability rule as add_weather: runs usable at the origin, and the
+    day-ahead comparison point is never later than the origin."""
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    rad, _ = towns.lookup(o, d, "rad")
+    rad_da, _ = towns.lookup(np.minimum(index["fi_solar_fc_da"].first_usable_at(d), o), d, "rad")
+    temp, _ = towns.lookup(o, d, "temp")
+    temp_da, _ = towns.lookup(np.minimum(index["fi_consumption_fc_da"].first_usable_at(d), o), d, "temp")
+    f["om_rad_rev"] = rad - rad_da
+    # Revision scaled to MW with the day-ahead solar forecast; the 50 W/m2 floor keeps dawn and
+    # dusk from blowing the ratio up.
+    f["om_solar_rev_mw"] = f["solar_fc"].to_numpy(dtype=float) * np.clip(
+        (rad - rad_da) / np.fmax(rad_da, 50.0), -1.0, 2.0)
+    f["om_temp_town"] = temp
+    f["om_temp_rev"] = temp - temp_da
+    return f
+
+
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
                    with_targets: bool = True, weather=None, nordic=None, weather2=None,
-                   wind_map=None) -> pd.DataFrame:
+                   wind_map=None, towns=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
 
     weather: optional WeatherIndex (src/data/weather.py) to add the om_* columns.
@@ -275,6 +296,8 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         f = add_weather2(f, index, weather, weather2)
     if wind_map is not None:
         f = add_wind_hat(f, index, wind_map)
+    if towns is not None:
+        f = add_towns(f, index, towns)
     if with_targets:
         f = add_targets(f, index)
     return f
@@ -339,6 +362,10 @@ WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
 
 # Learned wind production (MW) from the weather points (src/models/wind_power.py).
 WINDHAT_COLUMNS = ["om_wind_hat", "om_wind_hat_err", "om_wind_hat_rev"]
+
+# Town weather: solar revision and temperature (heating demand) revision since the day-ahead forecasts.
+TOWN_SOLAR_COLUMNS = ["om_rad_rev", "om_solar_rev_mw"]
+TOWN_TEMP_COLUMNS = ["om_temp_town", "om_temp_rev"]
 
 WEATHER_COLUMNS = [
     "om_wind_idx", "om_wind_idx_da", "om_wind_rev", "om_wind_rev_mw", "om_wind_speed",

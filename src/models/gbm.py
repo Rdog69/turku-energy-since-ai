@@ -22,7 +22,8 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, MEMORY_COLUMNS, NORDIC_COLUMNS,
-                                WEATHER2_COLUMNS, WEATHER_COLUMNS, WINDHAT_COLUMNS)
+                                TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS, WEATHER2_COLUMNS, WEATHER_COLUMNS,
+                                WINDHAT_COLUMNS)
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -102,6 +103,8 @@ class GBMModel:
     use_memory: bool = False        # 4-hour averages of the gap and direction
     use_icon: bool = False          # second weather model ICON-EU + ECMWF-vs-ICON spread
     use_wind_hat: bool = False      # learned wind production from the weather points (MW)
+    use_town_solar: bool = False    # solar radiation revision since the day-ahead solar forecast
+    use_town_temp: bool = False     # town temperature and its revision since the day-ahead forecast
     spike_shrink: int | None = None  # m0 for the shrunk spike Platt maps (see _Platt); None = plain
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
@@ -123,6 +126,8 @@ class GBMModel:
                 + (NORDIC_COLUMNS if self.use_nordic else [])
                 + (WEATHER2_COLUMNS if self.use_icon else [])
                 + (WINDHAT_COLUMNS if self.use_wind_hat else [])
+                + (TOWN_SOLAR_COLUMNS if self.use_town_solar else [])
+                + (TOWN_TEMP_COLUMNS if self.use_town_temp else [])
                 + (MEMORY_COLUMNS if self.use_memory else []))
 
     # ------------------------------------------------------------------ fitting

@@ -35,6 +35,9 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `v4_b4`: a separate model for steps 1–4 inside the short model | same | 41.32 | 11.89 | 0.794 | 0.0871 | 0.3893 | Dropped. +0.05 % (Sep) and +0.08 % (Aug) weighted, but MAE and pinball slightly worse in most weeks. A tie, so the simpler model stays. |
 | 7 Nov | `v4_wh`: + learned wind production: non-negative weights for 22 weather points (ECMWF and ICON) fitted to Fingrid's measured wind (dataset 181, data published before the cutoff only). Features: the predicted production, its gap to the day-ahead forecast, and its revision since then | + Fingrid 181 for the fit | 41.26 | 11.88 | 0.797 | 0.0874 | 0.3899 | **Kept.** MAE better in 3/4 weeks (Sep) and 4/5 (Aug); +0.02 % and +0.66 % weighted. On its own the learned map is cruder than Fingrid's day-ahead forecast (564 vs 321 MW error 5 h ahead in September), but it adds information next to it. |
 | 7 Nov | **`v4_n50`**: `v3_bmi_n50` with both kept changes in both of its models | + learned wind production | **41.08** | **11.88** | 0.797 | **0.0871** | **0.3899** | **Submitted model.** vs `v3_bmi_n50`: +0.19 % weighted (Sep; MAE better 3/4 weeks), +1.58 % (Aug; spikes better 5/5 weeks). |
+| 7 Nov | `v5_sol`: `v4_n50` + solar revision at 8 towns (ECMWF shortwave radiation vs the run behind Fingrid's day-ahead solar forecast, also scaled to MW) | + town weather | 41.08 | 11.91 | 0.795 | 0.0872 | 0.3903 | Not kept. −0.08 % (Sep) and −0.01 % (Aug) weighted by points: no effect, even in sunny August. |
+| 7 Nov | `v5_tmp`: `v4_n50` + town temperature and its revision since the day-ahead consumption forecast (heating demand) | + town weather | 41.05 | 11.87 | 0.794 | 0.0870 | 0.3866 | Not kept. +0.20 % (Sep; direction better in 3/4 weeks) but −0.20 % (Aug). See the August section. |
+| 7 Nov | `v5_st`: both | + town weather | 41.03 | 11.90 | 0.795 | 0.0868 | 0.3865 | Not kept. +0.21 % (Sep) but −0.16 % (Aug). |
 
 **Final vs baseline:** MAE −38 % (66.20 → 41.08), pinball −51 % (24.18 → 11.88), spike Brier −23 % (0.1132 → 0.0871), direction Brier −14 % (0.4509 → 0.3899). **Weighted by points (30/20/20/10): 34.4 % better** (`final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
 
@@ -56,12 +59,20 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | `v4_b4` | 28.33 | 7.02 | 0.731 | 0.0755 | **0.4450** |
 | `v4_wh` | 28.19 | **7.00** | 0.738 | 0.0744 | 0.4466 |
 | **`v4_n50` (submitted)** | **27.99** | **7.00** | 0.738 | **0.0710** | 0.4466 |
+| `v5_sol` | 27.94 | 7.01 | 0.732 | 0.0712 | 0.4464 |
+| `v5_tmp` | 28.08 | 7.03 | 0.734 | 0.0709 | 0.4473 |
+| `v5_st` | 27.98 | 7.05 | 0.736 | 0.0710 | 0.4470 |
 
 - **Same fold as the teammates:** `final_capw` reproduces Abdo's August numbers exactly (29.53 / 7.34 / 0.0882 / 0.4562), and `split_all` is within 0.02 MAE of Pavlo's (28.41).
 - **ICON holds:** `v3_bmi` vs `v3_bm` is better on all four metrics (+0.8 % weighted by points). ICON was chosen on September only, so this is a clean check.
 - **Round 3 holds against `final_capw`:** better in all 5 weeks on all four metrics (+6.9 % weighted). Not fully independent: the tuning folds (26 Jul – 6 Sep) overlap August.
 - **Nordic wind:** better median in 4 of 5 weeks; the band is worse overall because of one bad day (31 Aug). Same pattern as September, hence median only.
 - **The submitted model vs `final_capw`:** better in all 5 weeks on all four metrics (+8.2 % weighted by points).
+- **Town weather (round 5) doesn't pass:**
+  - **Solar revision:** no effect in either month.
+  - **Temperature revision:** helps September (+0.20 %, mostly direction; the coldest week gains most) but hurts every August week (−0.20 %), so it isn't kept.
+  - **The heating mechanism isn't visible in the training data yet.** A colder-than-planned forecast doesn't line up with higher-than-planned consumption from June to September (correlation +0.10 in September, the wrong sign for heating). Only the first four days of October show the heating pattern (−0.32), too little to rely on.
+  - The switch (`town_temp=True` in `make_final`) is ready if the heating season makes it worth a bet.
 - ⚠ **The older `split_all` stays close on August.** Before the round-4 spike fix it was level with our model (`v3_bmi_n50`: −0.1 % weighted, worse spikes). The submitted `v4_n50` beats it by +1.5 % (better MAE, band and spikes), but that's far below September's gap. Part of the September gain since `split_all` is probably specific to September, so expect a smaller gain on the test month.
 - Every model's error is lower in August (MAE about 28 vs 41 in September): it was a calmer month.
 
@@ -94,4 +105,5 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 - **Neighbouring countries' wind helps the median, not the band.** In both September and August it improved MAE but made the P10–P90 band worse. Extra inputs barely move the median, which has lots of data behind it, but give the tail models more noise to chase. So the final model uses it for the median only.
 - **A calibration window with few events needs shrinking.** Platt scaling learned on a quiet month can switch spike warnings almost off for the next, busier one. Shrinking the correction by how many spike quarters the window actually held fixed August (−6 % spike Brier) and still helped September.
 - **Learned wind production helps a little, even though it's cruder than Fingrid's own day-ahead forecast.** It adds information next to that forecast rather than replacing it.
+- **Solar adds nothing beyond Fingrid's day-ahead solar forecast, and temperature is a bet on the heating season.** Solar is small next to wind (85 MW vs 3,787 MW on average in October, by Fingrid's day-ahead forecasts in the starter package), and radiation revisions didn't help even in August. Temperature revisions helped only in September.
 - **Not used: blending with a teammate's model.** A 50/50 blend of `v3_bm` with Abdo's best lab model (`brainstorming-abdo`, CAL INT4) scored about 41.2 / 11.75 / 0.0870 / 0.3800 (`weekly.py`). But that model trains part of its direction forecast on Fingrid history from Mar 2025 – May 2026, and the organisers' README says to train only on 1 Jun – 4 Oct 2026. It stays out unless the organisers approve. His history-free reference model made the blend worse in every week.

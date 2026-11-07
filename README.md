@@ -24,7 +24,7 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 | Direction: three-class Brier score | 10 | 0.4509 | **0.3899** | **−14 %** |
 | P10–P90 coverage (target 80 %) | – | 0.68 | **0.80** | well calibrated |
 
-Weighted by the points, that's **34 % better than the baseline**. It's better in every one of the 4 validation weeks, on all four metrics. About 30 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July only) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
+**Weighted by the points (30/20/20/10), the model is 34.4 % better than the organisers' baseline** (MAE alone: 37.9 %). It's better in every one of the 4 validation weeks, on all four metrics. About 30 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July only) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ---
 
@@ -99,6 +99,13 @@ Weighted by the points, that's **34 % better than the baseline**. It's better in
 | **+ steadier spike calibration, learned wind production (final)** | **41.08** | **11.88** | **0.0871** | **0.3899** |
 
 On August (trained on June–July only) the final model scores 27.99 / 7.00 / 0.0710 / 0.4466, better than `final_capw` in all 5 weeks on all four metrics.
+
+Tried and left out, because they didn't win in both September and August:
+- neighbour wind for the band (it stays in the median);
+- a separate model for the first hour;
+- solar and temperature revisions at 8 towns.
+
+The details are in [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ### Around the forecast
 

@@ -79,6 +79,9 @@ DRIVER_LABELS = {
     "om_wind_hat": "Wind production from weather models (MW)",
     "om_wind_hat_err": "Weather models vs. day-ahead wind forecast (MW)",
     "om_wind_hat_rev": "Wind production revision since day-ahead (MW)",
+    # Town weather
+    "om_rad_rev": "Sunshine revision since day-ahead", "om_solar_rev_mw": "Solar production revision (MW)",
+    "om_temp_town": "Temperature in the towns", "om_temp_rev": "Temperature revision since day-ahead",
 }
 
 LEVERS = {

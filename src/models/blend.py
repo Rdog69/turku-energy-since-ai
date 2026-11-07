@@ -35,6 +35,11 @@ class HorizonSplit:
         return getattr(self.short, "use_wind_hat", False) or getattr(self.long, "use_wind_hat", False)
 
     @property
+    def use_towns(self) -> bool:
+        return any(getattr(m, a, False) for m in (self.short, self.long)
+                   for a in ("use_towns", "use_town_solar", "use_town_temp"))
+
+    @property
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
 
@@ -86,6 +91,10 @@ class MedianFrom:
     @property
     def use_wind_hat(self) -> bool:
         return self._either("use_wind_hat")
+
+    @property
+    def use_towns(self) -> bool:
+        return self._either("use_towns")
 
     @property
     def use_fingrid(self) -> bool:

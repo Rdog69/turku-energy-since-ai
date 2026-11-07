@@ -35,18 +35,19 @@ TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "lear
 
 def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
                icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
-               wind_hat: bool = False) -> HorizonSplit:
-    """final_capw plus optional round-3/4 changes. tuned: x = none, l = long model, b = both models.
+               wind_hat: bool = False, town_solar: bool = False, town_temp: bool = False) -> HorizonSplit:
+    """final_capw plus optional round-3/4/5 changes. tuned: x = none, l = long model, b = both models.
 
     bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
     spike_shrink: m0 for the shrunk spike calibration (GBMModel.spike_shrink).
     wind_hat: learned wind production from the weather points (src/models/wind_power.py).
+    town_solar / town_temp: solar and temperature revisions at 8 towns (src/data/weather.load_towns).
     """
     def params(on: bool) -> dict:
         return dict(TUNED_PARAMS if on else BASE_PARAMS)
     common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
                   use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
-                  use_wind_hat=wind_hat)
+                  use_wind_hat=wind_hat, use_town_solar=town_solar, use_town_temp=town_temp)
     short_kw = dict(use_fingrid=True, use_fingrid2=True, params=params(tuned == "b"), **common)
     if bands4:
         short = HorizonSplit(name=f"{name}_short", split_step=4,
@@ -57,6 +58,13 @@ def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool =
     return HorizonSplit(
         name=name, split_step=8, capacity_weighted=True, short=short,
         long=GBMModel(name=f"{name}_long", params=params(tuned in ("l", "b")), **common))
+
+def _v4_hybrid(name: str, **extra) -> MedianFrom:
+    """v4_n50 (median from the Nordic twin, shrunk spike calibration, learned wind) plus `extra`."""
+    kw = dict(memory=True, icon=True, spike_shrink=50, wind_hat=True, **extra)
+    return MedianFrom(name=name, base=make_final(f"{name}_base", "b", **kw),
+                      median=make_final(f"{name}_median", "b", nordic=True, **kw))
+
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
 MODELS = {
@@ -139,6 +147,10 @@ MODELS = {
         name="v4_n50",
         base=make_final("v4_ebwh", "b", memory=True, icon=True, spike_shrink=50, wind_hat=True),
         median=make_final("v4_ebwhn", "b", memory=True, nordic=True, icon=True, spike_shrink=50, wind_hat=True)),
+    # Round 5: v4_n50 plus town weather, one feature group each (solar revision / temperature revision).
+    "v5_sol": lambda: _v4_hybrid("v5_sol", town_solar=True),
+    "v5_tmp": lambda: _v4_hybrid("v5_tmp", town_temp=True),
+    "v5_st": lambda: _v4_hybrid("v5_st", town_solar=True, town_temp=True),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,
@@ -195,12 +207,12 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
 
 
 def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None,
-                   wind_map=None) -> pd.DataFrame:
+                   wind_map=None, towns=None) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
     f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2,
-                       wind_map=wind_map)
+                       wind_map=wind_map, towns=towns)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -274,13 +286,19 @@ def main(argv=None) -> int:
         from src.models.wind_power import WindPowerMap, load_points
         wind_map = WindPowerMap(load_points()).fit(index, cutoff)   # data published by the cutoff only
         print(wind_map.describe())
-    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map)
+    towns = None
+    if getattr(model, "use_towns", False):
+        from src.data.weather import load_towns
+        towns = load_towns()
+        if towns is None:
+            raise FileNotFoundError("town weather missing: python -m src.data.open_meteo --points solar")
+    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map, towns)
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
     feats = build_features(long, origins, index=index, with_targets=False, weather=weather, nordic=nordic,
-                           weather2=weather2, wind_map=wind_map)
+                           weather2=weather2, wind_map=wind_map, towns=towns)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"

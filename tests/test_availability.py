@@ -207,6 +207,25 @@ def test_wind_map_fit_uses_only_data_published_by_cutoff():
     assert a.n_fit == b.n_fit > 1000
 
 
+def test_town_features_ignore_unpublished_runs():
+    """Town weather (solar and temperature revisions): drop every run not yet usable at t."""
+    from src.data.weather import load_towns
+    from src.features.build import TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS
+    towns = load_towns()
+    if towns is None:
+        pytest.skip("town weather not downloaded (python -m src.data.open_meteo --points solar)")
+    cols = TOWN_SOLAR_COLUMNS + TOWN_TEMP_COLUMNS
+    origins = _origins(n_random=6, seed=7)
+    full = build_features(LONG, origins, with_targets=False, towns=towns)
+    assert full["om_temp_town"].notna().mean() > 0.95, "town weather coverage unexpectedly low"
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False, towns=towns.truncated(t))
+        a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
+        b = part[cols].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"town features at {t}")
+
+
 def test_weather_run_used_was_published():
     from src.data.availability import to_ns
     weather = _weather()

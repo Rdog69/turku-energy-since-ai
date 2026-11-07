@@ -72,6 +72,24 @@ def summarise_runs(raw: pd.DataFrame, weights: dict[str, float] | None = None) -
     return out
 
 
+def summarise_towns(raw: pd.DataFrame) -> pd.DataFrame:
+    """Per (run, valid hour): town means of solar radiation (W/m2), cloud cover (%) and temperature (C).
+
+    The 8 towns (open_meteo.POINTS_SOLAR) count equally.
+    """
+    g = raw.groupby(["run_init", "valid_time", "first_usable_origin_utc"])
+    return pd.DataFrame({"rad": g["shortwave_radiation"].mean(), "cloud": g["cloud_cover"].mean(),
+                         "temp": g["temperature_2m"].mean()}).reset_index()
+
+
+def load_towns(model: str = "ecmwf_ifs025") -> "WeatherIndex | None":
+    """Town weather (radiation, cloud, temperature) as a WeatherIndex with those three variables."""
+    path = OUT_DIR / f"{model}_solar.parquet"
+    if not path.exists():
+        return None
+    return TownIndex(summarise_towns(pd.read_parquet(path)))
+
+
 def load_nordic(model: str = "ecmwf_ifs025") -> dict[str, "WeatherIndex"] | None:
     """One WeatherIndex per neighbouring area (se / no / dk / ee), points weighted equally."""
     from src.data.open_meteo import POINT_AREAS
@@ -143,3 +161,8 @@ class WeatherIndex:
         v = np.where(ok & (lo >= 0) & (lo + 1 < n), v, np.nan)
         run = np.where(ok, self.run_init[kc], -1)
         return v.astype(float), run
+
+
+class TownIndex(WeatherIndex):
+    """Same lookups, for the town variables from summarise_towns()."""
+    VARS = ("rad", "cloud", "temp")
