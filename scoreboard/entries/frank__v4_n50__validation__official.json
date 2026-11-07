@@ -1,0 +1,28 @@
+{
+  "owner": "Frank",
+  "model": "v4_n50",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 41.084008,
+  "pinball": 11.882837,
+  "spike_brier": 0.087084,
+  "direction_brier": 0.389906,
+  "coverage": 0.797041,
+  "pre_june_data": false,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map"
+  ],
+  "description": "Round 4: LightGBM quantiles and direction, two horizon models, ICON-EU, Nordic wind for the median, learned wind map",
+  "notes": "Fingrid real-time ids 181, 188, 177, 193, 191, 192, 194, 371, 201, 202, 87, 89, 180, 187 (hours 1-2 only)",
+  "forecast_file": "",
+  "branch": "brainstorming-frank",
+  "commit": "67ab599",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T12:47:30Z"
+}

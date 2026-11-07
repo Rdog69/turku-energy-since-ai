@@ -1,0 +1,27 @@
+{
+  "owner": "Abdo",
+  "model": "P2 INT4+ss lgb7",
+  "period": "fold_b",
+  "scorer": "lab",
+  "mae": 27.274,
+  "pinball": 6.58797,
+  "spike_brier": 0.06669,
+  "direction_brier": 0.42618,
+  "coverage": 0.86129,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "wind_map",
+    "pre_june_history"
+  ],
+  "description": "Abdo's best single model: LightGBM mixture, eb50 calibration, history direction blend 0.6",
+  "notes": "From his experiments/lab/leaderboard.csv (fold B). His lab scorer reproduces Frank's official v4_n50 August scores exactly.",
+  "forecast_file": "",
+  "branch": "brainstorming-abdo",
+  "commit": "4a5db1d",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T12:47:31Z"
+}
