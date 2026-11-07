@@ -1,5 +1,7 @@
 # Test-period input drift (inputs only, no targets)
 
+> Analyses model inputs for the test period (5 Oct – 1 Nov 2026) against training rows up to 4 Oct, written before the merge for the `split_all` family. The pipeline model is now `v6_hf`, which also trains on pre-June history; that history is not in the training columns below.
+
 Quantiles of model inputs at test origins (5 Oct 00:00 - 1 Nov 23:00 local, 673 hourly origins x 40 steps) against the training rows (origins before 5 Oct 00:00 local, 120,720 rows) and against the last 14 days of training (the window the single-holdout calibration learns from). Features built with `with_targets=False` through the normal availability-aware pipeline; no test targets were read. Units: MW for `wind_fc`, `cons_fc`, `rt_wind_err` (Fingrid real-time wind minus day-ahead forecast); `om_wind_rev` is the ECMWF wind-index revision; `spot_abs_ramp` is a price ramp (aggregate quantiles only). `rt_sd_last` does not exist in the current feature set.
 
 | Feature | Training (<= 4 Oct) q05/25/50/75/95 | Last 14 days of training | Test origins (5 Oct - 1 Nov) | Test rows outside training 5-95 % range | NaN share train / test |

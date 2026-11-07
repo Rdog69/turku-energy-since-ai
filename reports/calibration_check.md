@@ -1,5 +1,7 @@
 # Reliability check of the probabilities (validation period, 7 Sep - 4 Oct 2026)
 
+> Analyses `split_all` on the validation period (7 Sep – 4 Oct 2026), written before the merge. The pipeline model is now `v6_hf`; the numbers below are not its probabilities.
+
 Quarter-hours are binned by forecast probability (all 40 steps pooled); `pred` is the mean forecast in the bin, `obs` the observed frequency, `n` the number of rows. A calibrated model has obs close to pred. Rows within a bin are strongly autocorrelated (10 hourly origins forecast each quarter-hour), so the effective sample is much smaller than `n`.
 
 ## split_all

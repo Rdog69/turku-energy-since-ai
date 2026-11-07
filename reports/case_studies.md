@@ -1,5 +1,7 @@
 # Spike case studies (split_all, validation only)
 
+> Analyses `split_all` on the validation period (7 Sep – 4 Oct 2026), written before the merge. The pipeline model is now `v6_hf`; the forecasts below are not its.
+
 The three largest realised spikes between 7 Sep and 4 Oct 2026 (by absolute gap to spot, at least 6 hours apart), and what the forecast said 1.5, 3.5 and 6.5 hours before. Hourly origins mean the lead times are not round numbers. All price numbers are **gaps to spot** (imbalance price minus spot), never spot levels. Source: `results/split_all/validation/forecast_backtest.csv` and `actuals_validation.csv`; no test-period targets.
 
 ### Case 1: Wed 09 Sep 2026, quarter starting 20:30 local

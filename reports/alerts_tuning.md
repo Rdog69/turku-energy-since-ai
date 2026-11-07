@@ -1,5 +1,7 @@
 # Alert threshold analysis (split_all, validation 7 Sep - 4 Oct 2026)
 
+> Analyses `split_all` on the validation period (7 Sep – 4 Oct 2026), written before the merge. The pipeline model is now `v6_hf`; the thresholds below were not re-tuned on it.
+
 Analysis only: nothing in `src/export/` was changed. Aggregates only, no spot values.
 
 ## Method

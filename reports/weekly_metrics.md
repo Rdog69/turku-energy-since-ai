@@ -1,5 +1,7 @@
 # Week-by-week stability, validation period (7 Sep - 4 Oct 2026)
 
+> Analyses `split_all` on the validation period (7 Sep – 4 Oct 2026), written before the merge. The pipeline model is now `v6_hf`; the numbers below are not its results.
+
 Per local week (Mon-Sun, Europe/Helsinki) of delivery quarter-hours, all 40 steps pooled. Definitions as in the organisers' `score.py` (MAE of p50; pinball = mean of p10 and p90 pinball; coverage of [p10, p90]; spike Brier = mean of high/low Brier with margin 50; three-class direction Brier). `spike_high_rate`/`spike_low_rate` are the observed shares. Computed by a script that reads `results/<model>/validation/forecast_backtest.csv`; only aggregates are shown.
 
 ## split_all

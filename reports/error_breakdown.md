@@ -1,5 +1,7 @@
 # Error breakdown of split_all on validation (7 Sep - 4 Oct 2026)
 
+> Analyses `split_all` on the validation period (7 Sep – 4 Oct 2026), written before the merge. The pipeline model is now `v6_hf`; the numbers below are not its errors.
+
 Source: `results/split_all/validation/forecast_backtest.csv` against the organisers' `actuals_validation.csv`, 26,700 scored rows. Overall MAE 42.53 and mean pinball 12.09 (matches the scorer). Pinball is the mean of the P10 and P90 pinball losses, as in `score.py`. A quarter is a **high spike** if the imbalance price is more than 50 EUR/MWh above spot, a **low spike** if more than 50 below. Hours are Europe/Helsinki local time of the delivery quarter. "Share" columns say how much of the total loss a slice carries; compare with its share of rows. Only gaps to spot are shown, no spot levels.
 
 | Step band | rows | share of rows | MAE | pinball | coverage | share of abs. error | share of pinball |
