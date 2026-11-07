@@ -40,17 +40,17 @@ def find(rel: str) -> Path | None:
     return None
 
 
-MODEL = "v7_rt + h_int4ss, P90 x1.15, spike cap"
+MODEL = "v7_rt + h_int4ss (50/50)"
 # blend: the submitted file; frank: our v7_rt; ours: Abdo's h_int4ss (local copy, else read from his branch in git)
 PERIODS = {
     "val": dict(label={"en": "Validation, 7 Sep – 4 Oct 2026", "fi": "Validointi, 7.9.–4.10.2026"},
-                blend="submissions/blend_hi15_env_validation.csv", frank="submissions/v7_rt_validation.csv",
+                blend="submissions/blend_v7_rt_h_int4ss_validation.csv", frank="submissions/v7_rt_validation.csv",
                 ours=("results/ext_abdo_h_int4ss/validation/forecast_backtest.csv", "submissions/validation_h_int4ss.csv")),
     "aug": dict(label={"en": "August 2026 (second check)", "fi": "Elokuu 2026 (toinen tarkistus)"},
-                blend="submissions/blend_hi15_env_august.csv", frank="submissions/v7_rt_august.csv",
+                blend="submissions/blend_v7_rt_h_int4ss_august.csv", frank="submissions/v7_rt_august.csv",
                 ours=("results/ext_abdo_h_int4ss/fold_b/forecast_backtest.csv", "submissions/foldb_h_int4ss.csv")),
     "test": dict(label={"en": "Test, 5 Oct – 1 Nov 2026", "fi": "Testi, 5.10.–1.11.2026"},
-                 blend="submissions/blend_hi15_env_test.csv", frank="submissions/v7_rt_test.csv",
+                 blend="submissions/blend_v7_rt_h_int4ss_test.csv", frank="submissions/v7_rt_test.csv",
                  ours=("results/ext_abdo_forecast_backtest_h_int4ss/test/forecast_backtest.csv",
                        "submissions/forecast_backtest_h_int4ss.csv")),
 }
@@ -58,7 +58,8 @@ ABDO_REF = "origin/brainstorming-abdo"
 COLS = ["p10", "p50", "p90", "p_up", "p_down", "p_none", "p_spike_high", "p_spike_low"]
 # The submitted blend stretches P90 away from P50 (too many prices landed above the 50/50 blend's P90 in
 # September and August; factor cross-fitted between the two months, docs/RESULTS.md round 9).
-P90_STRETCH = 1.15
+P90_STRETCH = 1.0       # the final submission does not stretch (team decision, deliverables branch)
+SPIKE_CAP = False
 
 
 def load_member(src) -> pd.DataFrame:
@@ -93,8 +94,9 @@ def blend(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
     sl = np.maximum(out.p_spike_high + out.p_spike_low, 1.0)
     out["p_spike_high"], out["p_spike_low"] = out.p_spike_high / sl, out.p_spike_low / sl
     out["p90"] = out["p50"] + P90_STRETCH * (out["p90"] - out["p50"])
-    out["p_spike_high"] = np.minimum(out["p_spike_high"], out["p_up"])
-    out["p_spike_low"] = np.minimum(out["p_spike_low"], out["p_down"])
+    if SPIKE_CAP:
+        out["p_spike_high"] = np.minimum(out["p_spike_high"], out["p_up"])
+        out["p_spike_low"] = np.minimum(out["p_spike_low"], out["p_down"])
     return out
 
 

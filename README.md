@@ -4,6 +4,8 @@
 
 Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Turku Energia** challenge.
 
+✅ **Submission:** [`deliverables/`](deliverables/README.md) has the checklist of everything we hand in (brief §07, starter README §10), its status and where each item lives. The submitted documents are on the `deliverables` branch.
+
 📋 **Implementation plan:** [`docs/PLAN.md`](docs/PLAN.md) covers which factors matter, the data inputs, the model, the dashboard and the timeline.
 
 🧒 **Short version:** [`docs/TLDR.md`](docs/TLDR.md) explains the whole thing in two minutes.
@@ -23,6 +25,8 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 | Exceptional prices: Brier score | 20 | 0.1132 | **0.0855** | **−24 %** |
 | Direction: three-class Brier score | 10 | 0.4509 | **0.3892** | **−14 %** |
 | P10–P90 coverage (target 80 %) | – | 0.68 | **0.79** | well calibrated |
+
+**Submitted forecast:** the 50/50 blend of this model (`v7_rt`) and Abdo's `h_int4ss`: 40.19 / 11.07 / 0.0840 / 0.3799 on September, **36.7 % better than the baseline** (August: 29.0 %). The table above is `v7_rt` alone.
 
 **Weighted by the points (30/20/20/10), the model is 35.7 % better than the organisers' baseline** (MAE alone: 38.6 %). It's better in every one of the 4 validation weeks, on all four metrics. About 37 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July plus the pre-June history) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
 
@@ -396,14 +400,14 @@ Planned additions: `src/models/` (quantile and probability models), `src/explain
 
 ## Deliverables checklist
 
-Due **Sunday 8 Nov, 10:00**, through the Since AI app.
+Due **Sunday 8 Nov, 10:00**, through the Since AI platform. The full checklist, with the source of each requirement and its status, is in [`deliverables/README.md`](deliverables/README.md). In short:
 
-- [ ] `forecast_backtest.csv`, passing `validate_submission.py`
-- [ ] Source code and start-up instructions
-- [ ] Short evaluation report: reasoning chain, factors affecting the forecast, validation-period metrics
-- [ ] List of the data sources, external services, ready-made models and software components we used, with their licences
+- [x] `forecast_backtest.csv`, passing `validate_submission.py` (½ `v7_rt` + ½ Abdo's `h_int4ss`, `submissions/MANIFEST.md`)
+- [ ] Source code and start-up instructions (written; commit hashes at the freeze)
+- [ ] Short evaluation report (written; final pass)
+- [x] Data sources, external services, models, software and licences
 - [ ] 5–8 presentation slides
-- [ ] Demo video (≤ 5 min): the next 10 h forecast in 15-min periods, its uncertainty, significant deviations, main drivers
+- [ ] Demo video (≤ 5 min)
 
 ## Timeline
 

@@ -2,6 +2,8 @@
 
 The exact files behind every number we report, so anyone can check them.
 
+> **Team decision (7 Nov, evening): the submitted file is the plain ½ `v7_rt` + ½ `h_int4ss` blend, `blend_v7_rt_h_int4ss_test.csv` (SHA-256 `923d508e…ae30eb`), as on the `deliverables` branch.** The P90-stretched and spike-capped versions below won September and August but were not chosen; they stay listed for the record.
+
 ## Team candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`, P90 stretched ×1.15, spike probabilities capped by direction
 
 The best model on the team scoreboard: 33.0 % better than the organisers' baseline, weighted by points and averaged over September (36.9 %) and August (29.1 %).

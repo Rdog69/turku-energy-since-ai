@@ -20,7 +20,7 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
   return (
     <aside className="flex flex-col gap-8 bg-bank px-5 py-6 text-bank-ink lg:sticky lg:top-0 lg:h-screen lg:w-[244px] lg:shrink-0">
       <div>
-        <p className="flex items-center gap-2.5 text-[26px] font-bold leading-none tracking-[-0.01em] text-white"><Logo />Tasehinta</p>
+        <p className="flex items-center gap-2 text-white" aria-label="Tasehinta"><Logo /><Wordmark /></p>
         <p className="mt-1.5 text-[14px] text-bank-ink2">{t(lang, "tagline")}</p>
       </div>
 
@@ -71,5 +71,15 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
         ))}
       </ul>
     </aside>
+  );
+}
+
+/** TASEHINTA in bold capitals; each A is an upside-down V (no crossbar), for a sharper, angular mark */
+function Wordmark() {
+  const A = <span className="inline-block rotate-180">V</span>;
+  return (
+    <span aria-hidden className="text-[23px] font-extrabold uppercase leading-none tracking-[0.06em]">
+      T{A}SEHINT{A}
+    </span>
   );
 }

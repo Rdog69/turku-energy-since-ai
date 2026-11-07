@@ -28,7 +28,6 @@ export function PeriodStrip({ p, i, now: nowMs, view, lang, onPan, onPanEnd, onJ
   const fr = (ms: number) => (ms - t0) / span;
   const l = fr(view[0]), r = fr(view[1]);
   const box = { l: Math.max(0, l), r: Math.min(1, r) };
-  const now = fr(nowMs);
   const days = useMemo(() => {
     const out: number[] = [];
     for (let k = 0; k < n; k++) if (hourOf(reviewMs(p, k)) === 0) out.push(k);
@@ -90,9 +89,8 @@ export function PeriodStrip({ p, i, now: nowMs, view, lang, onPan, onPanEnd, onJ
               onPan(d * (e.shiftKey ? H_MS : Q_MS));
               onPanEnd();
             }}
-            className={`absolute inset-y-[3px] rounded-[5px] border-2 border-bank bg-bank/[0.08] shadow-[0_2px_8px_-3px_rgba(11,60,106,0.45)] transition-colors duration-150 hover:bg-bank/[0.14] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank focus-visible:ring-offset-2 ${dragging ? "cursor-grabbing bg-bank/[0.16]" : "cursor-grab"}`}
+            className={`absolute inset-y-[2px] rounded-[4px] border border-bank/45 bg-bank/[0.07] transition-colors duration-150 hover:border-bank/70 hover:bg-bank/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank focus-visible:ring-offset-1 ${dragging ? "cursor-grabbing border-bank/80 bg-bank/[0.13]" : "cursor-grab"}`}
             style={{ left: `${box.l * 100}%`, width: `max(10px, ${(box.r - box.l) * 100}%)` }} />
-          {now >= 0 && now <= 1 && <span className="pointer-events-none absolute inset-y-[3px] w-[2px] -translate-x-1/2 bg-bank" style={{ left: `${now * 100}%` }} />}
         </div>
 
         {/* dates, every other day; the first and last kept inside the strip. While hovering: the time under the pointer */}
