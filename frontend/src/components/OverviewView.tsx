@@ -9,6 +9,8 @@ import { Q_MS, hhmm, type Lang } from "@/lib/time";
 import { ChanceDots } from "./Bits";
 import { BACK, H, TimeChart, TimeLegend } from "./TimeChart";
 import { TimeBar } from "./TimeBar";
+import { PeriodStrip } from "./PeriodStrip";
+import { useSmoothRange } from "@/lib/useSmooth";
 import { alertKey } from "./AlertList";
 import { QuarterTable } from "./QuarterTable";
 import { Hindsight } from "./Hindsight";
@@ -23,30 +25,30 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
 }) {
   const [panel, setPanel] = useState<{ kind: "alert"; a: Alert } | { kind: "quarter"; s: number } | { kind: "all" } | null>(null);
   const [zones, setZones] = useState(false);
-  // the graph window: "now" sits at BACK of the width; scrolling moves "now" through time hour by hour,
-  // with a sub-hour offset while the gesture lasts so the motion stays smooth
+  // the graph window: "now" sits at BACK of the width. Gestures move "now" in whole forecast hours (the
+  // remainder is kept for the next event); the window then glides to its new place, so motion stays smooth.
   const [span, setSpan] = useState(16 * H);
-  const [offset, setOffset] = useState(0);
   const iRef = useRef(i); iRef.current = i;
-  const offRef = useRef(0);
+  const rest = useRef(0);
   const n = p.origins.length;
   const pan = useCallback((ms: number) => {
     setPlaying(false);
-    let off = offRef.current + ms;
-    const k = Math.round(off / H);
-    if (k !== 0) {
-      const ni = Math.max(0, Math.min(n - 1, iRef.current + k));
-      off -= (ni - iRef.current) * H;
-      iRef.current = ni;
-      setI(ni);
-    }
-    if ((iRef.current === 0 && off < 0) || (iRef.current === n - 1 && off > 0)) off = 0;
-    offRef.current = off;
-    setOffset(off);
+    rest.current += ms;
+    const k = Math.trunc(rest.current / H);
+    if (k === 0) return;
+    rest.current -= k * H;
+    const ni = Math.max(0, Math.min(n - 1, iRef.current + k));
+    if (ni === 0 || ni === n - 1) rest.current = 0;
+    iRef.current = ni;
+    setI(ni);
   }, [n, setI, setPlaying]);
-  const panEnd = useCallback(() => { offRef.current = 0; setOffset(0); }, []);
-  const center = reviewMs(p, i) + offset;
-  const view: [number, number] = [center - BACK * span, center + (1 - BACK) * span];
+  const jump = useCallback((ms: number) => {
+    setPlaying(false);
+    rest.current = 0;
+    setI(Math.max(0, Math.min(n - 1, Math.round((ms - reviewMs(p, 0)) / H))));
+  }, [n, p, setI, setPlaying]);
+  const T = reviewMs(p, i);
+  const view = useSmoothRange([T - BACK * span, T + (1 - BACK) * span], 75, 31 * 24 * H);
   const [details, setDetails] = useState(false);
   const alerts = useMemo(() => sortedAlerts(p, i), [p, i]);
   const major = alerts.filter((a) => a.level === "high" || a.kind === "spike_high" || a.kind === "spike_low");
@@ -61,9 +63,10 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
       <WorthChips lang={lang} alerts={alerts} major={major} win={win}
         onOpen={(a) => setPanel({ kind: "alert", a })} onAll={() => setPanel({ kind: "all" })} />
 
-      <section aria-label={t(lang, "chartTitle")} className="rounded-xl border border-rule bg-sheet/50 px-4 pb-3 pt-4 sm:px-5">
-        <TimeBar p={p} i={i} setI={(v) => { panEnd(); setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} win={view} compact />
-        <div className="mb-1 mt-4 flex flex-wrap items-center justify-between gap-3 pr-[150px]">
+      <section aria-label={t(lang, "chartTitle")} className="rounded-2xl border border-rule bg-sheet/60 px-4 pb-4 pt-4 shadow-[0_1px_2px_rgba(20,34,51,0.04)] sm:px-6">
+        <TimeBar p={p} i={i} setI={(v) => { rest.current = 0; setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} compact />
+        <div className="mt-3"><PeriodStrip p={p} i={i} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
+        <div className="mb-2 mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-4">
           <TimeLegend lang={lang} />
           <button type="button" onClick={() => setZones(!zones)} aria-pressed={zones}
             className={`rounded-md border px-3 py-1 text-[13px] font-semibold transition-colors duration-150 ${zones ? "border-bank bg-bank text-white" : "border-rule bg-sheet text-bank"}`}>
@@ -72,12 +75,11 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
         </div>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TimeChart p={p} i={i} win={view} lang={lang} focus={focus} zones={zones} span={span}
-            onPan={pan} onPanEnd={panEnd} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
+            onPan={pan} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
             onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />
-          <span className="text-[12.5px] text-ink-3">{t(lang, "tcHint")}</span>
         </div>
       </section>
 
