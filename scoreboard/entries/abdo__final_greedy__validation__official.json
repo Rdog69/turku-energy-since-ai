@@ -1,0 +1,27 @@
+{
+  "owner": "Abdo",
+  "model": "final_greedy",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 41.398613,
+  "pinball": 11.431823,
+  "spike_brier": 0.087937,
+  "direction_brier": 0.384299,
+  "coverage": 0.816105,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "wind_map",
+    "pre_june_history"
+  ],
+  "description": "Abdo's 9-member ensemble, per-output weights (his models + Frank's final_capw for direction)",
+  "notes": "Rescored by Frank's session from Abdo's committed file. No August score published.",
+  "forecast_file": "brainstorming-abdo:submissions/validation_final_greedy.csv",
+  "branch": "brainstorming-abdo",
+  "commit": "9f9e8e5",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T12:47:31Z"
+}
