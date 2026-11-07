@@ -16,3 +16,8 @@
 - **INT8 int5+maxfeat0.8** [fl-Kimi-K3] ok score=3.613 (12.5 min): Feature bagging is an untested regularization axis on a wide feature set; decorrelating boosting stages often yields small simultaneous gains on MAE, pinball and both Briers that transfer across folds.
 - **INT9 int5+temp** [fl-Kimi-K3] ok score=3.559 (12.4 min): Exploration: weather agents show temp gives the best pinball_B on the board and helps direction_A, and unlike wind_hat (which broke spike Brier B) it is orthogonal to the rt wind-error features, so it is the safest untested combination with the champion spec.
 - leader after round: **INT5 int2+causal0.2** [fl-GLM-5.3] score=3.896 all-better-both=True
+
+## Round 3 (02:44)
+- **INT10 rt-short** [fl-DeepSeek-V4.1-] ok score=3.662 (14.4 min): Implements Frank's finding by giving real-time Fingrid sets only to bands ending at step 8, keeping the long band free of their noise while retaining runs/dir everywhere.
+- **INT11 rt-short+calib** [fl-DeepSeek-V4.1-] ok score=3.544 (13.9 min): Adds the known-good spike-calibration fix and 28-day calibration window on top of the short-band real-time feature split, targeting spike Brier without sacrificing MAE/pinball/direction.
+- leader after round: **LGB blend HGB+1seed 50/50** [lgb] score=3.981 all-better-both=True
