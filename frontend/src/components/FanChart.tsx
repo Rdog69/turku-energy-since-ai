@@ -16,9 +16,10 @@ const RIB_GAP = 30, RIB_H = 24, RISK_GAP = 34, RISK_HALF = 30, AXIS_H = 34;
 const fmt0 = (v: number) => Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
 const pct = (v: number) => `${Math.round(v * 100)} %`;
 
-export function FanChart({ p, i, lang, focus, periodKey }: {
-  p: Period; i: number; lang: Lang; focus: Alert | null; periodKey: string;
+export function FanChart({ p, i, lang, focus, periodKey, simple = false }: {
+  p: Period; i: number; lang: Lang; focus: Alert | null; periodKey: string; simple?: boolean;
 }) {
+  const L = labels(lang, simple);
   const wrap = useRef<HTMLDivElement>(null);
   const [W, setW] = useState(960);
   const [hover, setHover] = useState<number | null>(null); // grid index under the pointer
@@ -40,7 +41,7 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
   const ribY = M.t + PLOT_H + RIB_GAP;
   const riskY = ribY + RIB_H + RISK_GAP; // top of the high-risk half
   const baseY = riskY + RISK_HALF;
-  const axisY = baseY + RISK_HALF + 10;
+  const axisY = simple ? M.t + PLOT_H + 10 : baseY + RISK_HALF + 10;
   const H = axisY + AXIS_H;
 
   const x = useMemo(() => scaleLinear().domain([T - PAST_H * H_MS, T + FUT_H * H_MS]).range([M.l, W - M.r]), [T, W]);
@@ -116,8 +117,8 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
         ))}
 
         {/* spike thresholds and spot */}
-        <path d={plusLine ?? ""} fill="none" stroke="hsl(var(--verm))" strokeOpacity={0.55} strokeWidth={1} strokeDasharray="5 4" />
-        <path d={minusLine ?? ""} fill="none" stroke="hsl(var(--teal))" strokeOpacity={0.55} strokeWidth={1} strokeDasharray="5 4" />
+        {!simple && <path d={plusLine ?? ""} fill="none" stroke="hsl(var(--verm))" strokeOpacity={0.55} strokeWidth={1} strokeDasharray="5 4" />}
+        {!simple && <path d={minusLine ?? ""} fill="none" stroke="hsl(var(--teal))" strokeOpacity={0.55} strokeWidth={1} strokeDasharray="5 4" />}
         <path d={spotLine ?? ""} fill="none" stroke="hsl(var(--ink-2))" strokeWidth={1.4} strokeDasharray="1.5 3.5" strokeLinecap="round" />
 
         {/* the fan */}
@@ -141,9 +142,9 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
         {/* right-hand labels */}
         {lastSpot !== null && (
           <g className="text-[12px]">
-            <text x={W - M.r + 8} y={y(lastSpot + 50)} dy="0.32em" className="fill-verm">{t(lang, "plus50")}</text>
-            <text x={W - M.r + 8} y={y(lastSpot)} dy="0.32em" className="fill-ink-2">{t(lang, "spot")}</text>
-            <text x={W - M.r + 8} y={y(lastSpot - 50)} dy="0.32em" className="fill-teal">{t(lang, "minus50")}</text>
+            {!simple && <text x={W - M.r + 8} y={y(lastSpot + 50)} dy="0.32em" className="fill-verm">{t(lang, "plus50")}</text>}
+            <text x={W - M.r + 8} y={y(lastSpot)} dy="0.32em" className="fill-ink-2">{simple ? "" : t(lang, "spot")}</text>
+            {!simple && <text x={W - M.r + 8} y={y(lastSpot - 50)} dy="0.32em" className="fill-teal">{t(lang, "minus50")}</text>}
           </g>
         )}
 
@@ -152,6 +153,7 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
         <text x={xT + 6} y={M.t - 16} className="fill-bank text-[13px] font-semibold">{hhmm(T, lang)}</text>
         <text x={xT + 6 + 40} y={M.t - 16} className="fill-ink-3 text-[12px]">{t(lang, "now")}</text>
 
+        {!simple && (<>
         {/* balancing direction ribbon */}
         <text x={xT - 12} y={ribY + RIB_H / 2} dy="0.32em" textAnchor="end" className="fill-ink-2 text-[13px] font-semibold">{t(lang, "direction")}</text>
         <g className="text-[11px]">
@@ -195,6 +197,8 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
           );
         })}
 
+        </>)}
+
         {/* time axis */}
         {hours.map((h) => {
           const hr = hourOf(h);
@@ -219,12 +223,12 @@ export function FanChart({ p, i, lang, focus, periodKey }: {
         <div className="pointer-events-none absolute top-8 z-10 min-w-[188px] rounded-md border border-rule bg-sheet px-3 py-2 text-[13px] shadow-[0_6px_20px_-8px_rgba(20,34,51,0.35)]"
           style={{ left: Math.min(W - 200, Math.max(0, x(qMs(p, hover)) + 14)) }}>
           <div className="mb-1 font-semibold text-ink num">{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</div>
-          <Row k={t(lang, "spot")} v={hp?.spot ?? (hs !== null ? known(p.spot, p.spot_fu, hover, Tmin) : null)} />
+          <Row k={L.spot} v={hp?.spot ?? (hs !== null ? known(p.spot, p.spot_fu, hover, Tmin) : null)} />
           {hs === null && <Row k={t(lang, "realised")} v={hp?.y ?? null} />}
           {hs !== null && (
             <>
-              <Row k={t(lang, "median")} v={F.p50[hs]} strong />
-              <div className="flex justify-between gap-4 text-ink-2"><span>{t(lang, "band")}</span><span className="num">{fmt0(F.p10[hs])} – {fmt0(F.p90[hs])}</span></div>
+              <Row k={L.median} v={F.p50[hs]} strong />
+              <div className="flex justify-between gap-4 text-ink-2"><span>{L.band}</span><span className="num">{fmt0(F.p10[hs])} – {fmt0(F.p90[hs])}</span></div>
               <div className="mt-1 flex justify-between gap-4 text-ink-2"><span>{t(lang, "up")} / {t(lang, "down")}</span><span className="num">{pct(F.pu[hs])} / {pct(F.pd[hs])}</span></div>
               <div className="flex justify-between gap-4 text-verm"><span>{t(lang, "highRisk")}</span><span className="num">{pct(F.hi[hs])}</span></div>
               <div className="flex justify-between gap-4 text-teal"><span>{t(lang, "lowRisk")}</span><span className="num">{pct(F.lo[hs])}</span></div>
@@ -244,13 +248,20 @@ function Row({ k, v, strong }: { k: string; v: number | null | undefined; strong
   );
 }
 
-export function ChartLegend({ lang }: { lang: Lang }) {
+function labels(lang: Lang, simple: boolean) {
+  return simple
+    ? { median: t(lang, "sMedian"), band: t(lang, "sBand"), spot: t(lang, "sSpot") }
+    : { median: t(lang, "median"), band: t(lang, "band"), spot: t(lang, "spot") };
+}
+
+export function ChartLegend({ lang, simple = false }: { lang: Lang; simple?: boolean }) {
+  const L = labels(lang, simple);
   return (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px] text-ink-2">
       <span className="inline-flex items-center gap-2"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="hsl(var(--ink))" strokeWidth="2" /></svg>{t(lang, "realised")}</span>
-      <span className="inline-flex items-center gap-2"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="hsl(var(--bank))" strokeWidth="2.2" strokeDasharray="7 4" /></svg>{t(lang, "median")}</span>
-      <span className="inline-flex items-center gap-2"><svg width="22" height="10"><rect width="22" height="10" fill="hsl(var(--fan-inner))" fillOpacity="0.62" /></svg>{t(lang, "band")}</span>
-      <span className="inline-flex items-center gap-2"><svg width="22" height="8"><line x1="1" x2="21" y1="4" y2="4" stroke="hsl(var(--ink-2))" strokeWidth="1.4" strokeDasharray="1.5 3.5" strokeLinecap="round" /></svg>{t(lang, "spot")}</span>
+      <span className="inline-flex items-center gap-2"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="hsl(var(--bank))" strokeWidth="2.2" strokeDasharray="7 4" /></svg>{L.median}</span>
+      <span className="inline-flex items-center gap-2"><svg width="22" height="10"><rect width="22" height="10" fill="hsl(var(--fan-inner))" fillOpacity="0.62" /></svg>{L.band}</span>
+      <span className="inline-flex items-center gap-2"><svg width="22" height="8"><line x1="1" x2="21" y1="4" y2="4" stroke="hsl(var(--ink-2))" strokeWidth="1.4" strokeDasharray="1.5 3.5" strokeLinecap="round" /></svg>{L.spot}</span>
     </div>
   );
 }

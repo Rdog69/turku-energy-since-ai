@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Rail } from "@/components/Rail";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { Rail, VIEWS, type View } from "@/components/Rail";
+import { SimpleView } from "@/components/SimpleView";
+import { ProductionView } from "@/components/ProductionView";
 import { TimeBar } from "@/components/TimeBar";
 import { ChartLegend, FanChart } from "@/components/FanChart";
 import { AlertList, alertKey } from "@/components/AlertList";
@@ -29,6 +32,9 @@ export default function App() {
   const [i, setI] = useState(() => defaultHour(p));
   const [playing, setPlaying] = useState(false);
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [view, setViewState] = useState<View>(() => readPref("tasehinta.view", VIEWS, "simple"));
+  const [details, setDetails] = useState(false);
+  const setView = (v: View) => { setViewState(v); writePref("tasehinta.view", v); setFocusKey(null); };
 
   const setLang = (l: Lang) => { setLangState(l); writePref("tasehinta.lang", l); };
   const setPeriod = (id: string) => { setPeriodId(id); setI(defaultHour(PAYLOAD.periods[id])); setPlaying(false); setFocusKey(null); };
@@ -71,12 +77,16 @@ export default function App() {
   }, [step]);
 
   return (
+    <Tooltip.Provider delayDuration={120} skipDelayDuration={0}>
     <div className="min-h-screen bg-paper lg:flex">
-      <Rail period={periodId} setPeriod={setPeriod} lang={lang} setLang={setLang} />
+      <Rail period={periodId} setPeriod={setPeriod} lang={lang} setLang={setLang} view={view} setView={setView} />
       <main className="min-w-0 flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-[1480px] space-y-8">
           <TimeBar p={p} i={i} setI={setI} lang={lang} playing={playing} setPlaying={setPlaying} />
 
+          {view === "simple" && <SimpleView p={p} i={i} lang={lang} periodKey={periodId} />}
+          {view === "production" && <ProductionView p={p} i={i} lang={lang} periodKey={periodId} />}
+          {view === "trader" && (<>
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
             <section aria-labelledby="next-h" className="min-w-0">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
@@ -92,10 +102,18 @@ export default function App() {
             <AlertList p={p} i={i} alerts={alerts} lang={lang} focus={focus} onFocus={(a) => setFocusKey(a ? alertKey(a) : null)} />
           </div>
 
-          <QuarterTable p={p} i={i} lang={lang} focus={focus} />
-          <Hindsight p={p} i={i} lang={lang} />
+          <div>
+            <button type="button" onClick={() => setDetails(!details)} aria-expanded={details}
+              className="rounded-md border border-rule bg-sheet px-4 py-2 text-[14px] font-semibold text-bank transition-transform duration-150 ease-out active:scale-[0.96]">
+              {details ? t(lang, "hideDetails") : t(lang, "details")}
+            </button>
+          </div>
+          {details && <QuarterTable p={p} i={i} lang={lang} focus={focus} />}
+          {details && <Hindsight p={p} i={i} lang={lang} />}
+          </>)}
         </div>
       </main>
     </div>
+    </Tooltip.Provider>
   );
 }

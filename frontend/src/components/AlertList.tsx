@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Alert, Period } from "@/data/types";
 import { qMs, reviewMs, windowDrivers } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
@@ -19,7 +20,11 @@ export function alertKey(a: Alert) {
 export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
   p: Period; i: number; alerts: Alert[]; lang: Lang; focus: Alert | null; onFocus: (a: Alert | null) => void;
 }) {
+  const [showRoutine, setShowRoutine] = useState(false);
   const o = p.origins[i];
+  // the organisers' guidance: significant events in colour, routine items quiet and collapsed
+  const major = alerts.filter((a) => a.level === "high" || a.kind === "spike_high" || a.kind === "spike_low");
+  const routine = alerts.filter((a) => !major.includes(a));
   const prev = hhmm(reviewMs(p, i) - 3600_000, lang);
   const win = (a: Alert) => ({ a: hhmm(qMs(p, o + a.a), lang), b: hhmm(qMs(p, o + a.b) + Q_MS, lang) });
 
@@ -38,8 +43,14 @@ export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
           <p className="mt-1 text-[14px] text-ink-2">{t(lang, "quietSub")}</p>
         </div>
       ) : (
+        <>
+        {major.length === 0 && (
+          <div className="py-4">
+            <p className="text-[15px] font-semibold text-ink">{t(lang, "quiet")}</p>
+          </div>
+        )}
         <ul className="divide-y divide-rule">
-          {alerts.map((a) => {
+          {[...major, ...(showRoutine ? routine : [])].map((a) => {
             const k = alertKey(a);
             const open = focus !== null && alertKey(focus) === k;
             const dim = focus !== null && !open;
@@ -55,7 +66,7 @@ export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
               <li key={k} className={`transition-opacity duration-150 ease-out ${dim ? "opacity-50" : "opacity-100"}`}>
                 <button type="button" aria-expanded={open} onClick={() => onFocus(open ? null : a)}
                   className="group flex w-full items-start gap-3 py-3 text-left">
-                  <span className={`mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px] ${MARK[a.kind]}`} aria-hidden />
+                  <span className={`mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px] ${major.includes(a) ? MARK[a.kind] : "bg-ink-3/50"}`} aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="num text-[15px] font-semibold leading-snug text-ink group-hover:text-bank">{title}</span>
@@ -85,6 +96,13 @@ export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
             );
           })}
         </ul>
+        {routine.length > 0 && (
+          <button type="button" onClick={() => setShowRoutine(!showRoutine)} aria-expanded={showRoutine}
+            className="mt-1 border-t border-rule pt-3 text-left text-[14px] font-semibold text-ink-3 hover:text-ink-2">
+            {showRoutine ? t(lang, "hideDetails") : routine.length === 1 ? t(lang, "moreWatchOne") : t(lang, "moreWatch", { n: routine.length })}
+          </button>
+        )}
+        </>
       )}
     </section>
   );
