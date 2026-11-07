@@ -5,7 +5,6 @@ import { OverviewView } from "@/components/OverviewView";
 import { ProductionView } from "@/components/ProductionView";
 import { TimeBar } from "@/components/TimeBar";
 import { PAYLOAD, PERIOD_IDS, defaultHour } from "@/lib/model";
-import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/time";
 
 function readPref<T extends string>(k: string, ok: readonly T[], d: T): T {
@@ -32,7 +31,7 @@ export default function App() {
   const setLang = (l: Lang) => { setLangState(l); writePref("tasehinta.lang", l); };
   const setPeriod = (id: string) => { setPeriodId(id); setI(defaultHour(PAYLOAD.periods[id])); setPlaying(false); };
 
-  useEffect(() => { document.documentElement.lang = lang; document.title = `Tasehinta: ${t(lang, "tagline")}`; }, [lang]);
+  useEffect(() => { document.documentElement.lang = lang; document.title = "Tasehinta"; }, [lang]);
 
   const step = useCallback((d: number) => setI((v) => Math.max(0, Math.min(p.origins.length - 1, v + d))), [p]);
 
