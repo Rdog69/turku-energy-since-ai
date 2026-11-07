@@ -32,13 +32,15 @@ from src.models.gbm import BASE_PARAMS, GBMModel
 TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "learning_rate": 0.03,
                 "n_estimators": 300, "colsample_bytree": 0.6, "reg_lambda": 1.0}
 
+TUNE9_PARAMS = {"num_leaves": 15, "min_child_samples": 200, "learning_rate": 0.03, "n_estimators": 300,
+                "colsample_bytree": 0.8, "reg_lambda": 5.0}
 
 def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
                icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
                wind_hat: bool = False, town_solar: bool = False, town_temp: bool = False,
                history: bool = False, history_flag: bool = False, history_every: int = config.HISTORY_EVERY_H,
                history_weight: float = 1.0, runs: bool = False, history_rt: bool = False,
-               rt3: bool = False, thr: bool = False) -> HorizonSplit:
+               rt3: bool = False, thr: bool = False, params_override: dict | None = None) -> HorizonSplit:
     """final_capw plus optional round-3/4/5/6 changes. tuned: x = none, l = long model, b = both models.
 
     bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
@@ -50,7 +52,7 @@ def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool =
     runs: direction runs, 24-hour shares and the same quarter yesterday (build.RUNS_COLUMNS).
     """
     def params(on: bool) -> dict:
-        return dict(TUNED_PARAMS if on else BASE_PARAMS)
+        return {**(TUNED_PARAMS if on else BASE_PARAMS), **(params_override or {})}
     common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
                   use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
                   use_wind_hat=wind_hat, use_town_solar=town_solar, use_town_temp=town_temp,
@@ -176,6 +178,10 @@ MODELS = {
     "v8_imb": lambda: _v4_hybrid("v8_imb", history=True, history_flag=True, history_rt=True, rt3=True),
     "v8_thr": lambda: _v4_hybrid("v8_thr", history=True, history_flag=True, history_rt=True, thr=True),
     "v8_both": lambda: _v4_hybrid("v8_both", history=True, history_flag=True, history_rt=True, rt3=True, thr=True),
+    # Round 9: v7_rt with the best tree settings from src/models/tune_hist.py (training-only folds,
+    # 14 Jun - 26 Jul; -0.53 % vs the current settings there).
+    "v9_tune": lambda: _v4_hybrid("v9_tune", history=True, history_flag=True, history_rt=True,
+                                  params_override=TUNE9_PARAMS),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,
