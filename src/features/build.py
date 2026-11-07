@@ -136,8 +136,22 @@ def add_weather2(f: pd.DataFrame, index: dict[str, SeriesIndex], weather, icon) 
     return f
 
 
+def add_wind_hat(f: pd.DataFrame, index: dict[str, SeriesIndex], wind_map) -> pd.DataFrame:
+    """Wind production predicted by the learned point weights (src/models/wind_power.py), its gap
+    to Fingrid's day-ahead wind forecast, and its revision since that forecast was published."""
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    hat = wind_map.predict(o, d)
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    f["om_wind_hat"] = hat
+    f["om_wind_hat_err"] = hat - f["wind_fc"].to_numpy(dtype=float)
+    f["om_wind_hat_rev"] = hat - wind_map.predict(da_time, d)
+    return f
+
+
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
-                   with_targets: bool = True, weather=None, nordic=None, weather2=None) -> pd.DataFrame:
+                   with_targets: bool = True, weather=None, nordic=None, weather2=None,
+                   wind_map=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
 
     weather: optional WeatherIndex (src/data/weather.py) to add the om_* columns.
@@ -259,6 +273,8 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         f = add_weather_nordic(f, index, nordic)
     if weather2 is not None:
         f = add_weather2(f, index, weather, weather2)
+    if wind_map is not None:
+        f = add_wind_hat(f, index, wind_map)
     if with_targets:
         f = add_targets(f, index)
     return f
@@ -320,6 +336,9 @@ NORDIC_COLUMNS = [f"om_{a}_wind_{k}" for a in NORDIC_AREAS for k in ("idx", "rev
 
 # Second weather model (ICON-EU) and ECMWF-vs-ICON disagreement (Pavlo's split_all_icon).
 WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
+
+# Learned wind production (MW) from the weather points (src/models/wind_power.py).
+WINDHAT_COLUMNS = ["om_wind_hat", "om_wind_hat_err", "om_wind_hat_rev"]
 
 WEATHER_COLUMNS = [
     "om_wind_idx", "om_wind_idx_da", "om_wind_rev", "om_wind_rev_mw", "om_wind_speed",

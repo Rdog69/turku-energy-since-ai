@@ -170,6 +170,43 @@ def test_icon_run_used_was_published():
     assert (fu <= o[found]).all()
 
 
+def _wind_points():
+    from src.models.wind_power import load_points
+    pts = load_points()
+    if not pts:
+        pytest.skip("weather runs not downloaded")
+    return pts
+
+
+def test_wind_hat_features_ignore_unpublished_runs():
+    """Learned wind production: drop every weather run not yet usable at t, features must not change."""
+    from src.features.build import WINDHAT_COLUMNS
+    from src.models.wind_power import WindPowerMap
+    wm = WindPowerMap(_wind_points()).fit(build_index(LONG), VALIDATION_FIRST_ORIGIN)
+    origins = _origins(n_random=6, seed=6)
+    full = build_features(LONG, origins, with_targets=False, wind_map=wm)
+    assert full["om_wind_hat"].notna().mean() > 0.9, "wind production coverage unexpectedly low"
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False, wind_map=wm.truncated(t))
+        a = full.loc[full["origin"] == t, WINDHAT_COLUMNS].reset_index(drop=True)
+        b = part[WINDHAT_COLUMNS].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"wind production features at {t}")
+
+
+def test_wind_map_fit_uses_only_data_published_by_cutoff():
+    """Fitting with everything vs with only rows/runs usable at the cutoff must give the same weights."""
+    from src.models.wind_power import WindPowerMap
+    cutoff = pd.Timestamp("2026-07-31T21:00Z")          # start of the August check
+    pts = _wind_points()
+    a = WindPowerMap(pts).fit(build_index(LONG), cutoff)
+    trunc = LONG.loc[LONG["first_usable_origin_utc"] <= cutoff]
+    b = WindPowerMap({n: p.truncated(cutoff) for n, p in pts.items()}).fit(build_index(trunc), cutoff)
+    np.testing.assert_allclose(a.coef, b.coef)
+    assert a.intercept == pytest.approx(b.intercept)
+    assert a.n_fit == b.n_fit > 1000
+
+
 def test_weather_run_used_was_published():
     from src.data.availability import to_ns
     weather = _weather()

@@ -75,6 +75,10 @@ DRIVER_LABELS = {
     "om_dk_wind_idx": "Wind in Denmark", "om_dk_wind_rev": "Wind revision in Denmark",
     "om_ee_wind_idx": "Wind in Estonia", "om_ee_wind_rev": "Wind revision in Estonia",
     "om_nordic_wind_rev": "Wind revision in neighbouring countries",
+    # Learned wind production from the weather points
+    "om_wind_hat": "Wind production from weather models (MW)",
+    "om_wind_hat_err": "Weather models vs. day-ahead wind forecast (MW)",
+    "om_wind_hat_rev": "Wind production revision since day-ahead (MW)",
 }
 
 LEVERS = {

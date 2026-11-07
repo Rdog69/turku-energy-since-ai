@@ -22,7 +22,7 @@ import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
 from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, MEMORY_COLUMNS, NORDIC_COLUMNS,
-                                WEATHER2_COLUMNS, WEATHER_COLUMNS)
+                                WEATHER2_COLUMNS, WEATHER_COLUMNS, WINDHAT_COLUMNS)
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -46,21 +46,36 @@ def _logit(p):
 
 
 class _Platt:
-    """Monotone recalibration p -> sigmoid(a * logit(p) + b), fitted on a holdout."""
+    """Monotone recalibration p -> sigmoid(a + b * logit(p)), fitted on a holdout.
 
-    def __init__(self):
+    shrink_m0: shrink the map toward "no recalibration" by s = m / (m + m0), where m is the number
+    of distinct delivery quarters with an event in the holdout. A quiet holdout with few spikes
+    then can't wipe out the spike probabilities (empirical-Bayes idea from Abdo's lab,
+    experiments/lab/calib_eb.py). None = plain Platt scaling.
+    """
+
+    def __init__(self, shrink_m0: int | None = None):
         self.lr = None
+        self.shrink_m0 = shrink_m0
+        self.s = 1.0
 
-    def fit(self, p, y):
+    def fit(self, p, y, deliveries=None):
         if len(np.unique(y)) < 2:
             return self
         self.lr = LogisticRegression(C=100.0).fit(_logit(p).reshape(-1, 1), y)
+        if self.shrink_m0:
+            m = len(np.unique(np.asarray(deliveries)[np.asarray(y) == 1]))
+            self.s = m / (m + self.shrink_m0)
         return self
 
     def __call__(self, p):
         if self.lr is None:
             return p
-        return self.lr.predict_proba(_logit(p).reshape(-1, 1))[:, 1]
+        if not self.shrink_m0:
+            return self.lr.predict_proba(_logit(p).reshape(-1, 1))[:, 1]
+        a, b = float(self.lr.intercept_[0]), float(self.lr.coef_[0, 0])
+        z = self.s * a + (1 + self.s * (b - 1)) * _logit(p)
+        return 1 / (1 + np.exp(-z))
 
 
 @dataclass
@@ -86,6 +101,8 @@ class GBMModel:
     use_nordic: bool = False        # neighbouring areas' wind revision (src/data/weather.load_nordic)
     use_memory: bool = False        # 4-hour averages of the gap and direction
     use_icon: bool = False          # second weather model ICON-EU + ECMWF-vs-ICON spread
+    use_wind_hat: bool = False      # learned wind production from the weather points (MW)
+    spike_shrink: int | None = None  # m0 for the shrunk spike Platt maps (see _Platt); None = plain
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
@@ -105,6 +122,7 @@ class GBMModel:
                 + (FINGRID_RT2_COLUMNS if self.use_fingrid2 else [])
                 + (NORDIC_COLUMNS if self.use_nordic else [])
                 + (WEATHER2_COLUMNS if self.use_icon else [])
+                + (WINDHAT_COLUMNS if self.use_wind_hat else [])
                 + (MEMORY_COLUMNS if self.use_memory else []))
 
     # ------------------------------------------------------------------ fitting
@@ -165,7 +183,11 @@ class GBMModel:
             for col in ("up", "high", "low"):
                 y = {"up": hold["y_dir"] == 1, "high": hold["y_spike_high"] == 1,
                      "low": hold["y_spike_low"] == 1}[col].astype(int).to_numpy()
-                self.platt[col] = _Platt().fit(raw[col], y)
+                m0 = self.spike_shrink if col in ("high", "low") else None
+                self.platt[col] = _Platt(m0).fit(raw[col], y, hold["delivery"].to_numpy())
+            if self.spike_shrink:
+                self.log.append("spike Platt shrink s: " + ", ".join(
+                    f"{c}={self.platt[c].s:.2f}" for c in ("high", "low")))
             for col, q in QUANTILES.items():
                 resid = hold["y_gap"].to_numpy() - raw[col]
                 for lo, hi in STEP_BANDS:

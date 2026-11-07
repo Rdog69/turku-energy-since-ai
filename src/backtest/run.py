@@ -34,16 +34,28 @@ TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "lear
 
 
 def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
-               icon: bool = False) -> HorizonSplit:
-    """final_capw plus optional round-3 changes. tuned: x = none, l = long model, b = both models."""
+               icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
+               wind_hat: bool = False) -> HorizonSplit:
+    """final_capw plus optional round-3/4 changes. tuned: x = none, l = long model, b = both models.
+
+    bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
+    spike_shrink: m0 for the shrunk spike calibration (GBMModel.spike_shrink).
+    wind_hat: learned wind production from the weather points (src/models/wind_power.py).
+    """
     def params(on: bool) -> dict:
         return dict(TUNED_PARAMS if on else BASE_PARAMS)
     common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
-                  use_memory=memory, use_nordic=nordic, use_icon=icon)
+                  use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
+                  use_wind_hat=wind_hat)
+    short_kw = dict(use_fingrid=True, use_fingrid2=True, params=params(tuned == "b"), **common)
+    if bands4:
+        short = HorizonSplit(name=f"{name}_short", split_step=4,
+                             short=GBMModel(name=f"{name}_hour1", **short_kw),
+                             long=GBMModel(name=f"{name}_hour2", **short_kw))
+    else:
+        short = GBMModel(name=f"{name}_short", **short_kw)
     return HorizonSplit(
-        name=name, split_step=8, capacity_weighted=True,
-        short=GBMModel(name=f"{name}_short", use_fingrid=True, use_fingrid2=True,
-                       params=params(tuned == "b"), **common),
+        name=name, split_step=8, capacity_weighted=True, short=short,
         long=GBMModel(name=f"{name}_long", params=params(tuned in ("l", "b")), **common))
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
@@ -117,6 +129,16 @@ MODELS = {
     "v3_bmi_n50": lambda: MedianFrom(name="v3_bmi_n50",
                                      base=make_final("v3_bmi", "b", memory=True, icon=True),
                                      median=make_final("v3_bmni", "b", memory=True, nordic=True, icon=True)),
+    # Round 4 experiments: v3_bmi plus exactly one change each, scored on September and August.
+    "v4_b4": lambda: make_final("v4_b4", "b", memory=True, icon=True, bands4=True),
+    "v4_eb": lambda: make_final("v4_eb", "b", memory=True, icon=True, spike_shrink=50),
+    "v4_wh": lambda: make_final("v4_wh", "b", memory=True, icon=True, wind_hat=True),
+    # The two that won in both months (shrunk spike calibration, learned wind production), in the
+    # same median-from-Nordic hybrid as v3_bmi_n50.
+    "v4_n50": lambda: MedianFrom(
+        name="v4_n50",
+        base=make_final("v4_ebwh", "b", memory=True, icon=True, spike_shrink=50, wind_hat=True),
+        median=make_final("v4_ebwhn", "b", memory=True, nordic=True, icon=True, spike_shrink=50, wind_hat=True)),
     # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
     "final_tuned": lambda: HorizonSplit(
         name="final_tuned", split_step=8, capacity_weighted=True,
@@ -172,11 +194,13 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     return out / "forecast_origins.csv", out / "sample_submission.csv"
 
 
-def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None) -> pd.DataFrame:
+def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None,
+                   wind_map=None) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
-    f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2)
+    f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2,
+                       wind_map=wind_map)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -220,7 +244,8 @@ def main(argv=None) -> int:
 
     pkg = config.package_dir()
     model = MODELS[args.model]()
-    long = load_long_all() if getattr(model, "use_fingrid", False) else load_long()
+    long = (load_long_all() if getattr(model, "use_fingrid", False) or getattr(model, "use_wind_hat", False)
+            else load_long())
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
@@ -244,13 +269,18 @@ def main(argv=None) -> int:
         # Only the 8 main points were downloaded for ICON, so its points count equally
         # (capacity weights are defined over ECMWF's 14 points).
         weather2 = WeatherIndex.load("icon_eu")
-    train = training_table(long, index, cutoff, weather, nordic, weather2)
+    wind_map = None
+    if getattr(model, "use_wind_hat", False):
+        from src.models.wind_power import WindPowerMap, load_points
+        wind_map = WindPowerMap(load_points()).fit(index, cutoff)   # data published by the cutoff only
+        print(wind_map.describe())
+    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map)
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
     feats = build_features(long, origins, index=index, with_targets=False, weather=weather, nordic=nordic,
-                           weather2=weather2)
+                           weather2=weather2, wind_map=wind_map)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"

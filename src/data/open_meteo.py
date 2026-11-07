@@ -79,16 +79,34 @@ POINTS_NORDIC = {
     "ee_west": (58.50, 23.60),
 }
 POINT_AREAS = {name: name.split("_")[0][:2] for name in POINTS_NORDIC}   # se / no / dk / ee
-POINT_SETS = {"main": POINTS, "extra": POINTS_EXTRA, "nordic": POINTS_NORDIC}
+# Towns: Finland's solar capacity is mostly rooftop and small parks in the populous south and west,
+# and heating demand sits in the same places, so these points follow the larger towns rather than
+# the wind clusters. Used for solar radiation and for population-weighted temperature.
+POINTS_SOLAR = {
+    "helsinki": (60.17, 24.94),
+    "turku": (60.45, 22.27),
+    "tampere": (61.50, 23.76),
+    "lahti": (60.98, 25.66),
+    "jyvaskyla": (62.24, 25.75),
+    "kuopio": (62.89, 27.68),
+    "vaasa": (63.10, 21.62),
+    "oulu": (65.01, 25.47),
+}
+POINT_SETS = {"main": POINTS, "extra": POINTS_EXTRA, "nordic": POINTS_NORDIC, "solar": POINTS_SOLAR}
 VARIABLES = ["wind_speed_100m", "temperature_2m", "relative_humidity_2m"]
+SET_VARIABLES = {"solar": ["shortwave_radiation", "cloud_cover", "temperature_2m"]}   # others: VARIABLES
 FORECAST_DAYS = 3
 
 
-def _url(model: str, run: pd.Timestamp, points: dict) -> str:
+def variables(point_set: str) -> list[str]:
+    return SET_VARIABLES.get(point_set, VARIABLES)
+
+
+def _url(model: str, run: pd.Timestamp, points: dict, point_set: str = "main") -> str:
     lats = ",".join(str(p[0]) for p in points.values())
     lons = ",".join(str(p[1]) for p in points.values())
     q = {
-        "latitude": lats, "longitude": lons, "hourly": ",".join(VARIABLES), "models": model,
+        "latitude": lats, "longitude": lons, "hourly": ",".join(variables(point_set)), "models": model,
         "run": run.strftime("%Y-%m-%dT%H:%M"), "forecast_days": FORECAST_DAYS,
         "wind_speed_unit": "ms", "timezone": "GMT",
     }
@@ -101,7 +119,8 @@ def fetch_run(model: str, run: pd.Timestamp, raw_dir: Path, pause: float = 1.0,
     path = raw_dir / sub / f"{run:%Y%m%dT%H}.json"
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
-    req = urllib.request.Request(_url(model, run, POINT_SETS[point_set]), headers={"User-Agent": "sinceai-imbalance-forecast"})
+    req = urllib.request.Request(_url(model, run, POINT_SETS[point_set], point_set),
+                                 headers={"User-Agent": "sinceai-imbalance-forecast"})
     for attempt in range(6):
         try:
             data = json.load(urllib.request.urlopen(req, timeout=60))
@@ -135,7 +154,7 @@ def to_frame(model: str, run: pd.Timestamp, data: list, point_set: str = "main")
     parts = []
     for name, loc in zip(POINT_SETS[point_set], data):
         h = loc["hourly"]
-        df = pd.DataFrame({v: h[v] for v in VARIABLES})
+        df = pd.DataFrame({v: h[v] for v in variables(point_set)})
         df["valid_time"] = pd.to_datetime(h["time"], utc=True)
         df["point"] = name
         parts.append(df)

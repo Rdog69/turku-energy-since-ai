@@ -31,6 +31,10 @@ class HorizonSplit:
         return getattr(self.short, "use_icon", False) or getattr(self.long, "use_icon", False)
 
     @property
+    def use_wind_hat(self) -> bool:
+        return getattr(self.short, "use_wind_hat", False) or getattr(self.long, "use_wind_hat", False)
+
+    @property
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
 
@@ -78,6 +82,10 @@ class MedianFrom:
     @property
     def use_icon(self) -> bool:
         return self._either("use_icon")
+
+    @property
+    def use_wind_hat(self) -> bool:
+        return self._either("use_wind_hat")
 
     @property
     def use_fingrid(self) -> bool:

@@ -18,10 +18,10 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 
 | Metric | Points | Baseline | **Our model** | Improvement |
 |---|---|---|---|---|
-| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **41.21** | **−38 %** |
+| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **41.08** | **−38 %** |
 | Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.88** | **−51 %** |
-| Exceptional prices: Brier score | 20 | 0.1132 | **0.0873** | **−23 %** |
-| Direction: three-class Brier score | 10 | 0.4509 | **0.3902** | **−13 %** |
+| Exceptional prices: Brier score | 20 | 0.1132 | **0.0871** | **−23 %** |
+| Direction: three-class Brier score | 10 | 0.4509 | **0.3899** | **−14 %** |
 | P10–P90 coverage (target 80 %) | – | 0.68 | **0.80** | well calibrated |
 
 Weighted by the points, that's **34 % better than the baseline**. It's better in every one of the 4 validation weeks, on all four metrics. About 30 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July only) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
@@ -64,7 +64,7 @@ Weighted by the points, that's **34 % better than the baseline**. It's better in
 3. **Two models by horizon.**
    - **Hours 1–2:** a model that also sees fresh real-time grid data.
    - **Hours 3–10:** a model without it, because fresh data turns into noise after about 2 hours.
-4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from.
+4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from. The spike correction is shrunk when those 28 days held few spikes, so a quiet month can't switch the spike warnings off.
 5. **5-seed averaging.** Each model is trained five times with different random seeds and averaged, for steadier forecasts.
 6. **Neighbour wind for the median only.** A twin model that also sees wind in Sweden, Norway, Denmark and Estonia supplies the median (P50). In both September and August that improved the median but made the uncertainty band worse, so the band and the probabilities come from the model without it.
 
@@ -76,6 +76,7 @@ Weighted by the points, that's **34 % better than the baseline**. It's better in
 | Recent state | Latest gap and regulation direction, plus their 1, 2 and 4-hour averages; mFRR volumes, cross-border flows, neighbour imbalance prices | Starter package |
 | Weather revision | How the newest ECMWF run's wind differs from the run the day-ahead forecast was based on, at 14 points weighted by **installed wind capacity**; temperature; icing risk | Open-Meteo Single Runs + OpenStreetMap turbines |
 | Second weather model | DWD ICON-EU's wind, its revision since the day-ahead forecast, and how far it disagrees with ECMWF | Open-Meteo Single Runs |
+| Learned wind production | Wind production predicted from all 22 weather points, with weights fitted to Fingrid's measured output; its gap to the day-ahead forecast and its revision | Open-Meteo + Fingrid real-time (fit on training data only) |
 | Neighbouring countries (median only) | ECMWF wind and its revision at 12 points in Sweden, Norway, Denmark and Estonia | Open-Meteo Single Runs |
 | Grid right now (hours 1–2) | Measured wind vs. forecast, grid frequency, nuclear changes, hydro, electric boilers, net import, CHP, flows | Fingrid real-time API |
 
@@ -94,9 +95,10 @@ Weighted by the points, that's **34 % better than the baseline**. It's better in
 | + capacity-weighted weather | 42.34 | 12.06 | 0.0900 | 0.3908 |
 | + smaller, slower trees and 4-hour memory | 41.68 | 11.90 | 0.0880 | 0.3888 |
 | + second weather model, ICON-EU | 41.31 | 11.88 | 0.0873 | 0.3902 |
-| **+ neighbour wind for the median only (final)** | **41.21** | **11.88** | **0.0873** | **0.3902** |
+| + neighbour wind for the median only | 41.21 | 11.88 | 0.0873 | 0.3902 |
+| **+ steadier spike calibration, learned wind production (final)** | **41.08** | **11.88** | **0.0871** | **0.3899** |
 
-On August (trained on June–July only) the final model scores 27.99 / 7.01 / 0.0758 / 0.4458, better than `final_capw` in all 5 weeks on all four metrics.
+On August (trained on June–July only) the final model scores 27.99 / 7.00 / 0.0710 / 0.4466, better than `final_capw` in all 5 weeks on all four metrics.
 
 ### Around the forecast
 
@@ -289,10 +291,10 @@ python -m src.backtest.run --period test --model spot_anchor
 
 Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
 
-The submitted model is `v3_bmi_n50`:
+The submitted model is `v4_n50`:
 
 ```bash
-python -m src.backtest.run --period test --model v3_bmi_n50
+python -m src.backtest.run --period test --model v4_n50
 ```
 
 It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August. To refresh the tables:
@@ -315,7 +317,7 @@ Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbou
 **Dashboard data, briefings and alerts:**
 
 ```bash
-python -m src.export.dashboard --model v3_bmi_n50 --period test
+python -m src.export.dashboard --model v4_n50 --period test
 ```
 
 Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).

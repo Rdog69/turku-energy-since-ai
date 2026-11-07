@@ -30,11 +30,15 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `v3_bmn` / `v3_lmn`: + wind at 12 points in Sweden, Norway, Denmark and Estonia (ECMWF) | + Nordic weather | 41.52 / 41.49 | 12.04 / 12.04 | 0.803 / 0.805 | 0.0888 / 0.0887 | 0.3883 / 0.3889 | **Rejected.** vs `v3_bm`: MAE better in 2/4 weeks, but pinball and spikes worse in 3/4. About 0.35 % worse weighted by points. |
 | 7 Nov | `v3_bmi`: `v3_bm` + a second weather model, DWD ICON-EU (wind index, its revision since the day-ahead forecast, ECMWF–ICON disagreement), ported from Pavlo's `split_all_icon` | + ICON-EU | 41.31 | **11.88** | 0.796 | **0.0873** | 0.3902 | vs `v3_bm`: MAE better 4/4 weeks, spikes 3/4, pinball 2/4, direction 1/4. About 0.5 % better weighted by points; also better on all four metrics in August (below). |
 | 7 Nov | `v3_bmni`: `v3_bmi` + Nordic weather | + ICON-EU + Nordic | 41.21 | 12.02 | 0.801 | 0.0879 | 0.3885 | Not used as a whole. vs `v3_bmi`: MAE better in 2/4 weeks, pinball worse in all 4, spikes worse 3/4. About 0.3 % worse weighted by points here, 1.1 % better in August. |
-| 7 Nov | **`v3_bmi_n50`**: `v3_bmi` with the median (P50) and its drivers taken from `v3_bmni` | + ICON-EU + Nordic (median only) | **41.21** | **11.88** | 0.796 | **0.0873** | 0.3902 | **Submitted model.** Nordic wind improved the median in both September and August and made the band worse in both, so it's used for the median only. vs `v3_bmi`: +0.09 % weighted by points (Sep), +0.45 % (Aug); band and probabilities unchanged. |
+| 7 Nov | `v3_bmi_n50`: `v3_bmi` with the median (P50) and its drivers taken from `v3_bmni` | + ICON-EU + Nordic (median only) | 41.21 | 11.88 | 0.796 | 0.0873 | 0.3902 | Submitted model in round 3. Nordic wind improved the median in both September and August and made the band worse in both, so it's used for the median only. vs `v3_bmi`: +0.09 % weighted by points (Sep), +0.45 % (Aug); band and probabilities unchanged. |
+| 7 Nov | `v4_eb`: `v3_bmi` with the spike calibration shrunk toward the uncalibrated model when the calibration window holds few spike quarters (s = m / (m + 50); idea from Abdo's `calib_eb.py`) | same | 41.31 | 11.88 | 0.796 | 0.0869 | 0.3902 | **Kept.** Only the spike probabilities change: better in 4/4 weeks (Sep, +0.12 % weighted) and 5/5 (Aug, spike Brier −6 %, +1.49 %). In August the plain calibration, learned on a quiet July, had cut the high-spike probability to 2.3 % against 10.5 % observed. |
+| 7 Nov | `v4_b4`: a separate model for steps 1–4 inside the short model | same | 41.32 | 11.89 | 0.794 | 0.0871 | 0.3893 | Dropped. +0.05 % (Sep) and +0.08 % (Aug) weighted, but MAE and pinball slightly worse in most weeks. A tie, so the simpler model stays. |
+| 7 Nov | `v4_wh`: + learned wind production: non-negative weights for 22 weather points (ECMWF and ICON) fitted to Fingrid's measured wind (dataset 181, data published before the cutoff only). Features: the predicted production, its gap to the day-ahead forecast, and its revision since then | + Fingrid 181 for the fit | 41.26 | 11.88 | 0.797 | 0.0874 | 0.3899 | **Kept.** MAE better in 3/4 weeks (Sep) and 4/5 (Aug); +0.02 % and +0.66 % weighted. On its own the learned map is cruder than Fingrid's day-ahead forecast (564 vs 321 MW error 5 h ahead in September), but it adds information next to it. |
+| 7 Nov | **`v4_n50`**: `v3_bmi_n50` with both kept changes in both of its models | + learned wind production | **41.08** | **11.88** | 0.797 | **0.0871** | **0.3899** | **Submitted model.** vs `v3_bmi_n50`: +0.19 % weighted (Sep; MAE better 3/4 weeks), +1.58 % (Aug; spikes better 5/5 weeks). |
 
-**Final vs baseline:** MAE −38 % (66.20 → 41.21), pinball −51 % (24.18 → 11.88), spike Brier −23 % (0.1132 → 0.0873), direction Brier −13 % (0.4509 → 0.3902). **Weighted by points (30/20/20/10): 34.3 % better** (`final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
+**Final vs baseline:** MAE −38 % (66.20 → 41.08), pinball −51 % (24.18 → 11.88), spike Brier −23 % (0.1132 → 0.0871), direction Brier −14 % (0.4509 → 0.3899). **Weighted by points (30/20/20/10): 34.4 % better** (`final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
 
-⚠ About 30 variants were compared on this one validation month, so expect the test period to come in somewhat worse.
+⚠ About 35 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
 
 ## Second check: August
 
@@ -47,13 +51,18 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | `v3_bm` | 28.38 | 7.11 | 0.738 | 0.0768 | 0.4492 |
 | `v3_bmi` | 28.32 | **7.01** | 0.732 | 0.0758 | 0.4458 |
 | `v3_bmni` | **27.99** | 7.08 | 0.736 | **0.0730** | **0.4453** |
-| **`v3_bmi_n50` (submitted)** | **27.99** | **7.01** | 0.732 | 0.0758 | 0.4458 |
+| `v3_bmi_n50` | **27.99** | 7.01 | 0.732 | 0.0758 | 0.4458 |
+| `v4_eb` | 28.32 | 7.01 | 0.732 | 0.0713 | 0.4458 |
+| `v4_b4` | 28.33 | 7.02 | 0.731 | 0.0755 | **0.4450** |
+| `v4_wh` | 28.19 | **7.00** | 0.738 | 0.0744 | 0.4466 |
+| **`v4_n50` (submitted)** | **27.99** | **7.00** | 0.738 | **0.0710** | 0.4466 |
 
 - **Same fold as the teammates:** `final_capw` reproduces Abdo's August numbers exactly (29.53 / 7.34 / 0.0882 / 0.4562), and `split_all` is within 0.02 MAE of Pavlo's (28.41).
 - **ICON holds:** `v3_bmi` vs `v3_bm` is better on all four metrics (+0.8 % weighted by points). ICON was chosen on September only, so this is a clean check.
 - **Round 3 holds against `final_capw`:** better in all 5 weeks on all four metrics (+6.9 % weighted). Not fully independent: the tuning folds (26 Jul – 6 Sep) overlap August.
 - **Nordic wind:** better median in 4 of 5 weeks; the band is worse overall because of one bad day (31 Aug). Same pattern as September, hence median only.
-- ⚠ **The older `split_all` is about level with the final model on August** (−0.1 % weighted: better MAE and band, worse spikes). Part of the September gain since `split_all` is probably specific to September, so expect a smaller gain on the test month.
+- **The submitted model vs `final_capw`:** better in all 5 weeks on all four metrics (+8.2 % weighted by points).
+- ⚠ **The older `split_all` stays close on August.** Before the round-4 spike fix it was level with our model (`v3_bmi_n50`: −0.1 % weighted, worse spikes). The submitted `v4_n50` beats it by +1.5 % (better MAE, band and spikes), but that's far below September's gap. Part of the September gain since `split_all` is probably specific to September, so expect a smaller gain on the test month.
 - Every model's error is lower in August (MAE about 28 vs 41 in September): it was a calmer month.
 
 ### What each step added (for the reasoning chain)
@@ -68,6 +77,7 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | → + smaller, slower trees + 4-hour memory | −0.7 | −0.2 | −0.0020 | −0.0020 |
 | → + second weather model (ICON-EU) | −0.4 | −0.02 | −0.0007 | +0.0014 |
 | → + neighbour wind for the median only | −0.1 | 0 | 0 | 0 |
+| → + steadier spike calibration and learned wind production | −0.1 | 0 | −0.0002 | −0.0003 |
 
 ## Takeaways so far
 
@@ -82,4 +92,6 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 - **Smaller, slower trees are a consistent accuracy win** (MAE better in all 4 weeks). The settings were picked on training-only folds, not on the validation month.
 - **A second weather model helps everywhere.** ICON-EU next to ECMWF improved MAE in every September week and all four metrics in August.
 - **Neighbouring countries' wind helps the median, not the band.** In both September and August it improved MAE but made the P10–P90 band worse. Extra inputs barely move the median, which has lots of data behind it, but give the tail models more noise to chase. So the final model uses it for the median only.
+- **A calibration window with few events needs shrinking.** Platt scaling learned on a quiet month can switch spike warnings almost off for the next, busier one. Shrinking the correction by how many spike quarters the window actually held fixed August (−6 % spike Brier) and still helped September.
+- **Learned wind production helps a little, even though it's cruder than Fingrid's own day-ahead forecast.** It adds information next to that forecast rather than replacing it.
 - **Not used: blending with a teammate's model.** A 50/50 blend of `v3_bm` with Abdo's best lab model (`brainstorming-abdo`, CAL INT4) scored about 41.2 / 11.75 / 0.0870 / 0.3800 (`weekly.py`). But that model trains part of its direction forecast on Fingrid history from Mar 2025 – May 2026, and the organisers' README says to train only on 1 Jun – 4 Oct 2026. It stays out unless the organisers approve. His history-free reference model made the blend worse in every week.
