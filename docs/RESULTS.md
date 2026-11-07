@@ -17,6 +17,7 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 6 Nov | `gbm_weather`: package + ECMWF weather runs (wind index, revision vs. the day-ahead run, temperature, icing) | + weather | 43.08 | 12.19 | 0.816 | 0.0932 | 0.4088 | Weather helps every metric. |
 | 6 Nov | **`split_all`**: steps 1–8 with Fingrid RT + weather, steps 9–40 with weather | + Fingrid RT + weather | **42.53** | **12.09** | 0.814 | **0.0921** | **0.4011** | **Current best on all four metrics.** |
 | 7 Nov | `split_all_icon`: `split_all` + ICON-EU wind index, ICON revision vs. day-ahead run, ECMWF-vs-ICON wind spread (both models, short and long) | + Fingrid RT + 2 weather models | **42.14** | **12.06** | 0.807 | 0.0923 | **0.3995** | Fold A: MAE −0.39, pinball −0.03, direction −0.012 vs `split_all`; spike Brier +0.0002 (noise). Small, consistent gain; coverage −0.007. |
+| 7 Nov | `split_all_icon` (**fold B**, August, cutoff 1 Aug) | + Fingrid RT + 2 weather models | **28.11** | **6.99** | 0.758 | **0.0738** | **0.4445** | Fold B vs `split_all` (28.41 / 7.10 / 0.766 / 0.0750 / 0.4491): better on MAE, pinball, both Briers; coverage −0.008. Same sign as fold A, so the ICON gain is not a one-window fluke, though small. |
 
 **Best vs baseline:** MAE −36 % (66.20 → 42.53), pinball −50 % (24.18 → 12.09), spike Brier −19 % (0.1132 → 0.0921), direction Brier −11 % (0.4509 → 0.4011).
 
