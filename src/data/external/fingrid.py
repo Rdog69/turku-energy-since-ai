@@ -58,6 +58,35 @@ RT = [  # real-time 3-min, verified on data.fingrid.fi dataset pages (6 Nov 2026
     DS(191, "hydro_rt", "rt3", "MW"),
     DS(209, "power_system_state_rt", "rt3", "state"),
 ]
+RT2 = [  # second real-time batch (teammate Frank found it helps spikes/direction); same 30-min rule
+    DS(371, "boilers_rt", "rt3", "MW"),          # electric boiler consumption: flexible load
+    DS(201, "chp_dh_rt", "rt3", "MW"),           # district-heating cogeneration
+    DS(202, "chp_ind_rt", "rt3", "MW"),          # industrial cogeneration
+    DS(87, "flow_se1_rt", "rt3", "MW"),          # FI-SE1 transmission, real time
+    DS(89, "flow_se3_rt", "rt3", "MW"),          # FI-SE3 transmission, real time
+    DS(180, "flow_ee_rt", "rt3", "MW"),          # FI-EE transmission, real time
+    DS(187, "flow_no_rt", "rt3", "MW"),          # FI-NO transmission, real time
+]
+MFRR2 = [  # balancing-market internals; per-quarter values, same 60-min rule as the package's mFRR data
+    DS(377, "mfrr_need", "period", "MW", 60),            # Fingrid's estimate of the mFRR energy need
+    DS(373, "mfrr_up_bids", "period", "MW", 60),         # sum of up bids (merit-order depth)
+    DS(374, "mfrr_down_bids", "period", "MW", 60),
+    DS(349, "afrr_up_vol", "period", "MW", 60),          # aFRR activation volume (the June-2026 VWAP's other half)
+    DS(350, "afrr_down_vol", "period", "MW", 60),
+    DS(381, "mfrr_net_export", "period", "MW", 60),      # cross-border mFRR exchange (+ export)
+    DS(385, "mfrr_sa_up", "period", "MW", 60),           # scheduled activation
+    DS(386, "mfrr_sa_down", "period", "MW", 60),
+    DS(390, "mfrr_da_up", "period", "MW", 60),           # direct activation (acute events)
+    DS(389, "mfrr_da_down", "period", "MW", 60),
+    DS(317, "fcrn_price", "daily", "EUR/MW", publish_local="23:00"),     # published D-1 22:45 EET
+    DS(318, "fcrd_up_price", "daily", "EUR/MW", publish_local="23:00"),
+    DS(283, "fcrd_down_price", "daily", "EUR/MW", publish_local="23:00"),
+    DS(26, "dacap_fi_se1", "daily", "MW", publish_local="18:00"),        # published D-1 afternoon, never changed
+    DS(27, "dacap_fi_se3", "daily", "MW", publish_local="18:00"),
+    DS(24, "dacap_se1_fi", "daily", "MW", publish_local="18:00"),
+    DS(25, "dacap_se3_fi", "daily", "MW", publish_local="18:00"),
+    DS(397, "calc_imbalance_rt", "rt3", "MW"),           # ACE open loop, real time (ask organisers; separate feature set)
+]
 PACKAGE = [  # same series as the starter package; delays as in availability.csv
     DS(319, "imbalance_price", "period", "EUR/MWh", 60),
     DS(369, "mfrr_direction", "period", "-1/0/1", 60),
@@ -86,7 +115,7 @@ EXTRA = [
     DS(251, "mfrr_last_down_bid_price", "period", "EUR/MWh", 60, verified=True),  # ☐ idem
     DS(176, "imbalance_power_fi_se", "period", "MWh/h", 60),  # ☐ delay unverified
 ]
-GROUPS = {"rt": RT, "package": PACKAGE, "extra": EXTRA}
+GROUPS = {"rt": RT, "rt2": RT2, "mfrr2": MFRR2, "package": PACKAGE, "extra": EXTRA}
 # Package-series history from the Nordic mFRR market start (Mar 2025) to the package start,
 # so the direction/spike models can see last autumn and winter.
 HISTORY = ("2025-03-01", "2026-06-01")
@@ -163,7 +192,7 @@ def fetch(group: str = "all") -> None:
     for gname, items in GROUPS.items():
         if group not in (gname, "all"):
             continue
-        periods = dict(PERIODS)
+        periods = dict(PERIODS) if gname != "mfrr2" else {"main": PERIODS["main"]}
         if gname == "package":       # package series: continuous history instead of two windows
             periods = {"history": HISTORY}   # already contains last autumn
         for pname, (s, e) in periods.items():

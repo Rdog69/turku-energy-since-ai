@@ -1,0 +1,1 @@
+{"name": "G wx B3 H15 cal28", "features": ["package", "ifs_rev", "wind_err", "ifs_now", "wind_hat"], "model": "mixture", "hgb": {"max_leaf_nodes": 15, "min_samples_leaf": 400, "max_iter": 150}, "bands": [[1, 4], [5, 8], [9, 16]], "causal": 0.2, "cal_days": 28, "calib": "eb50"}

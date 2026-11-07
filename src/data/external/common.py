@@ -26,6 +26,9 @@ PERIODS = {
     "last_autumn": ("2025-09-01", "2025-12-01"),
     # training + test window of the package, plus one week before for lags
     "main": ("2026-05-25", "2026-11-03"),
+    # history gaps (Mar-Aug 2025, Dec 2025-May 2026) for the extended training set; fetched separately
+    "history_a": ("2025-03-01", "2025-09-01"),
+    "history_b": ("2025-12-01", "2026-05-25"),
 }
 
 # Wind-power clusters (approximate coordinates of the big farm areas) + one load point.

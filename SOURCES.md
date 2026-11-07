@@ -140,6 +140,42 @@ Abdo's family (`src/data/external/open_meteo.py`) can also fetch IFS, ICON-EU an
 
 Energinet's `DayAheadPrices` (FI vs SE/EE price spread, PLAN edge E3) has **not been fetched**: Nord Pool–derived prices need a licence check first.
 
+## 6a. Details from Abdo's branch
+
+### Extended history, used by `v6_hf` for training (`experiments/lab/build_history.py`, `src/data/external/elering_spot.py`)
+
+The package starts on 1 Jun 2026. To train on more data and to test on **last year's test weeks (5 Oct – 1 Nov 2025)**, we rebuilt the package series back to 1 Mar 2025:
+
+| Series | Source | Check |
+|---|---|---|
+| 17 Fingrid package series (mFRR/aFRR prices and volumes, direction, flows, consumption, production, day-ahead forecasts) | Fingrid Open Data, same dataset ids as the package | Identical to the package on the overlap (values and `first_usable`) |
+| `fi_spot_price` | Elering's Nord Pool price API (hourly before 1 Oct 2025, repeated per quarter) | Identical to `spot_nordpool.csv` on all 14,824 overlapping quarters, same D-1 14:00 availability |
+| `fi_imbalance_price` | **Recomputed with the 1 Jun 2026 rule**: volume-weighted mFRR/aFRR price when both act in the dominating direction, else the mFRR price; spot when there is no direction. Uses aFRR volumes (Fingrid 349/350, `fingrid/afrr_vol_history.csv.gz`) | The rule reproduces the official price on 99.5 % of Jun–Oct 2026 quarters (MAE 0.09 €/MWh; the old rule gives 5.45). The raw old-rule price is kept as `fi_imbalance_price_oldrule` |
+| calendar | computed like the package (Finnish holidays incl. Midsummer Eve) | |
+| Fingrid real-time (198/186/181/…) | `fingrid/rt_history.csv.gz` (Mar–Aug 2025, Dec 2025 – May 2026; Sep–Nov 2025 is in `rt_last_autumn`) | Same delays as `rt_main` |
+| ECMWF IFS runs | `open_meteo/runs_ecmwf_ifs_history_{a,b}.csv.gz` (00/12 UTC) | Same 8 h delay |
+
+**Price-rule change (Fingrid, 1 Jun 2026):** before, the up-regulation price was max(mFRR marginal, aFRR volume-weighted) and the down price the min. From June, the volume-weighted average of both. Training on old-rule prices would teach the model the wrong formula, so the history target uses the new rule. **Not in the history:** the ENTSO-E neighbour series (SE1/SE3/EE imbalance prices, load forecasts, capacities). Our features do not use them.
+
+The lab's history mode (`LAB_HISTORY=1`) uses all of it. It adds **fold C** (train < 5 Oct 2025, validate 5 Oct – 1 Nov 2025) and writes to `leaderboard_hist.csv`.
+
+### Nord Pool UMM outage messages (`src/data/external/umm.py`)
+
+`https://ummapi.nordpoolgroup.com/messages`, no key. We fetch areas FI, SE1, SE3 and EE, and **all versions** (`IncludeOutdated=true`). We save one row per message version × unit × time period. A version is usable at `ceil_hour(publicationDate)`; at each origin, use the **newest usable version** of each message.
+
+> **Example (9 Sep 2026, the most volatile day in validation):** unit **B3 (Olkiluoto 3, 1,600 MW)** tripped at **16:42 UTC**. The message was published at 16:53, so it's usable from the **17:00 origin**. The imbalance price hit **2,640–4,000 €/MWh at 17:15–17:45**. Package-only models can't see this; UMM can.
+
+**Quick check on training quarters** (unplanned Finnish generation outages that are active *and* already published):
+
+| Outage | Quarters | High-spike rate | Mean gap |
+|---|---:|---:|---:|
+| None | 10,514 | 8.3 % | −3 |
+| Any | 1,582 | 13.5 % | +12 |
+| > 300 MW | 428 | 2.3 % | +16 |
+| **> 800 MW** | 20 | **50 %** | **+527** |
+
+⚠️ **Correction (outages agent, 7 Nov):** the "> 800 MW" row is **one event**, the 9 Sep OL3 trip, and it falls in the validation month. No training row has a fresh trip that large, so a model can't learn it, and none of the UMM feature sets beat the reference on both folds. Recommendation: keep UMM only for a rule-based **insurance override** (a fresh unplanned outage ≥ 800 MW raises spike probability, P(up) and p90) and for the dashboard.
+
 ## 7. Checked and not used
 
 | Source | Why not |

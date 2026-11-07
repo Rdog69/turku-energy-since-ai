@@ -1,0 +1,1 @@
+{"name": "P2 INT1+ss lgb cal21", "features": ["package", "rt_imb", "rt_wind", "rt_misc", "spot_shape"], "model": "mixture", "hgb": {"max_leaf_nodes": 15, "min_samples_leaf": 400, "max_iter": 150}, "calib": "eb50", "cal_days": 21, "bands": [[1, 4], [5, 8], [9, 16]], "causal": 0.2, "engine": "lgb"}

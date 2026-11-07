@@ -1,0 +1,1 @@
+{"name": "P5 INT4+ss H7", "features": ["package", "rt_imb", "rt_wind", "rt_misc", "runs", "dir", "wind_hat", "spot_shape"], "model": "mixture", "hgb": {"max_leaf_nodes": 7, "min_samples_leaf": 400, "max_iter": 300, "learning_rate": 0.05}, "calib": "eb50", "cal_days": 14, "bands": [[1, 4], [5, 8], [9, 16]], "hist_blend": 0.6, "causal": 0.2}

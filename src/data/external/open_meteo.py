@@ -20,7 +20,7 @@ import sys
 
 import pandas as pd
 
-from .common import PERIODS, POINTS, Http, ceil_hour, json_loads, write
+from .common import CACHE, PERIODS, POINTS, Http, ceil_hour, json_loads, write
 
 SINGLE = "https://single-runs-api.open-meteo.com/v1/forecast"
 ERA5 = "https://archive-api.open-meteo.com/v1/archive"
@@ -31,6 +31,7 @@ DELAY_H = {"ecmwf_ifs": 8, "icon_eu": 5, "metno_nordic": 2}
 JOBS = {
     "ifs": [("ecmwf_ifs", "last_autumn", (0, 12), 48), ("ecmwf_ifs", "main", (0, 6, 12, 18), 48)],
     "icon_eu": [("icon_eu", "main", (0, 6, 12, 18), 48)],
+    "ifs_hist": [("ecmwf_ifs", "history_a", (0, 12), 48), ("ecmwf_ifs", "history_b", (0, 12), 48)],
     "metno": [("metno_nordic", "main", (0, 6, 12, 18), 24)],
 }
 # 8 locations per call count as 8 calls on the free tier (600/min, 5000/h, 10000/day):
@@ -49,7 +50,17 @@ def fetch_runs(model: str, period: str, hours, fc_hours: int) -> pd.DataFrame:
                                  "timezone": "GMT"}, cache_key=f"{model}/{r.replace(':', '')}.json")
         if body is None:
             continue
-        data = json_loads(body)
+        try:
+            data = json_loads(body)
+        except ValueError:            # truncated response got cached: drop it and fetch again once
+            (http_cache := CACHE / "open_meteo" / f"{model}/{r.replace(':', '')}.json").unlink(missing_ok=True)
+            body = http.get(SINGLE, {"latitude": ",".join(lats), "longitude": ",".join(lons), "hourly": ",".join(VARS),
+                                     "models": model, "run": r, "forecast_hours": fc_hours, "wind_speed_unit": "ms",
+                                     "timezone": "GMT"}, cache_key=f"{model}/{r.replace(':', '')}.json")
+            try:
+                data = json_loads(body)
+            except (ValueError, TypeError):
+                print(f"  {model} {r}: unreadable response twice, skipped"); continue
         data = data if isinstance(data, list) else [data]
         for name, loc in zip(names, data):
             h = pd.DataFrame(loc["hourly"])

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import subprocess
 import sys
 import tempfile
@@ -68,9 +69,39 @@ def data_cutoff(rows: pd.DataFrame, data: Data) -> pd.Series:
     return pd.Series(cut.reindex(U(rows["origin"])).to_numpy(), index=rows.index)
 
 
-def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag: str) -> Path:
+def sub_fit(fns, Xb, train, Xr, rows, model, target, hgb, cal, calib=None, cal_days=14):
+    """fit on train, predict rows; optional calibration on the last `cal_days` of the (given) training rows.
+    calib="eb50": probs' EB-shrunk Platt + multiplicative widths (experiments/lab/calib_eb.py), as in combo.py."""
+    pred = fit_predict(Xb.loc[train.index], train, Xr, rows, model=model, target=target, hgb=hgb)
+    if cal:
+        c0 = train.delivery.max() - pd.Timedelta(days=cal_days)
+        inner, calw = train[train.origin < c0 - pd.Timedelta(hours=10)], train[train.origin >= c0]
+        pc = fit_predict(Xb.loc[inner.index], inner, Xb.loc[calw.index], calw, model=model, target=target, hgb=hgb)
+        if calib == "eb50":
+            from .calib_eb import calibrate_eb
+            pred = calibrate_eb(pc, calw, pred, rows)
+        else:
+            pred = calibrate(pc, calw, pred, rows)
+    return pred
+
+
+def sub_bands(pred, fns, Xb, train, Xr, rows, bands, model, target, hgb, cal, calib=None, cal_days=14):
+    """Per step band refit on the submission training rows (submission analogue of combo.band_post)."""
+    out = {k: np.asarray(v, float).copy() for k, v in pred.items()}
+    for a, b in bands:
+        trb = train[train.step.between(a, b)]
+        mv = rows.step.between(a, b).to_numpy()
+        rb = rows[mv]
+        pb = sub_fit(fns, Xb, trb, Xr.loc[rb.index], rb, model, target, hgb, cal, calib, cal_days)
+        for k in out:
+            out[k][mv] = pb[k]
+    return out
+
+
+def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag: str, spec=None) -> Path:
+    """spec: None (package-style CLI args), one combo spec dict, or a list of specs (equal-weight average)."""
     data, base = Data(), build_base()
-    fns = load_fns(fn_specs)
+    specs = [spec] if isinstance(spec, dict) else list(spec or [{}])
     if mode == "test":
         cutoff, tpl_path, origins_path = END, PKG / "sample_submission.csv", PKG / "forecast_origins.csv"
     else:
@@ -80,20 +111,44 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
                         "2026-10-04", "--output-dir", str(tmp)], check=True, cwd=PKG, capture_output=True)
         tpl_path, origins_path = tmp / "sample_submission.csv", tmp / "forecast_origins.csv"
     tpl, rows = rows_from_template(tpl_path)
-    print(f"{mode}: {rows.origin.nunique()} origins, {len(rows)} rows; cutoff {cutoff}, embargo {EMBARGO}")
-
-    for fn in fns:                               # leak-check on the submission origins themselves
-        leakcheck(fn, rows, Data(), n=8, seed=7)
+    print(f"{mode}: {rows.origin.nunique()} origins, {len(rows)} rows; cutoff {cutoff}, embargo {EMBARGO}, {len(specs)} spec(s)")
     train = base[(base.delivery < cutoff - EMBARGO) & base.gap.notna()]
-    Xb, Xr = feats(fns, base, data), feats(fns, rows, data)
     rows = rows.assign(spot=at_delivery(data.series("pkg", "fi_spot_price"), rows).to_numpy())
     assert rows.spot.notna().all(), "spot missing for some submission rows"
-    pred = fit_predict(Xb.loc[train.index], train, Xr, rows, model=model, target=target)
-    if cal:
-        c0 = train.delivery.max() - pd.Timedelta(days=14)
-        inner, calw = train[train.origin < c0 - pd.Timedelta(hours=10)], train[train.origin >= c0]
-        pc = fit_predict(Xb.loc[inner.index], inner, Xb.loc[calw.index], calw, model=model, target=target)
-        pred = calibrate(pc, calw, pred, rows)
+
+    from . import models as _M
+    _hgb_learners = (_M._reg, _M._clf)
+    preds = []
+    for sp in specs:
+        if sp.get("engine") == "lgb":          # LightGBM learners (bagging + seeds), as in combo.run_spec
+            from .combo import use_lgb
+            use_lgb(sp.get("lgb"))
+        else:
+            _M._reg, _M._clf = _hgb_learners
+        m, t, c = model, target, cal
+        hgb = sp.get("hgb") or None
+        if sp:
+            from .combo import resolve
+            m, t, c = sp.get("model", model), sp.get("target", target), sp.get("calibrate", cal)
+            fns = resolve(list(dict.fromkeys(["package"] + list(sp["features"]))))
+        else:
+            fns = load_fns(fn_specs)
+        print("spec:", sp.get("name", "(cli)"))
+        for fn in fns:                           # leak-check on the submission origins themselves
+            leakcheck(fn, rows.drop(columns="spot"), Data(), n=8, seed=7)
+        Xb, Xr = feats(fns, base, data), feats(fns, rows.drop(columns="spot"), data)
+        calib, cal_days = sp.get("calib"), int(sp.get("cal_days", 14))
+        pred = sub_fit(fns, Xb, train, Xr, rows, m, t, hgb, c, calib, cal_days)
+        if sp.get("bands"):
+            pred = sub_bands(pred, fns, Xb, train, Xr, rows, [tuple(x) for x in sp["bands"]], m, t, hgb, c, calib, cal_days)
+        if sp.get("hist_blend"):
+            from .exp_history import blend_post
+            pred = blend_post(float(sp["hist_blend"]))(pred, rows, Xr)
+        if sp.get("causal"):
+            from .features.structure import causal_post, ramp
+            pred = causal_post(ramp(float(sp["causal"])))(pred, rows, Xr)
+        preds.append({k: np.asarray(v, float) for k, v in pred.items()})
+    pred = {k: np.mean([p[k] for p in preds], axis=0) for k in preds[0]}
 
     out = tpl.copy()
     p10, p50, p90 = np.sort(np.stack([pred["p10"], pred["p50"], pred["p90"]]), axis=0)
@@ -141,5 +196,8 @@ if __name__ == "__main__":
     ap.add_argument("--target", default="gap")
     ap.add_argument("--no-cal", action="store_true")
     ap.add_argument("--tag", default="ref_mixture")
+    ap.add_argument("--spec", help="combo spec JSON string")
+    ap.add_argument("--spec-file")
     a = ap.parse_args()
-    make(a.mode, a.features, a.model, a.target, not a.no_cal, a.tag)
+    sp = json.loads(a.spec) if a.spec else json.loads(Path(a.spec_file).read_text()) if a.spec_file else None  # dict or list
+    make(a.mode, a.features, a.model, a.target, not a.no_cal, a.tag, sp)
