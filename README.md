@@ -1,441 +1,206 @@
-# Turku Energia × Since AI 2026: Imbalance Price Forecast
+<div align="center">
 
-> We forecast the Finnish power system imbalance price 10 hours ahead, give it a calibrated uncertainty band, and build a situational view that tells a shift supervisor or trader **what to check now** and **what's coming**.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0B3C6A,100:0E7F7A&height=190&section=header&text=TASEHINTA&fontSize=64&fontColor=ffffff&fontAlignY=36&desc=Finnish%20imbalance%20price,%2010%20hours%20ahead,%20every%2015%20minutes&descSize=18&descAlignY=58&animation=fadeIn" alt="Tasehinta" width="100%"/>
 
-Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Turku Energia** challenge.
+<img src="docs/assets/tasehinta-mark.svg" alt="" width="56"/>
 
-✅ **Submission:** [`deliverables/`](deliverables/README.md) has the checklist of everything we hand in (brief §07, starter README §10), its status and where each item lives. The submitted documents are on the `deliverables` branch.
+**An imbalance-price forecast and situational view for Turku Energia**<br/>
+Since AI 2026 hackathon · Turku · 6–8 November 2026
 
-📋 **Implementation plan:** [`docs/PLAN.md`](docs/PLAN.md) covers which factors matter, the data inputs, the model, the dashboard and the timeline.
+![Better than the baseline](https://img.shields.io/badge/vs_baseline-36.7%25_better-0E7F7A?style=for-the-badge)
+![Submission](https://img.shields.io/badge/forecast_file-validated-0B3C6A?style=for-the-badge)
+![Leakage tests](https://img.shields.io/badge/leakage_tests-21%2F21_pass-0B3C6A?style=for-the-badge)
 
-🧒 **Short version:** [`docs/TLDR.md`](docs/TLDR.md) explains the whole thing in two minutes.
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![LightGBM](https://img.shields.io/badge/LightGBM-quantile_%2B_classifiers-9ACD32)
+![React](https://img.shields.io/badge/React-dashboard-61DAFB?logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Data](https://img.shields.io/badge/data-Fingrid_%C2%B7_ENTSO--E_%C2%B7_Open--Meteo-555)
 
-📊 **Dashboard:** VAAKA, the situation room built with Lovable. The published preview runs on demo data with a synthetic spot price; real Nord Pool data stays local.
+[**Results**](#-results) · [**How it works**](#-how-it-works) · [**Dashboard**](#-the-dashboard) · [**Submission**](#-submission) · [**Run it**](#-run-it) · [**Team**](#-team)
 
----
-
-## Results at a glance
-
-Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (lower is better):
-
-| Metric | Points | Baseline | **Our model** | Improvement |
-|---|---|---|---|---|
-| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **40.64** | **−39 %** |
-| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.20** | **−54 %** |
-| Exceptional prices: Brier score | 20 | 0.1132 | **0.0855** | **−24 %** |
-| Direction: three-class Brier score | 10 | 0.4509 | **0.3892** | **−14 %** |
-| P10–P90 coverage (target 80 %) | – | 0.68 | **0.79** | well calibrated |
-
-**Submitted forecast:** the 50/50 blend of this model (`v7_rt`) and Abdo's `h_int4ss`: 40.19 / 11.07 / 0.0840 / 0.3799 on September, **36.7 % better than the baseline** (August: 29.0 %). The table above is `v7_rt` alone.
-
-**Weighted by the points (30/20/20/10), the model is 35.7 % better than the organisers' baseline** (MAE alone: 38.6 %). It's better in every one of the 4 validation weeks, on all four metrics. About 37 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July plus the pre-June history) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
+</div>
 
 ---
 
-## Contents
+## ⚡ In one paragraph
 
-- [Results at a glance](#results-at-a-glance)
-- [The model](#the-model)
-- [The problem](#the-problem)
-- [The challenge](#the-challenge)
-- [Data](#data)
-- [The data availability rule](#the-data-availability-rule)
-- [Output format](#output-format)
-- [Scoring](#scoring)
-- [Baseline to beat](#baseline-to-beat)
-- [Getting started](#getting-started)
-- [Repository layout](#repository-layout)
-- [Deliverables checklist](#deliverables-checklist)
-- [Timeline](#timeline)
-- [Rules and licensing](#rules-and-licensing)
-- [Team](#team)
+A Turku Energia trader who misses their plan settles the difference at the **imbalance price**, which is set every 15 minutes and can jump far above or below the day-ahead (spot) price when the grid is short or in surplus. Every full hour, **Tasehinta** forecasts the next **40 quarter-hours**: the likely price, an 80 % range around it, which way the grid is likely to be balanced, and the risk of a price more than 50 €/MWh above or below spot. It does that by averaging two independently built LightGBM models, each trained on 19 months of data with the pre-June prices rebuilt under the June 2026 rule. The dashboard then shows only what is worth checking, explains why, and lets you replay any past hour exactly as it looked then.
 
----
+## 📊 Results
 
-## The model
+The submitted forecast (½ Frank's `v7_rt` + ½ Abdo's `h_int4ss`), scored with the organisers' `score.py`. Lower is better.
 
-**Idea in one line:** the imbalance price is the day-ahead spot price plus a jump up or down. Spot is known in advance, so we forecast **the jump** (the gap to spot), its uncertainty, and the chance that it's up, down or exceptionally large.
+<table>
+<tr><th>Score (points)</th><th colspan="3">September · organisers' validation month</th><th colspan="3">August · second check</th></tr>
+<tr><td></td><td>Baseline</td><td><b>Ours</b></td><td>Change</td><td>Baseline</td><td><b>Ours</b></td><td>Change</td></tr>
+<tr><td>Median error, MAE €/MWh (30)</td><td>66.20</td><td><b>40.19</b></td><td>−39 %</td><td>38.67</td><td><b>27.05</b></td><td>−30 %</td></tr>
+<tr><td>Uncertainty, pinball P10/P90 (20)</td><td>24.18</td><td><b>11.07</b></td><td>−54 %</td><td>11.65</td><td><b>6.22</b></td><td>−47 %</td></tr>
+<tr><td>Exceptional prices, spike Brier (20)</td><td>0.1132</td><td><b>0.0840</b></td><td>−26 %</td><td>0.0792</td><td><b>0.0648</b></td><td>−18 %</td></tr>
+<tr><td>Direction, Brier (10)</td><td>0.4509</td><td><b>0.3799</b></td><td>−16 %</td><td>0.4792</td><td><b>0.4202</b></td><td>−12 %</td></tr>
+<tr><td><b>Weighted by the points</b></td><td></td><td colspan="2"><b>36.7 % better</b></td><td></td><td colspan="2"><b>29.0 % better</b></td></tr>
+</table>
 
-### How it's built
+- **Every week of September** is better than the baseline, on all four scores.
+- **The 80 % range is honest:** it holds the real price in 81 % of September's quarter-hours.
+- **Each model was trained only on data published before its month started.** August's baseline is the organisers' own notebook code run on August.
 
-1. **Spot anchor.** Predicting "spot + a typical gap" alone cuts the baseline's error by a third. The baseline repeats the last known imbalance price, which is already over an hour old when it becomes usable.
-2. **Gradient-boosted trees (LightGBM).** These models predict:
-   - the gap's 10th, 50th and 90th percentiles (quantile regression)
-   - the chance of up-regulation
-   - the chance of an exceptionally high or low price, each *given* the direction (`P(up) × P(gap > 50 | up)`). That keeps the probabilities consistent with each other.
+<details>
+<summary><b>How we got here: every change had to win both months</b></summary>
 
-   The trees are small and slow-learning (15 leaves, at least 800 rows per leaf). We picked those settings on three training-only folds, not on the validation month.
-3. **Two models by horizon.**
-   - **Hours 1–2:** a model that also sees fresh real-time grid data.
-   - **Hours 3–10:** a model without it, because fresh data turns into noise after about 2 hours.
-4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from. The spike correction is shrunk when those 28 days held few spikes, so a quiet month can't switch the spike warnings off.
-5. **5-seed averaging.** Each model is trained five times with different random seeds and averaged, for steadier forecasts.
-6. **Neighbour wind for the median only.** A twin model that also sees wind in Sweden, Norway, Denmark and Estonia supplies the median (P50). In both September and August that improved the median but made the uncertainty band worse, so the band and the probabilities come from the model without it.
-7. **15 months of history before June.** The trees also learn from March 2025 – May 2026, not just from June onwards. The organisers allow pre-June data (Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
-   - The pricing rule changed on 1 June 2026, so the older imbalance prices are recomputed with the new volume-weighted rule.
-   - A flag tells the model which rule a row was priced under.
-   - It improved both September and August, most of all the uncertainty band (pinball −6 %).
-   - The history rows also get Fingrid's real-time series (all 14, downloaded for March 2025 – May 2026), so the hours 1–2 model learns from them too. A small gain in both months.
+<br/>
 
-### What it looks at
+| Step | What changed | September | August |
+|---|---|---|---|
+| Baseline | Organisers' `baseline.ipynb` | – | – |
+| `v4_n50` | LightGBM, real-time grid data, weather-forecast revisions, Nordic wind for the median | 34.4 % | 23.7 % |
+| `v6_hf` | + 15 months of pre-June history, prices rebuilt under the June 2026 rule | 35.7 % | 26.0 % |
+| `v7_rt` | + real-time grid data on the history rows too | 35.7 % | 26.2 % |
+| **Submitted** | ½ `v7_rt` + ½ Abdo's `h_int4ss` | **36.7 %** | **29.0 %** |
 
-| Group | Inputs | Source |
+Tried and dropped because they lost one of the months: per-output blend weights, a third blend member, retuned trees, surplus/deficit series, spike-threshold distances, and more. The full log is in [`docs/RESULTS.md`](docs/RESULTS.md); every score is on the team scoreboard ([`scoreboard/`](scoreboard/)).
+
+</details>
+
+## 🧠 How it works
+
+```mermaid
+flowchart LR
+  subgraph IN["Known before the hour"]
+    A1["Package data<br/>prices, balancing, flows,<br/>day-ahead forecasts"]
+    A2["Fingrid real-time<br/>wind, frequency, hydro,<br/>boilers, net import"]
+    A3["Weather-model runs<br/>ECMWF + ICON-EU,<br/>Finland + Nordics"]
+    A4["19 months of history<br/>June 2026 price rule"]
+  end
+  IN --> F["Features for 40 quarter-hours<br/>(only rows published by then)"]
+  F --> M1["Frank · v7_rt<br/>gap quantiles + direction + spikes"]
+  F --> M2["Abdo · h_int4ss<br/>direction × price-gap mixture"]
+  M1 --> B["50/50 blend"]
+  M2 --> B
+  B --> O1["forecast_backtest.csv<br/>P10 · P50 · P90 · P(up/down/none) · P(spike)"]
+  B --> O2["Tasehinta dashboard"]
+```
+
+1. **Forecast the gap, not the price.** The day-ahead price is known the afternoon before, so both models forecast how far the imbalance price will land from it, then add it back.
+2. **Direction drives everything.** With a surplus the price drops below spot; with a shortage it jumps above. The models forecast the balancing direction and the gap together, so price, range, direction and spike risk tell one consistent story.
+3. **Only what was known.** Every input row is used only from its `first_usable_origin_utc`: real-time data 30 minutes or more after the quarter, weather runs 8 h (ECMWF) or 5 h (ICON-EU) after they start, prices 75 minutes later. Leakage tests guard it: [`tests/`](tests/).
+4. **What moves it most:** the spot level, the latest gap to spot, wind in Sweden, the expected error of the day-ahead wind forecast, and grid frequency in the first hour.
+
+<details>
+<summary><b>The two halves in a little more detail</b></summary>
+
+<br/>
+
+| | Frank · `v7_rt` | Abdo · `h_int4ss` |
 |---|---|---|
-| Known a day ahead | Spot price, spot ramps, day-ahead wind, solar and consumption forecasts, calendar | Starter package |
-| Recent state | Latest gap and regulation direction, plus their 1, 2 and 4-hour averages; mFRR volumes, cross-border flows, neighbour imbalance prices | Starter package |
-| Weather revision | How the newest ECMWF run's wind differs from the run the day-ahead forecast was based on, at 14 points weighted by **installed wind capacity**; temperature; icing risk | Open-Meteo Single Runs + OpenStreetMap turbines |
-| Second weather model | DWD ICON-EU's wind, its revision since the day-ahead forecast, and how far it disagrees with ECMWF | Open-Meteo Single Runs |
-| Learned wind production | Wind production predicted from all 22 weather points, with weights fitted to Fingrid's measured output; its gap to the day-ahead forecast and its revision | Open-Meteo + Fingrid real-time (fit on training data only) |
-| Neighbouring countries (median only) | ECMWF wind and its revision at 12 points in Sweden, Norway, Denmark and Estonia | Open-Meteo Single Runs |
-| Grid right now (hours 1–2) | Measured wind vs. forecast, grid frequency, nuclear changes, hydro, electric boilers, net import, CHP, flows | Fingrid real-time API |
-| History (training only) | The package's Fingrid series and spot price for Mar 2025 – May 2026, with the imbalance price recomputed under the June 2026 rule | Fingrid Open Data + Elering; table built by Abdo's `build_history.py` |
+| Shape | Separate models for hours 1–2 (real-time grid) and hours 3–10 (weather); the median from a twin that also sees Nordic wind | A mixture: P(up/down/none) × the price gap in each direction |
+| Training | Package + 15 months of pre-June history, one row per origin and quarter | Same history, its own features and calibration |
+| Calibration | Last 28 days before the cutoff: Platt scaling for probabilities, quantile offsets per horizon band | Its own holdout calibration |
+| Code | [`src/`](src/) on this branch | `experiments/lab/` on `brainstorming-abdo` |
 
-**No data from the future.** Every row is used only after its `first_usable_origin_utc`, including our own sources. Leakage tests (`python -m pytest`) rebuild features after deleting every not-yet-published row and require identical results. The details and assumed publication delays are in [`SOURCES.md`](SOURCES.md).
+Everything about the model: `model/README.md` on the [`deliverables`](https://github.com/Rdog69/turku-energy-since-ai/tree/deliverables) branch.
 
-### What each step added (validation)
+</details>
 
-| Step | MAE | Pinball | Spikes | Direction |
-|---|---|---|---|---|
-| Baseline (persistence) | 66.20 | 24.18 | 0.1132 | 0.4509 |
-| Spot + constant gap | 44.29 | 14.99 | 0.1132 | 0.4508 |
-| + LightGBM, calibration, direction-aware spikes | 43.22 | 12.44 | 0.0939 | 0.4148 |
-| + weather revision | 43.08 | 12.19 | 0.0932 | 0.4088 |
-| + Fingrid real-time for hours 1–2 (two-model split) | 42.53 | 12.09 | 0.0921 | 0.4011 |
-| + more real-time series, 5 seeds, 28-day calibration | 42.38 | 12.01 | 0.0905 | 0.3938 |
-| + capacity-weighted weather | 42.34 | 12.06 | 0.0900 | 0.3908 |
-| + smaller, slower trees and 4-hour memory | 41.68 | 11.90 | 0.0880 | 0.3888 |
-| + second weather model, ICON-EU | 41.31 | 11.88 | 0.0873 | 0.3902 |
-| + neighbour wind for the median only | 41.21 | 11.88 | 0.0873 | 0.3902 |
-| + steadier spike calibration, learned wind production | 41.08 | 11.88 | 0.0871 | 0.3899 |
-| + 15 months of pre-June history, with a pricing-rule flag | 40.67 | 11.19 | 0.0856 | 0.3892 |
-| **+ real-time series on the history rows too (final)** | **40.64** | **11.20** | **0.0855** | **0.3892** |
+## 🖥️ The dashboard
 
-On August (trained on June–July plus the pre-June history) the final model scores 27.67 / 6.56 / 0.0680 / 0.4378. That's 3.3 % better than the model without history, weighted by points.
+**Tasehinta** turns the forecast into a situational view for a trader or a production shift supervisor (Level 2 of the challenge). It replays every forecast hour exactly as it was known at that hour.
 
-Tried and left out, because they didn't win in both September and August:
-- neighbour wind for the band (it stays in the median);
-- a separate model for the first hour;
-- solar and temperature revisions at 8 towns.
-
-The details are in [`docs/RESULTS.md`](docs/RESULTS.md).
-
-### Around the forecast
-
-- **Drivers:** `top_drivers` comes from the model's own SHAP values.
-- **Briefings:** a short LLM briefing per hour (Qwen2.5-32B on Featherless). It's built from facts only: no spot prices are sent, every number must appear in the facts, and wind direction is checked.
-- **Alerts:** an n8n workflow relays alerts when a high-severity situation is coming in the next 3 hours.
-
----
-
-## The problem
-
-Production and consumption have to match at every moment. When a market party's plan and its actual production or consumption differ, the difference is an **imbalance**, and it gets settled at the **imbalance price**.
-
-- The price is set separately for every **15-minute** period.
-- The dominating direction comes from **mFRR** (manually activated reserve):
-  - **Up-regulation**: the price is above spot.
-  - **Down-regulation**: the price is below spot.
-  - **No dominating direction**: the price follows the day-ahead spot price.
-- Since **1 June 2026**, when both mFRR and **aFRR** are in the dominating direction, the price is the volume-weighted average of their energy prices.
-- More wind and solar on the grid means balancing needs, and therefore prices, change faster.
-
-Turku Energia plans purchases, trading, and the use of its production and flexible capacity from market forecasts. Seeing price spikes earlier means less imbalance cost and better-timed decisions.
-
-## The challenge
-
-### Level 1: the forecast (80 % of the total)
-
-From **every full-hour forecast origin**, forecast the next **10 hours = 40 quarter-hours**:
-
-| What | Columns | Meaning |
-|---|---|---|
-| Imbalance price | `p10`, `p50`, `p90` | Median forecast and an 80 % interval (€/MWh) |
-| Direction of the balancing need | `p_up`, `p_down`, `p_none` | Probabilities of the dominating mFRR direction (they sum to 1) |
-| Exceptional prices | `p_spike_high`, `p_spike_low` | P(price > spot + 50 €/MWh) and P(price < spot − 50 €/MWh) (they sum to ≤ 1) |
-| *Optional, not scored* | `data_cutoff_utc`, `top_drivers` | Data freshness and the main drivers of the forecast |
-
-### Level 2: the situational view (20 % of the total)
-
-A UI for an energy expert that the jury judges on:
-
-- Clarity and usability for a shift supervisor or electricity trading specialist
-- Two time spans: **right now / next 10 h**, and **past performance** (previous day, week, month)
-- **Time travel**: move the viewing time into the past to show the forecast's usefulness over time
-- Inventiveness: insights that give experts new information
-
-Extra credit:
-
-- Alerts when the balancing need or the price forecast changes significantly
-- Justified suggestions for when Turku Energia should review trading, the production plan, or capacity use
-
-> *Example:* "The risk of an exceptionally high price has increased for 16:00–18:00. The forecast is driven mainly by a lower wind power forecast, higher consumption and the cross-border flow situation. Uncertainty is high, so the production plan and market position should be checked."
-
-### Why we forecast the past (backtest)
-
-Future forecasts can't be scored during the weekend, so we forecast the test period **as if it were then**:
-
-| Period | Dates (2026) | Use |
-|---|---|---|
-| Training | 1 Jun – 4 Oct | Model fitting |
-| ↳ Validation | 7 Sep – 4 Oct | Part of training, used for our own scoring |
-| **Test** | **5 Oct – 1 Nov** | **673 forecast origins**, scored by the organisers |
-
-The 673 origins run from `2026-10-04T21:00:00Z` to `2026-11-01T21:00:00Z`. **All timestamps are UTC.** Pre-June aFRR and mFRR data may also be used for training, but older realised imbalance prices aren't comparable because the pricing rule changed (organisers' Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
-
-## Data
-
-All of it ships in the organisers' starter package at 15-minute resolution from 1 June 2026:
-
-| Source | Content |
+| | |
 |---|---|
-| **Fingrid** | Imbalance price (the target), mFRR and aFRR, consumption, production, cross-border flows |
-| **Fingrid forecasts** (datasets 165, 246, 247) | Day-ahead consumption, wind and solar forecasts (the weather signal) |
-| **ENTSO-E** | Imbalance prices and load forecasts for SE1, SE3 and EE; FI–EE transfer capacity |
-| **Nord Pool** | Day-ahead spot price (⚠️ licensed, see [Rules](#rules-and-licensing)) |
-| **Calendar** | Weekday, hour, holidays, DST |
+| 🔎 **Glance first** | One sentence for the next 10 hours ("Low prices likely 07:00–09:00, 7 in 10 chance") and the few items worth checking |
+| 📈 **One time axis** | Price with its 80 % range, balancing direction and spike risk (with the threshold lines and the change since an hour ago), all on the same 15-minute grid |
+| ⏪ **Move through time** | Scroll or drag the graph in 15-minute steps, or use the period slider; nothing published after "now" is ever shown |
+| 🧭 **Why and what to check** | Click any forecast quarter or alert: its drivers, strongest first, and a suggestion to review, never a trading instruction |
+| ✅ **Hindsight** | How the forecast did over the last day, week or period, scored only on prices published by then |
+| 🌍 **English / Suomi** | Language switch in the top right |
 
-The data is in long format, one row per series per quarter-hour:
-
-```
-series_id, source, dataset_id, timestamp_utc, value, unit, first_usable_origin_utc
-```
-
-Other open or paid data is allowed if we list it and handle its licence. For weather, use the **Open-Meteo Single Runs API**. The Historical Forecast API is not recommended because it leaks future information.
-
-## The data availability rule
-
-> **At forecast origin `t`, use a row only if `first_usable_origin_utc ≤ t`.**
-
-Breaking this rule gets an **automatic score of 0**. The organisers check the source code of the top solutions for leakage, possibly with AI.
-
-Example: the 09:00–09:15 UTC quarter-hour is published at 10:15 UTC (+60 min), so it's first usable at the 11:00 UTC origin.
-
-Use `rows_available_at()` from `baseline.ipynb` for **every** feature lookup, and treat any feature that skips it as a bug.
-
-## Output format
-
-Submit one file, `forecast_backtest.csv`, with **673 origins × 40 steps = 26,920 rows and 13 columns**:
-
-```
-forecast_origin_utc, delivery_start_utc, step,
-p10, p50, p90,
-p_up, p_down, p_none,
-p_spike_high, p_spike_low,
-data_cutoff_utc, top_drivers
-```
-
-Constraints:
-
-- `step` runs 1–40, and step 1 starts at the forecast origin.
-- `p10 ≤ p50 ≤ p90`
-- `p_up + p_down + p_none = 1`
-- `p_spike_high + p_spike_low ≤ 1`
-
-Start from `sample_submission.csv` and keep its identifier columns and row order as they are. Then validate the file:
+Run it locally:
 
 ```bash
-python validate_submission.py --backtest forecast_backtest.csv --origins forecast_origins.csv
+python frontend/scripts/build_data.py      # builds frontend/public/payload.json from the submitted files
+cd frontend && npx -y pnpm@9.15.9 install --frozen-lockfile && npx -y pnpm@9.15.9 dev
 ```
 
-A file that fails validation scores **0**, and nothing can be fixed after the deadline.
+Needs Node 20.19+. The offline single file for demos, Windows notes and details: [`frontend/README.md`](frontend/README.md).
 
-## Scoring
+> [!IMPORTANT]
+> The page contains licensed Nord Pool spot prices. `payload.json` and `bundle.html` are git-ignored. Show the dashboard from your own machine; don't host it.
 
-**Total = 80 % Level 1 + 20 % Level 2**
+## 📦 Submission
 
-| Level 1 component | Points | Metric | Scored by |
-|---|---:|---|---|
-| Forecast accuracy | 30 | MAE of P50 (€/MWh) | `score.py` |
-| Uncertainty calibration | 20 | Mean pinball loss of P10 and P90 | `score.py` |
-| Exceptional prices | 20 | Brier score of the spike probabilities | `score.py` |
-| Direction of the balancing need | 10 | Brier score of the direction probabilities | `score.py` |
-| Reasoning chain | 20 | Evaluation report, slides, demo | Jury (0–5 in half-point steps) |
+Due **Sunday 8 November 2026, 10:00**, through the Since AI platform. The full checklist, with the source of every requirement, is in [`deliverables/README.md`](deliverables/README.md). The documents themselves are on the [`deliverables`](https://github.com/Rdog69/turku-energy-since-ai/tree/deliverables) branch.
 
-For each automatic metric, matching the baseline (or doing worse) gets **0 points** and the best accepted submission gets **full points**. Everyone else gets the share of the gap they close. For example, baseline MAE 60, best 30, ours 40 means we close 2/3 of the gap, which is worth 20/30 points.
+| Deliverable (brief §07) | Status | Where |
+|---|---|---|
+| Forecast file `forecast_backtest.csv`, validated | ✅ | [`submissions/blend_v7_rt_h_int4ss_test.csv`](submissions/), 26,920 rows, 0 errors; hash in [`MANIFEST.md`](submissions/MANIFEST.md) |
+| Data sources, external services, models, software, licences | ✅ | `sources/SOURCES_AND_LICENCES.md` (deliverables branch), [`SOURCES.md`](SOURCES.md) |
+| Situational view (Level 2) | ✅ | [`frontend/`](frontend/) |
+| Source code and run instructions | ✅ | This README ([Run it](#-run-it)), `code/README.md` (deliverables branch) |
+| Evaluation report | ✅ | `report/evaluation_report.md` (deliverables branch) |
+| 5–8 slides · demo video ≤ 5 min | ⏳ | In progress |
 
-## Baseline to beat
-
-The baseline is persistence: P50 is the latest usable imbalance price, held flat for all 40 steps. P10 and P90 come from historical persistence errors per step, and the probabilities are historical shares.
-
-Baseline metrics on the validation period (7 Sep – 4 Oct):
-
-| Metric | Baseline |
-|---|---|
-| MAE | 66.20 €/MWh |
-| Pinball loss (mean) | 24.18 |
-| P10–P90 coverage | 0.68 (target 0.80) |
-| Brier, exceptional prices | 0.1132 |
-| Brier, direction | 0.4509 |
-| High / low spike share | 12.1 % / 13.0 % |
-
-Score our validation forecast against it:
+## 🚀 Run it
 
 ```bash
-python score.py --submission my_validation.csv --actuals data/actuals_validation.csv \
-  --spike-margin 50 --output-dir results/my_model \
-  --baseline-summary baseline_output/validation/score/score_summary.csv
-```
-
-## Getting started
-
-**Requirements:** Python **3.11+**.
-
-```bash
-git clone https://github.com/Rdog69/turku-energy-since-ai.git
-cd turku-energy-since-ai
-python -m venv .venv
-# Windows: .venv\Scripts\activate   |   macOS/Linux: source .venv/bin/activate
+python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+python -m pytest                                  # leakage tests: must all pass
 ```
 
-Then unzip the organisers' **starter package** so that `starter_package_v1/` sits inside `starter_package/` (e.g. `starter_package/starter_package_v1/data/inputs.parquet`). Other locations work if you set `TE_PACKAGE_DIR` to the `starter_package_v1` folder. **It must never be committed**: it contains licensed Nord Pool data, and `.gitignore` excludes it.
-
-### Run it
+Unzip the organisers' starter package into `starter_package/` (git-ignored; it holds licensed spot data). Then:
 
 ```bash
-python -m pytest
+# our half: train on everything up to 4 Oct, forecast the 673 test origins, validate
+python -m src.backtest.run --model v7_rt --period test
+# the validation month, scored with the organisers' score.py
+python -m src.backtest.run --model v7_rt --period validation
+# the submitted blend from the two halves (Abdo's file comes from his branch)
+python -I submissions/tools/blend_period.py . v7_rt test submissions/forecast_backtest_h_int4ss.csv blend_v7_rt_h_int4ss
 ```
 
-Runs the leakage tests. **If any of them fail, fix that first:** using data before it was published scores 0.
+Abdo's half and the full run order for both: `code/README.md` on the deliverables branch. Pre-June history and external data: [`SOURCES.md`](SOURCES.md).
 
-```bash
-python -m src.backtest.run --period validation --model spot_anchor
-```
+<details>
+<summary><b>Repository map</b></summary>
 
-Trains on data published before 7 Sep, forecasts 7 Sep – 4 Oct, then runs the organisers' validator and `score.py` against the baseline. Results go to `results/<model>/validation/` (git-ignored).
-
-```bash
-python -m src.backtest.run --period test --model spot_anchor
-```
-
-Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
-
-The submitted model is `v7_rt`:
-
-```bash
-python -m src.backtest.run --period test --model v7_rt
-```
-
-It needs the external data tables (Fingrid real-time and its pre-June history, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
-
-It also needs the pre-June history: `external_data/history/pkg_history.parquet` or `pkg_history.csv.gz`, built by `experiments/lab/build_history.py` on the `brainstorming-abdo` branch. It isn't committed here, because it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only). To refresh the tables:
-
-```bash
-python -m src.data.fingrid
-```
-
-Downloads the Fingrid real-time series. Needs `FINGRID_API_KEY` in `.env`.
-
-```bash
-python -m src.data.open_meteo --pause 5.5
-python -m src.data.open_meteo --points extra --pause 5.5
-python -m src.data.open_meteo --model icon_eu --pause 5.5
-python -m src.data.open_meteo --points nordic --pause 5.5
-```
-
-Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbouring countries) and the ICON-EU runs from Open-Meteo. No key needed; the pause keeps under Open-Meteo's rate limit.
-
-**Dashboard data, briefings and alerts:**
-
-```bash
-python -m src.export.dashboard --model v7_rt --period test
-```
-
-Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).
-
-```bash
-python -m src.explain.featherless --period test
-```
-
-Adds an LLM briefing to each hour. Needs `FEATHERLESS_API_KEY`. Prompts are spot-free.
-
-```bash
-python -m src.automation.replay --period test --hours 24
-```
-
-Replays updates into the n8n alert workflow ([`automation/`](automation/)).
-
-To get the baseline's own score for comparison, run the organisers' `baseline.ipynb` once in the package folder. It writes `baseline_output/validation/score/score_summary.csv`, which the runner picks up automatically.
-
-Scores so far are logged in [`docs/RESULTS.md`](docs/RESULTS.md).
-
-```
-starter_package/starter_package_v1/
-├─ README.md               # organisers' quick start, rules, glossary
-├─ baseline.ipynb          # data loading, rows_available_at(), baseline, scoring
-├─ data/
-│  ├─ inputs.parquet / inputs.csv
-│  ├─ spot_nordpool.csv    # ⚠️ licensed, do not commit
-│  ├─ actuals_validation.csv
-│  └─ quality_report.csv / .md
-├─ sample_submission.csv
-├─ forecast_origins.csv
-├─ availability.csv
-├─ validate_submission.py
-├─ score.py
-└─ make_templates.py
-```
-
-## Repository layout
+<br/>
 
 ```
 .
-├─ README.md
-├─ requirements.txt
-├─ src/
-│  ├─ config.py           # paths, periods, constants
-│  ├─ data/
-│  │  ├─ load.py          # load the package's long-format data
-│  │  └─ availability.py  # THE availability rule: available_at(), fast SeriesIndex lookups
-│  ├─ features/build.py   # leakage-safe feature table, one row per (origin, step)
-│  ├─ models/anchor.py    # spot-anchor model (the floor to beat)
-│  └─ backtest/run.py     # train → forecast → write → validate → score
-├─ tests/                 # leakage tests (run with pytest)
-├─ docs/                  # plan, TL;DR, results log
-├─ results/               # model outputs, git-ignored
-└─ starter_package/       # organisers' data, git-ignored
+├─ src/                 our model: data loading + availability rule, features, models, backtest
+├─ tests/               leakage and format tests (pytest)
+├─ submissions/         final forecast files, their hashes (MANIFEST.md) and the blend tools
+├─ frontend/            the Tasehinta dashboard (React + Vite)
+├─ deliverables/        submission checklist
+├─ scoreboard/          the team's shared score log
+├─ docs/                results log, plan, development README, logo
+├─ external_data/       open data we downloaded (Fingrid real-time, weather runs; CC BY 4.0)
+├─ SOURCES.md           every data source and its licence
+└─ QUESTIONS.md         questions to the organisers and their answers
 ```
 
-Planned additions: `src/models/` (quantile and probability models), `src/explain/`, `api/`, `app/`, `automation/`, `reports/`.
+</details>
 
-## Deliverables checklist
+## 📜 Data, rules and licences
 
-Due **Sunday 8 Nov, 10:00**, through the Since AI platform. The full checklist, with the source of each requirement and its status, is in [`deliverables/README.md`](deliverables/README.md). In short:
+- **Starter package** (Fingrid, ENTSO-E, Nord Pool, calendar), plus Fingrid's open real-time API, Open-Meteo weather runs (CC BY 4.0), OpenStreetMap turbines (ODbL) and Elering's 2025 spot prices: [`SOURCES.md`](SOURCES.md).
+- **Nord Pool spot prices** are licensed to Turku Energia for the hackathon only. They are never committed, the repository is private, and the data is deleted after the event.
+- **Questions to the organisers** and their answers (pre-June data, corrected Fingrid history): [`QUESTIONS.md`](QUESTIONS.md).
+- **AI tools:** we used Claude Code for coding and analysis, and Featherless-hosted open LLMs for the written briefings in an earlier dashboard. Listed in the sources document.
 
-- [x] `forecast_backtest.csv`, passing `validate_submission.py` (½ `v7_rt` + ½ Abdo's `h_int4ss`, `submissions/MANIFEST.md`)
-- [ ] Source code and start-up instructions (written; commit hashes at the freeze)
-- [ ] Short evaluation report (written; final pass)
-- [x] Data sources, external services, models, software and licences
-- [ ] 5–8 presentation slides
-- [ ] Demo video (≤ 5 min)
+## 👥 Team
 
-## Timeline
-
-| When | What |
+| | Main work |
 |---|---|
-| Fri 6 Nov, 18:50 | Challenge briefing |
-| Sat 7 Nov | Organisers available 09:00–12:00 and 14:30–18:00 |
-| **Sun 8 Nov, 10:00** | **Submission deadline** |
-| Sun 8 Nov, 13:30 | Top 3 announced |
+| **Frank** | `v7_rt` model, blend and submission files, team scoreboard, dashboard design |
+| **Abdo** | `h_int4ss` history model, the history dataset, dashboard (`front-end`), deliverables and report |
+| **Jim** | Evaluation framework, explanations and alerts, API, slides and video drafts |
+| **Pavlo** | Data map, ICON-EU weather features, leakage review, sources |
+| **Pavel** | Model audits, tuning trials, questions to the data providers |
 
-Questions go to the **`#turku-energia`** channel in the Since AI Discord. Ask there so that every team gets the same answer.
+<div align="center">
 
-## Rules and licensing
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0E7F7A,100:0B3C6A&height=90&section=footer" width="100%" alt=""/>
 
-- ✅ Public code, other data with listed sources, Open-Meteo Single Runs
-- ❌ **Sharing Nord Pool spot data.** It's for hackathon use only. Don't put it in this repo, and delete it after the event.
-- ❌ **Using data before its `first_usable_origin_utc`**, which scores 0
-
-All data sources and third-party components we use will be listed in [`SOURCES.md`](SOURCES.md) *(to be added)*.
-
-## Team
-
-| Name | Role |
-|---|---|
-| Pavlo | Data: availability layer, features, external sources |
-| Pavel | Models: forecasts, calibration, backtest |
-| Frank | Dashboard: API and Lovable situation room |
-| Jim | Explanations & alerts: drivers, LLM text, n8n |
-| Abdo | Story & quality: report, slides, video, submission |
-
-Details of each role are in [`docs/PLAN.md` §11](docs/PLAN.md#11-roles).
+</div>

@@ -12,14 +12,14 @@ const VIEW_KEYS: Record<View, [string, string, LucideIcon]> = {
   overview: ["vOverview", "vOverviewHint", LayoutDashboard], production: ["vProd", "vProdHint", Factory],
 };
 
-export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
-  period: string; setPeriod: (p: string) => void; lang: Lang; setLang: (l: Lang) => void; view: View; setView: (v: View) => void;
+export function Rail({ period, setPeriod, lang, view, setView }: {
+  period: string; setPeriod: (p: string) => void; lang: Lang; setLang?: (l: Lang) => void; view: View; setView: (v: View) => void;
 }) {
   const seg = (on: boolean) =>
     `w-full rounded-[4px] px-3 py-2 text-left text-[14px] font-semibold transition-colors duration-150 ${on ? "bg-white text-bank" : "text-bank-ink hover:bg-white/10"}`;
   return (
     <aside className="flex flex-col gap-8 bg-bank px-5 py-6 text-bank-ink lg:sticky lg:top-0 lg:h-screen lg:w-[244px] lg:shrink-0">
-      <div>
+      <div className="flex flex-col items-center text-center">
         <p className="flex items-center gap-2 text-white" aria-label="Tasehinta"><Logo /><Wordmark /></p>
         <p className="mt-1.5 text-[14px] text-bank-ink2">{t(lang, "tagline")}</p>
       </div>
@@ -47,17 +47,6 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
         ))}
       </nav>
 
-      <div className="space-y-1.5">
-        <p className="text-[13px] font-semibold text-bank-ink2">{t(lang, "language")}</p>
-        <div className="grid grid-cols-2 gap-1 rounded-md bg-white/10 p-1">
-          {(["en", "fi"] as Lang[]).map((l) => (
-            <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)}
-              className={`rounded-[4px] py-1.5 text-[14px] font-semibold transition-colors duration-150 ${lang === l ? "bg-white text-bank" : "text-bank-ink hover:bg-white/10"}`}>
-              {l === "en" ? "English" : "Suomi"}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <ul className="mt-auto space-y-1">
         {([["infoModel", "modelText", Info], ["infoRules", "rules", ShieldCheck], ["infoLocal", "local", Lock]] as const).map(([label, text, Icon]) => (

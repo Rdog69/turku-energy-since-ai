@@ -4,6 +4,7 @@ import { Rail, VIEWS, type View } from "@/components/Rail";
 import { OverviewView } from "@/components/OverviewView";
 import { ProductionView } from "@/components/ProductionView";
 import { TimeBar } from "@/components/TimeBar";
+import { LangToggle } from "@/components/LangToggle";
 import { PAYLOAD, PERIOD_IDS, defaultHour } from "@/lib/model";
 import type { Lang } from "@/lib/time";
 
@@ -31,7 +32,7 @@ export default function App() {
   const setLang = (l: Lang) => { setLangState(l); writePref("tasehinta.lang", l); };
   const setPeriod = (id: string) => { setPeriodId(id); setI(defaultHour(PAYLOAD.periods[id])); setPlaying(false); };
 
-  useEffect(() => { document.documentElement.lang = lang; document.title = "Tasehinta"; }, [lang]);
+  useEffect(() => { document.documentElement.lang = lang; document.title = "Tasehinta Dashboard"; }, [lang]);
 
   const step = useCallback((d: number) => setI((v) => Math.max(0, Math.min(p.origins.length - 1, v + d))), [p]);
 
@@ -69,7 +70,8 @@ export default function App() {
     <Tooltip.Provider delayDuration={120} skipDelayDuration={0}>
     <div className="min-h-screen bg-paper lg:flex">
       <Rail period={periodId} setPeriod={setPeriod} lang={lang} setLang={setLang} view={view} setView={setView} />
-      <main className="min-w-0 flex-1 px-4 pb-16 pt-5 sm:px-8 lg:px-10">
+      <main className="relative min-w-0 flex-1 px-4 pb-16 pt-5 sm:px-8 lg:px-10">
+        <div className="absolute right-4 top-4 z-20 sm:right-8 lg:right-10"><LangToggle lang={lang} setLang={setLang} /></div>
         <div className="mx-auto max-w-[1480px] space-y-6">
           {view !== "overview" && <TimeBar p={p} i={i} setI={setI} lang={lang} playing={playing} setPlaying={setPlaying} />}
 
