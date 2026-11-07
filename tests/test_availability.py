@@ -14,7 +14,7 @@ import pytest
 from src.config import VALIDATION_FIRST_ORIGIN, TEST_FIRST_ORIGIN
 from src.data.availability import build_index, wide_at
 from src.data.load import IMBALANCE, SPOT, load_long_all
-from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, TARGET_COLUMNS,
+from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, MEMORY_COLUMNS, TARGET_COLUMNS,
                                 build_features)
 
 try:
@@ -49,7 +49,7 @@ def test_features_ignore_unpublished_rows(full_features):
     for t in origins:
         truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
         part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False)
-        cols = FEATURE_COLUMNS + [c for c in FINGRID_RT_COLUMNS + FINGRID_RT2_COLUMNS if c in full] + ["data_cutoff"]
+        cols = FEATURE_COLUMNS + MEMORY_COLUMNS + [c for c in FINGRID_RT_COLUMNS + FINGRID_RT2_COLUMNS if c in full] + ["data_cutoff"]
         a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
         b = part[cols].reset_index(drop=True)
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"features at {t}")
@@ -113,6 +113,61 @@ def test_weather_features_ignore_unpublished_runs():
         a = full.loc[full["origin"] == t, WEATHER_COLUMNS].reset_index(drop=True)
         b = part[WEATHER_COLUMNS].reset_index(drop=True)
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"weather features at {t}")
+
+
+def test_nordic_weather_ignores_unpublished_runs():
+    """Same truncation test for the neighbouring-area weather (Sweden, Norway, Denmark, Estonia)."""
+    from src.data.weather import load_nordic
+    from src.features.build import NORDIC_COLUMNS
+    nordic = load_nordic()
+    if nordic is None:
+        pytest.skip("Nordic weather runs not downloaded (python -m src.data.open_meteo --points nordic)")
+    origins = _origins(n_random=6, seed=3)
+    full = build_features(LONG, origins, with_targets=False, nordic=nordic)
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False,
+                              nordic={a: w.truncated(t) for a, w in nordic.items()})
+        a = full.loc[full["origin"] == t, NORDIC_COLUMNS].reset_index(drop=True)
+        b = part[NORDIC_COLUMNS].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"nordic features at {t}")
+
+
+def _icon():
+    from src.data.open_meteo import OUT_DIR
+    from src.data.weather import WeatherIndex
+    path = OUT_DIR / "icon_eu.parquet"
+    if not path.exists():
+        pytest.skip("ICON-EU runs not downloaded (python -m src.data.open_meteo --model icon_eu)")
+    return WeatherIndex.load(path=path)
+
+
+def test_icon_features_ignore_unpublished_runs():
+    """Truncate BOTH weather models to runs usable at t: ICON and spread features must not change."""
+    from src.features.build import WEATHER2_COLUMNS
+    weather, icon = _weather(), _icon()
+    origins = _origins(n_random=6, seed=4)
+    full = build_features(LONG, origins, with_targets=False, weather=weather, weather2=icon)
+    assert full["om_icon_wind_idx"].notna().mean() > 0.95, "ICON coverage unexpectedly low"
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False,
+                              weather=weather.truncated(t), weather2=icon.truncated(t))
+        a = full.loc[full["origin"] == t, WEATHER2_COLUMNS].reset_index(drop=True)
+        b = part[WEATHER2_COLUMNS].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"icon features at {t}")
+
+
+def test_icon_run_used_was_published():
+    from src.data.availability import to_ns
+    icon = _icon()
+    # publication rule: first usable = ceil_hour(run init + 5 h)
+    assert ((icon.run_fu - icon.run_init) == 5 * 3_600_000_000_000).all()
+    o = to_ns(_origins(n_random=20, seed=5))
+    _, run = icon.lookup(o, o, "wind_idx")
+    found = run >= 0
+    fu = icon.run_fu[np.searchsorted(icon.run_init, run[found])]
+    assert (fu <= o[found]).all()
 
 
 def test_weather_run_used_was_published():

@@ -58,6 +58,23 @@ DRIVER_LABELS = {
     "om_wind_rev": "Wind forecast revision", "om_wind_rev_mw": "Wind forecast revision (MW)",
     "om_wind_speed": "Wind speed (weather model)", "om_temp": "Temperature", "om_icing": "Icing risk",
     "om_lead_h": "Weather run age",
+    # Fingrid real-time batch 2
+    "rt_hydro": "Hydro output now", "rt_hydro_chg_1h": "Hydro output change (1 h)",
+    "rt_boilers": "Electric boilers now", "rt_boilers_chg_1h": "Electric boilers change (1 h)",
+    "rt_netimport": "Net cross-border flow now", "rt_netimport_chg_1h": "Net cross-border flow change (1 h)",
+    "rt_flow_se3": "SE3 border flow now", "rt_flow_se3_chg_1h": "SE3 border flow change (1 h)",
+    "rt_flow_ee": "Estonia border flow now", "rt_flow_ee_chg_1h": "Estonia border flow change (1 h)",
+    "rt_chp_chg_1h": "CHP output change (1 h)",
+    # 4-hour memory and the second weather model (ICON-EU)
+    "mean_gap_last16": "Recent imbalance vs. spot (4 h)", "mean_dir_last16": "Recent regulation direction (4 h)",
+    "om_icon_wind_idx": "Wind (second weather model)", "om_icon_wind_rev": "Wind revision (second weather model)",
+    "om_model_spread": "Weather models disagree on wind",
+    # Wind in the neighbouring countries (used by the median model only)
+    "om_se_wind_idx": "Wind in Sweden", "om_se_wind_rev": "Wind revision in Sweden",
+    "om_no_wind_idx": "Wind in Norway", "om_no_wind_rev": "Wind revision in Norway",
+    "om_dk_wind_idx": "Wind in Denmark", "om_dk_wind_rev": "Wind revision in Denmark",
+    "om_ee_wind_idx": "Wind in Estonia", "om_ee_wind_rev": "Wind revision in Estonia",
+    "om_nordic_wind_rev": "Wind revision in neighbouring countries",
 }
 
 LEVERS = {

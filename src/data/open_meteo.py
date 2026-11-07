@@ -62,7 +62,24 @@ POINTS_EXTRA = {
     "kainuu_kajaani": (64.20, 27.70),
     "lapland_pello": (66.70, 24.30),
 }
-POINT_SETS = {"main": POINTS, "extra": POINTS_EXTRA}
+# Neighbouring Nordic/Baltic wind areas. Since 2025 the Nordic mFRR energy market is shared,
+# so a wind miss in Sweden or Norway can tip Finland's regulation direction too.
+POINTS_NORDIC = {
+    "se1_norrbotten": (65.40, 20.80),
+    "se2_jamtland": (63.10, 15.30),
+    "se2_vasternorrland": (62.70, 17.20),
+    "se3_vastra_gotaland": (58.50, 13.00),
+    "se3_gotland": (57.40, 18.50),
+    "se4_skane": (55.80, 13.60),
+    "no3_fosen": (63.90, 10.00),
+    "no2_rogaland": (58.80, 6.00),
+    "no4_finnmark": (70.50, 25.00),
+    "dk1_jutland": (56.00, 8.40),
+    "dk2_offshore": (55.40, 12.60),
+    "ee_west": (58.50, 23.60),
+}
+POINT_AREAS = {name: name.split("_")[0][:2] for name in POINTS_NORDIC}   # se / no / dk / ee
+POINT_SETS = {"main": POINTS, "extra": POINTS_EXTRA, "nordic": POINTS_NORDIC}
 VARIABLES = ["wind_speed_100m", "temperature_2m", "relative_humidity_2m"]
 FORECAST_DAYS = 3
 
@@ -97,12 +114,16 @@ def fetch_run(model: str, run: pd.Timestamp, raw_dir: Path, pause: float = 1.0,
             wait = 60 * (attempt + 1) if e.code == 429 else 5 * (attempt + 1)
             print(f"  HTTP {e.code} for {run:%Y-%m-%dT%H}, retry in {wait}s: {body}")
             time.sleep(wait)
-        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException,
+                json.JSONDecodeError) as e:  # truncated responses arrive as broken JSON
             wait = 10 * (attempt + 1)
             print(f"  {type(e).__name__} for {run:%Y-%m-%dT%H}, retry in {wait}s")
             time.sleep(wait)
     else:
-        raise RuntimeError(f"giving up on {model} {run}")
+        # Skip rather than abort: nothing is cached, so a later rerun tries again, and the
+        # availability layer falls back to the previous usable run for this slot.
+        print(f"  giving up on {model} {run:%Y-%m-%dT%H} for now (skipped)")
+        return None
     data = data if isinstance(data, list) else [data]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data), encoding="utf-8")

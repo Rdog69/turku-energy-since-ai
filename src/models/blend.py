@@ -23,6 +23,14 @@ class HorizonSplit:
         return getattr(self.short, "use_weather", False) or getattr(self.long, "use_weather", False)
 
     @property
+    def use_nordic(self) -> bool:
+        return getattr(self.short, "use_nordic", False) or getattr(self.long, "use_nordic", False)
+
+    @property
+    def use_icon(self) -> bool:
+        return getattr(self.short, "use_icon", False) or getattr(self.long, "use_icon", False)
+
+    @property
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
 
@@ -42,3 +50,59 @@ class HorizonSplit:
     def describe(self) -> str:
         return (f"{self.name}: steps 1-{self.split_step} from [{self.short.describe()}]\n"
                 f"  steps {self.split_step + 1}-40 from [{self.long.describe()}]")
+
+
+@dataclass
+class MedianFrom:
+    """P50 (and its drivers) from one model, everything else from another.
+
+    Wind in the neighbouring countries sharpens the median in both September and August, but
+    makes the P10-P90 band and the spike probabilities noisier (docs/RESULTS.md). So the final
+    model takes only the median from the variant that sees it.
+    """
+    base: object
+    median: object
+    name: str = "median_from"
+
+    def _either(self, attr: str) -> bool:
+        return getattr(self.base, attr, False) or getattr(self.median, attr, False)
+
+    @property
+    def use_weather(self) -> bool:
+        return self._either("use_weather")
+
+    @property
+    def use_nordic(self) -> bool:
+        return self._either("use_nordic")
+
+    @property
+    def use_icon(self) -> bool:
+        return self._either("use_icon")
+
+    @property
+    def use_fingrid(self) -> bool:
+        return self._either("use_fingrid")
+
+    @property
+    def capacity_weighted(self) -> bool:
+        both = {getattr(self.base, "capacity_weighted", False), getattr(self.median, "capacity_weighted", False)}
+        if len(both) != 1:
+            raise ValueError("both models must weight the weather points the same way")
+        return both.pop()
+
+    def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "MedianFrom":
+        self.base.fit(train, cutoff)
+        self.median.fit(train, cutoff)
+        return self
+
+    def predict(self, feats: pd.DataFrame) -> pd.DataFrame:
+        out = self.base.predict(feats)
+        med = self.median.predict(feats)
+        out["p50"] = med["p50"].to_numpy()
+        if "top_drivers" in med:            # the drivers explain the median
+            out["top_drivers"] = med["top_drivers"].to_numpy()
+        return out
+
+    def describe(self) -> str:
+        return (f"{self.name}: P50 and drivers from [{self.median.describe()}]\n"
+                f"  everything else from [{self.base.describe()}]")

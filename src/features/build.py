@@ -89,11 +89,59 @@ def add_weather(f: pd.DataFrame, index: dict[str, SeriesIndex], weather) -> pd.D
     return f
 
 
+NORDIC_AREAS = ("se", "no", "dk", "ee")
+
+
+def add_weather_nordic(f: pd.DataFrame, index: dict[str, SeriesIndex], nordic: dict) -> pd.DataFrame:
+    """Neighbouring areas' wind and its revision since the day-ahead forecast was made.
+
+    Same availability rule as the Finnish weather: newest run usable at the origin, compared with
+    the run usable when Fingrid published its day-ahead wind forecast for that quarter.
+    """
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    revs = []
+    for area in NORDIC_AREAS:
+        w = nordic.get(area)
+        if w is None:
+            f[f"om_{area}_wind_idx"] = np.nan
+            f[f"om_{area}_wind_rev"] = np.nan
+            continue
+        now, _ = w.lookup(o, d, "wind_idx")
+        then, _ = w.lookup(da_time, d, "wind_idx")
+        f[f"om_{area}_wind_idx"] = now
+        f[f"om_{area}_wind_rev"] = now - then
+        revs.append(now - then)
+    f["om_nordic_wind_rev"] = np.nanmean(np.vstack(revs), axis=0) if revs else np.nan
+    return f
+
+
+def add_weather2(f: pd.DataFrame, index: dict[str, SeriesIndex], weather, icon) -> pd.DataFrame:
+    """Second weather model (ICON-EU) and its disagreement with ECMWF.
+
+    Ported from Pavlo's branch (femboystorming-pavlo, split_all_icon). Same availability-aware
+    lookups as add_weather: the newest ICON run usable at the origin, and the ICON run usable when
+    Fingrid published its day-ahead wind forecast.
+    """
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    wind, _ = icon.lookup(o, d, "wind_idx")
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    wind_da, _ = icon.lookup(da_time, d, "wind_idx")
+    f["om_icon_wind_idx"] = wind
+    f["om_icon_wind_rev"] = wind - wind_da
+    ecmwf = weather.lookup(o, d, "wind_idx")[0] if weather is not None else np.nan
+    f["om_model_spread"] = np.abs(ecmwf - wind)
+    return f
+
+
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
-                   with_targets: bool = True, weather=None) -> pd.DataFrame:
+                   with_targets: bool = True, weather=None, nordic=None, weather2=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
 
     weather: optional WeatherIndex (src/data/weather.py) to add the om_* columns.
+    weather2: optional second-model WeatherIndex (ICON-EU) for the om_icon_* / spread columns.
     """
     index = index or build_index(long)
     origins = pd.DatetimeIndex(origins).tz_convert("UTC").as_unit("ns")
@@ -149,7 +197,7 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     # Short trailing means of the gap and direction over the newest usable quarters.
     # value_at() applies the availability mask, so a quarter that wasn't published yet is NaN.
-    for n in (4, 8):
+    for n in (4, 8, 16):   # 1 h, 2 h and 4 h of the newest usable quarters
         gaps, dirs = [], []
         for j in range(n):
             ts_j = imb_ts - j * NS_PER_QUARTER
@@ -207,6 +255,10 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     if weather is not None:
         f = add_weather(f, index, weather)
+    if nordic is not None:
+        f = add_weather_nordic(f, index, nordic)
+    if weather2 is not None:
+        f = add_weather2(f, index, weather, weather2)
     if with_targets:
         f = add_targets(f, index)
     return f
@@ -260,6 +312,14 @@ FINGRID_RT2_COLUMNS = [
     "rt_netimport_chg_1h", "rt_flow_se3", "rt_flow_se3_chg_1h", "rt_flow_ee", "rt_flow_ee_chg_1h",
     "rt_chp_chg_1h",
 ]
+
+# Longer memory: 4-hour averages beat the newest quarter at every horizon (training data, 7 Nov).
+MEMORY_COLUMNS = ["mean_gap_last16", "mean_dir_last16"]
+
+NORDIC_COLUMNS = [f"om_{a}_wind_{k}" for a in NORDIC_AREAS for k in ("idx", "rev")] + ["om_nordic_wind_rev"]
+
+# Second weather model (ICON-EU) and ECMWF-vs-ICON disagreement (Pavlo's split_all_icon).
+WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
 
 WEATHER_COLUMNS = [
     "om_wind_idx", "om_wind_idx_da", "om_wind_rev", "om_wind_rev_mw", "om_wind_speed",

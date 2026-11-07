@@ -264,6 +264,8 @@ Five people. Each role has a clear output, and the hand-offs are files, so peopl
 
 ## 12. Open questions
 
+The data questions for the organisers are collected, with priorities, in [`QUESTIONS.md`](../QUESTIONS.md).
+
 - [ ] Ask in `#turku-energia`: are Fingrid real-time 3-min series acceptable with our own documented publication delay?
 - [ ] Ask in `#turku-energia`: is the Nord Pool UMM API allowed? (It's public, but it's Nord Pool.)
 - [ ] Ask in `#turku-energia`: during the test backtest, may we correct bias or recalibrate using test-period imbalance prices that are already usable at the origin (`first_usable_origin_utc ≤ t`)? The data rule allows it, but "train only on data up to 4 Oct" may not. This could be a real gain given the drift in finding 9, so ask before relying on it.

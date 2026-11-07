@@ -5,8 +5,10 @@
 
 Validation: trains on rows whose targets were published by the first validation origin
 (7 Sep 00:00), forecasts 7 Sep - 4 Oct and scores against actuals_validation.csv with the
-organisers' score.py. Test: trains on everything published by 5 Oct 00:00 and writes
-results/<model>/test/forecast_backtest.csv, ready for the validator and submission.
+organisers' score.py. fold_b: the same for August (trained on June-July only), scored against
+actuals built from the package by src/backtest/actuals.py. Test: trains on everything published
+by 5 Oct 00:00 and writes results/<model>/test/forecast_backtest.csv, ready for the validator
+and submission.
 """
 from __future__ import annotations
 
@@ -24,8 +26,25 @@ from src.data.availability import build_index
 from src.data.load import load_long, load_long_all
 from src.features.build import build_features
 from src.models.anchor import SpotAnchor
-from src.models.blend import HorizonSplit
-from src.models.gbm import GBMModel
+from src.models.blend import HorizonSplit, MedianFrom
+from src.models.gbm import BASE_PARAMS, GBMModel
+
+TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "learning_rate": 0.03,
+                "n_estimators": 300, "colsample_bytree": 0.6, "reg_lambda": 1.0}
+
+
+def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
+               icon: bool = False) -> HorizonSplit:
+    """final_capw plus optional round-3 changes. tuned: x = none, l = long model, b = both models."""
+    def params(on: bool) -> dict:
+        return dict(TUNED_PARAMS if on else BASE_PARAMS)
+    common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
+                  use_memory=memory, use_nordic=nordic, use_icon=icon)
+    return HorizonSplit(
+        name=name, split_step=8, capacity_weighted=True,
+        short=GBMModel(name=f"{name}_short", use_fingrid=True, use_fingrid2=True,
+                       params=params(tuned == "b"), **common),
+        long=GBMModel(name=f"{name}_long", params=params(tuned in ("l", "b")), **common))
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
 MODELS = {
@@ -81,6 +100,36 @@ MODELS = {
                        use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
         long=GBMModel(name="long_weather_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
                       use_weather=True, n_seeds=5)),
+    "final_nordic": lambda: HorizonSplit(
+        name="final_nordic", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28_nordic", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, use_nordic=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28_nordic", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, use_nordic=True, n_seeds=5)),
+    # Round 3 combinations on top of final_capw: t = tuned settings (x = none / l = long model only /
+    # b = both), m = 4-hour memory, n = Nordic weather, i = ICON-EU second weather model (from Pavlo's
+    # branch). E.g. "v3_lm" = tuned long model + memory, "v3_bmi" = both tuned + memory + ICON.
+    **{f"v3_{t}{'m' * m}{'n' * n}{'i' * i}": (lambda t=t, m=m, n=n, i=i: make_final(f"v3_{t}{'m' * m}{'n' * n}{'i' * i}", t, m, n, i))
+       for t in ("x", "l", "b") for m in (False, True) for n in (False, True) for i in (False, True)},
+    # Submitted model: v3_bmi, with the median (P50) and its drivers from the same model plus Nordic
+    # wind. Nordic wind improved the median in September and August but made the band and the spike
+    # probabilities worse in both, so it's used for the median only (docs/RESULTS.md).
+    "v3_bmi_n50": lambda: MedianFrom(name="v3_bmi_n50",
+                                     base=make_final("v3_bmi", "b", memory=True, icon=True),
+                                     median=make_final("v3_bmni", "b", memory=True, nordic=True, icon=True)),
+    # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
+    "final_tuned": lambda: HorizonSplit(
+        name="final_tuned", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS)),
+        long=GBMModel(name="long_weather_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS))),
+    "final_tuned_long": lambda: HorizonSplit(
+        name="final_tuned_long", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS))),
     # calibration window check: re-tune on the last 21 / 28 training days instead of 14
     **{f"split_all_h{d}": (lambda d=d: HorizonSplit(
         name=f"split_all_h{d}", split_step=8,
@@ -113,21 +162,21 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     """(origins csv, template csv) for the period."""
     if period == "test":
         return pkg / "forecast_origins.csv", pkg / "sample_submission.csv"
-    out = config.RESULTS_DIR / "templates" / "validation"
+    out = config.RESULTS_DIR / "templates" / period
     if not (out / "sample_submission.csv").exists():
         out.mkdir(parents=True, exist_ok=True)
-        rc = run_script(pkg, "make_templates.py", "--test-start", "2026-09-07", "--test-end",
-                        "2026-10-04", "--output-dir", str(out))
+        rc = run_script(pkg, "make_templates.py", "--test-start", config.PERIODS[period]["start"],
+                        "--test-end", config.PERIODS[period]["end"], "--output-dir", str(out))
         if rc != 0:
             raise RuntimeError("make_templates.py failed")
     return out / "forecast_origins.csv", out / "sample_submission.csv"
 
 
-def training_table(long, index, cutoff: pd.Timestamp, weather=None) -> pd.DataFrame:
+def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
-    f = build_features(long, origins, index=index, weather=weather)
+    f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -165,7 +214,7 @@ def write_submission(feats: pd.DataFrame, pred: pd.DataFrame, template: Path, pa
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--period", choices=["validation", "test"], default="validation")
+    ap.add_argument("--period", choices=["validation", "fold_b", "test"], default="validation")
     ap.add_argument("--model", choices=sorted(MODELS), default="spot_anchor")
     args = ap.parse_args(argv)
 
@@ -175,20 +224,33 @@ def main(argv=None) -> int:
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
-    cutoff = origins.min() if args.period == "validation" else config.TRAIN_CUTOFF
+    cutoff = origins.min() if args.period != "test" else config.TRAIN_CUTOFF
     assert cutoff <= config.TRAIN_CUTOFF
+    if args.period != "test":
+        assert cutoff == config.PERIODS[args.period]["first_origin"], "template origins don't match the period"
 
     weather = None
     if getattr(model, "use_weather", False):
         from src.data.weather import WeatherIndex
         weather = WeatherIndex.load("ecmwf_ifs025",
                                     capacity_weighted=getattr(model, "capacity_weighted", False))
-    train = training_table(long, index, cutoff, weather)
+    nordic = None
+    if getattr(model, "use_nordic", False):
+        from src.data.weather import load_nordic
+        nordic = load_nordic("ecmwf_ifs025")
+    weather2 = None
+    if getattr(model, "use_icon", False):
+        from src.data.weather import WeatherIndex
+        # Only the 8 main points were downloaded for ICON, so its points count equally
+        # (capacity weights are defined over ECMWF's 14 points).
+        weather2 = WeatherIndex.load("icon_eu")
+    train = training_table(long, index, cutoff, weather, nordic, weather2)
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
-    feats = build_features(long, origins, index=index, with_targets=False, weather=weather)
+    feats = build_features(long, origins, index=index, with_targets=False, weather=weather, nordic=nordic,
+                           weather2=weather2)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"
@@ -204,11 +266,16 @@ def main(argv=None) -> int:
     rc = run_script(pkg, "validate_submission.py", "--backtest", str(sub_path), "--origins", str(origins_csv))
     if rc != 0:
         return rc
-    if args.period == "validation":
-        baseline = pkg / "baseline_output" / "validation" / "score" / "score_summary.csv"
-        extra = ["--baseline-summary", str(baseline)] if baseline.exists() else []
-        rc = run_script(pkg, "score.py", "--submission", str(sub_path), "--actuals",
-                        "data/actuals_validation.csv", "--spike-margin", str(int(config.SPIKE_MARGIN)),
+    if args.period != "test":
+        if args.period == "validation":
+            actuals = "data/actuals_validation.csv"            # the organisers' own file
+            baseline = pkg / "baseline_output" / "validation" / "score" / "score_summary.csv"
+            extra = ["--baseline-summary", str(baseline)] if baseline.exists() else []
+        else:
+            from src.backtest.actuals import write_actuals
+            actuals, extra = str(write_actuals(args.period)), []   # built from the package
+        rc = run_script(pkg, "score.py", "--submission", str(sub_path), "--actuals", actuals,
+                        "--spike-margin", str(int(config.SPIKE_MARGIN)),
                         "--output-dir", str(out_dir / "score"), *extra)
     return rc
 

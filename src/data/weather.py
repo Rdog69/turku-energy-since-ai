@@ -72,6 +72,18 @@ def summarise_runs(raw: pd.DataFrame, weights: dict[str, float] | None = None) -
     return out
 
 
+def load_nordic(model: str = "ecmwf_ifs025") -> dict[str, "WeatherIndex"] | None:
+    """One WeatherIndex per neighbouring area (se / no / dk / ee), points weighted equally."""
+    from src.data.open_meteo import POINT_AREAS
+    path = OUT_DIR / f"{model}_nordic.parquet"
+    if not path.exists():
+        return None
+    raw = pd.read_parquet(path)
+    raw["area"] = raw["point"].map(POINT_AREAS)
+    return {area: WeatherIndex(summarise_runs(g.drop(columns="area")))
+            for area, g in raw.groupby("area")}
+
+
 class WeatherIndex:
     """Runs x hourly matrix per variable, looked up by (origin, time) with linear interpolation."""
 
