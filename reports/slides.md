@@ -12,10 +12,11 @@
 * **Core Philosophy:** Predict **deviations from spot** driven by physical grid fundamentals, not black-box price guessing.
 * **Key Achievements:**
   * **38.1% MAE Error Reduction** vs. official baseline (40.97 vs. 66.20 €/MWh).
-  * **51.9% Calibration Loss Reduction** (Pinball: 11.63 vs. 24.18, 80.1% coverage).
+  * **52.0% Calibration Loss Reduction** (Pinball: 11.61 vs. 24.18, 80.1% coverage).
+  * **24.0% Spike Brier Reduction** (0.0860 vs. 0.1132, with zero-parameter Kolmogorov direction envelope).
   * **Anti-Overfit Equal-Weight Architecture:** Wins **9 out of 10 individual weeks** across both August (+6.81) and September (+6.35).
   * **Validated Official Submission:** 26,920 rows verified with zero errors, 100% TreeSHAP physical drivers.
-  * **Operational Situation Room:** Interactive UI with time travel, SHAP drivers, revision alerts, and asset recommendations.
+  * **Operational Situation Room:** Interactive UI with time travel, consensus monitoring, primary action window, and actuals audit.
 
 ---
 
@@ -68,9 +69,10 @@ $$\longrightarrow \text{mFRR Balancing Activation} \longrightarrow \text{Asymmet
 | **Dual-NWP + Learned Wind (v4_n50)** | 41.08 | 11.88 | 0.0871 | 0.3899 | -37.9% MAE, -50.9% Pinball |
 | **Grand Champion V1 (Static Fusion)** | 40.95 | 11.77 | 0.0865 | 0.3818 | -38.1% MAE, -51.3% Pinball |
 | **Grand Champion V2 (Horizon-Banded)** | 40.73 | 11.76 | 0.0862 | 0.3812 | Single-month Sep tuning (overfit signature: +5.85 on Aug) |
-| **🏆 GRAND CHAMPION FINAL (Anti-Overfit 50/50)** | **`40.97`** | **`11.63`** | **`0.0861`** | **`0.3803`** | **🏆 Best Overall (+6.81 on Aug, 9/10 wks won, 100% TreeSHAP)** |
+| **🏆 GRAND CHAMPION FINAL (Anti-Overfit 50/50)** | **`40.97`** | **`11.61`** | **`0.0860`** | **`0.3803`** | **🏆 Best Overall (+6.81 on Aug, 9/10 wks won, 100% TreeSHAP)** |
 
 * **Anti-Overfit Generalization:** Equal weighting of orthogonal models ($\frac{1}{2}$ Frank + $\frac{1}{2}$ Abdo) eliminates estimation variance (Clemen's theorem), beating tuned weights out-of-fold.
+* **Physical Direction Envelope (Law 1D):** Monotonicity envelope ($p_{\text{spike\_high}} \le p_{\text{up}}$, $p_{\text{spike\_low}} \le p_{\text{down}}$) eliminates 387 contradictions with zero tuned parameters.
 * **Short Horizon (Steps 1–4):** MAE drops to **36.25 €/MWh** (powered by Fingrid real-time nowcasting).
 * **Long Horizon (Steps 37–40):** Governed by dual-NWP (ECMWF + ICON-EU) 22-station wind power curve.
 
@@ -79,9 +81,10 @@ $$\longrightarrow \text{mFRR Balancing Activation} \longrightarrow \text{Asymmet
 ## Slide 6: Level 2 Situational Room & Operational Decision Support
 ### From Model Predictions to Real-World Dispatch Decisions
 * **Interactive Situation Room (`app/dashboard.py`):**
-  * Time-travel slider over historical origins.
+  * Time-travel slider over historical origins with real-time NWP vs telemetry consensus badge.
   * 10-hour probabilistic fan chart ($P_{10}$–$P_{90}$ 80% band, $P_{50}$ point forecast, spot anchor).
-  * Up/down balancing probability stack and tail spike risk heatmaps.
+  * **Primary Action Window Box:** Highlighted 1h–3h pre-gate closure zone (Steps 4–12) for trader bids.
+  * **Jury Verification Audit Mode:** Live overlay of realized actuals with window MAE & empirical coverage metrics.
 * **Targeted Asset Suggestions:**
   * **Naantali CHP Plant:** Early warning prompts during high-spike regimes ($P > 20\%$) to hold uncommitted upward reserve capacity.
   * **Power-to-Heat / Electric Boilers:** Dispatched during negative/low-price periods to absorb cheap surplus power and avoid down-regulation penalties.

@@ -77,12 +77,12 @@ Every feature group and architectural improvement was evaluated on the official 
 | **7. Dual-NWP + Learned Wind Curve (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread + 22-point wind map + Nordic P50. |
 | **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | 40.95 | 11.77 | 0.0865 | 0.3818 | Static 65/35 fusion beating initial teammate branches. |
 | **9. Grand Champion V2 (Horizon-Banded Ensemble)** | 40.73 | 11.76 | 0.0862 | 0.3812 | Single-month tuning on September (overfit signature: collapsed on August +5.85). |
-| **10. Grand Champion Final (Anti-Overfit 50/50 + TreeSHAP)** | **`40.97`** | **`11.63`** | **`0.0861`** | **`0.3803`** | **🏆 Winning Model (Equal-weight prior; +6.81 on Aug, 9/10 weeks won, 100% TreeSHAP drivers).** |
+| **10. Grand Champion Final (Anti-Overfit 50/50 + TreeSHAP)** | **`40.97`** | **`11.61`** | **`0.0860`** | **`0.3803`** | **🏆 Winning Model (Equal-weight prior + Kolmogorov spike envelope; +6.81 on Aug, 9/10 weeks won, 100% TreeSHAP drivers).** |
 
 ### Net Score Improvement Over Baseline:
 * **Accuracy (MAE):** Reduced by **25.23 €/MWh (-38.11%)**
-* **Calibration (Pinball):** Reduced by **12.55 (-51.90%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-23.94%**
+* **Calibration (Pinball):** Reduced by **12.57 (-51.99%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-24.03%** (0.0860 vs 0.1132)
 * **Balancing Direction (Brier):** Improved by **-15.66%**
 * **Interval Coverage:** Calibrated to **80.1%** (exact competition target 80.0%)
 * **Out-of-Sample Stability:** Highest total score on both September (+6.35) and August (+6.81) across 9/10 weeks.
