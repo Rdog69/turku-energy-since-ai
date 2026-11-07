@@ -1,6 +1,7 @@
 import { Factory, Info, LayoutDashboard, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
 import { PAYLOAD, PERIOD_IDS } from "@/lib/model";
 import { Tip } from "./Bits";
+import { Logo } from "./Logo";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/time";
 
@@ -19,7 +20,7 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
   return (
     <aside className="flex flex-col gap-8 bg-bank px-5 py-6 text-bank-ink lg:sticky lg:top-0 lg:h-screen lg:w-[244px] lg:shrink-0">
       <div>
-        <p className="text-[26px] font-bold leading-none tracking-[-0.01em] text-white">Tasehinta</p>
+        <p className="flex items-center gap-2.5 text-[26px] font-bold leading-none tracking-[-0.01em] text-white"><Logo />Tasehinta</p>
         <p className="mt-1.5 text-[14px] text-bank-ink2">{t(lang, "tagline")}</p>
       </div>
 
