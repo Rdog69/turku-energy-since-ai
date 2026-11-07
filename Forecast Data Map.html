@@ -1,0 +1,255 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Forecast Data Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,500..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a grid-operator coverage map. One wide timeline (datasets x months) with fold windows as bands, then a model-by-dataset matrix. */
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --ink: #14212b; --muted: #5a6a76; --line: #d8e0e6; --line-strong: #9aabb8;
+  --band: #e7eef3; --band-test: #f8e7c4; --band-ink: #3d5566;
+  --core: #1d5d8f; --frank: #6b4fb5; --new: #c98410; --pending: #2a8a82; --dropped: #b45f58; --unused: #b9c4cc;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e161c; --surface: #15202a; --ink: #e3ebf0; --muted: #93a4b0; --line: #2a3a46; --line-strong: #56697a;
+  --band: #1b2933; --band-test: #3b3017; --band-ink: #a9bccb;
+  --core: #5da4da; --frank: #a68ce8; --new: #eeb03e; --pending: #4fbdb2; --dropped: #d98a83; --unused: #4c5c67;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e161c; --surface: #15202a; --ink: #e3ebf0; --muted: #93a4b0; --line: #2a3a46; --line-strong: #56697a;
+  --band: #1b2933; --band-test: #3b3017; --band-ink: #a9bccb;
+  --core: #5da4da; --frank: #a68ce8; --new: #eeb03e; --pending: #4fbdb2; --dropped: #d98a83; --unused: #4c5c67;
+  color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.5 }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 40px }
+header { display: grid; gap: 14px }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+h1 { font-family: var(--f-display); font-stretch: 82%; font-weight: 800; font-size: clamp(34px, 6vw, 56px); line-height: 1; margin: 0; letter-spacing: -.01em; text-wrap: balance }
+.lede { margin: 0; max-width: 66ch; color: var(--muted); font-size: 16px }
+.stats { display: flex; flex-wrap: wrap; gap: 12px 36px; margin-top: 6px }
+.stat { display: grid; gap: 2px }
+.stat b { font-family: var(--f-display); font-stretch: 90%; font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.1 }
+.stat span { font-size: 13px; color: var(--muted) }
+h2 { font-family: var(--f-display); font-stretch: 88%; font-weight: 700; font-size: 22px; margin: 0; text-wrap: balance }
+.sec { display: grid; gap: 14px }
+.sec > p { margin: 0; color: var(--muted); max-width: 70ch }
+
+/* legend */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px }
+.legend span { display: inline-flex; align-items: center; gap: 8px }
+.sw { width: 22px; height: 10px; border-radius: 2px; display: inline-block; flex: none }
+
+/* timeline */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px }
+.scroll { overflow-x: auto }
+.tl { min-width: 860px; display: grid; grid-template-columns: 270px 1fr; font-size: 13px }
+.lab { position: sticky; left: 0; z-index: 2; background: var(--surface); padding: 6px 14px 6px 16px; border-right: 1px solid var(--line); min-width: 0 }
+.lab .n { font-weight: 600; line-height: 1.25 }
+.lab .d { color: var(--muted); font-size: 12px; line-height: 1.3 }
+.trk { position: relative; min-height: 46px; border-bottom: 1px solid var(--line) }
+.lab.row { border-bottom: 1px solid var(--line) }
+.grp { grid-column: 1 / -1; display: grid; grid-template-columns: 270px 1fr }
+.grp .lab { font-family: var(--f-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 14px; padding-bottom: 4px; border-bottom: 1px solid var(--line) }
+.grp .trk { min-height: 0; border-bottom: 1px solid var(--line) }
+.band { position: absolute; top: 0; bottom: 0; background: var(--band) }
+.band.test { background: var(--band-test) }
+.ev { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--line-strong) }
+.bar { position: absolute; top: 50%; height: 14px; margin-top: -7px; border-radius: 3px; outline-offset: 2px }
+.bar:focus-visible { outline: 2px solid var(--ink) }
+.s-core { background: var(--core) } .s-frank { background: var(--frank) } .s-new { background: var(--new) }
+.s-dropped { background: var(--dropped) } .s-unused { background: var(--unused) }
+.s-pending { background: repeating-linear-gradient(135deg, var(--pending) 0 4px, transparent 4px 8px); box-shadow: inset 0 0 0 1.5px var(--pending) }
+.axis .trk { min-height: 64px; border-bottom: 1px solid var(--line-strong) }
+.axis .lab { display: flex; align-items: flex-end; font-family: var(--f-mono); font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--line-strong) }
+.tick { position: absolute; bottom: 0; height: 6px; border-left: 1px solid var(--line-strong) }
+.mo { position: absolute; bottom: 8px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); transform: translateX(3px) }
+.yr { position: absolute; bottom: 24px; font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--ink); transform: translateX(3px) }
+.fl { position: absolute; top: 6px; font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--band-ink); white-space: nowrap }
+.evrow .trk { min-height: 34px }
+.evrow .lab { font-family: var(--f-mono); font-size: 11px; color: var(--muted); display: flex; align-items: center }
+.evl { position: absolute; top: 9px; font-size: 12px; color: var(--muted); white-space: nowrap; padding-left: 6px }
+.note { font-size: 13px; color: var(--muted); margin: 0 }
+
+/* matrix */
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14px }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top }
+thead th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--line-strong) }
+thead th .chip { margin-right: 6px }
+tbody th { font-weight: 600; width: 26% }
+td { color: var(--ink) }
+td.no { color: var(--muted) }
+.chip { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px }
+.yes::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: currentColor }
+.c-core { color: var(--core) } .c-frank { color: var(--frank) } .c-new { color: var(--new) }
+.yes span { color: var(--ink) }
+tr.period td, tr.period th { background: var(--bg); font-variant-numeric: tabular-nums }
+.foot { font-size: 13px; color: var(--muted); max-width: 80ch; margin: 0 }
+@media (max-width: 640px) {
+  .tl, .grp { grid-template-columns: 170px 1fr }
+  .lab .d { display: none }
+  .trk { min-height: 38px }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Turku Energia · imbalance-price forecast · as of Sat 7 Nov 2026</div>
+    <h1>Forecast Data Map</h1>
+    <p class="lede">Every dataset we have downloaded: the period it covers, which model reads it, and which ones we tested and dropped. The shaded columns are the windows we score on.</p>
+    <div class="stats">
+      <div class="stat"><b>19</b><span>datasets on the map</span></div>
+      <div class="stat"><b>9</b><span>feed the current submission (team5050)</span></div>
+      <div class="stat"><b>119k → 556k</b><span>training rows with the history added today</span></div>
+      <div class="stat"><b>15 months</b><span>of extra history (Mar 2025 – May 2026)</span></div>
+    </div>
+  </header>
+
+  <section class="sec" aria-labelledby="h-cov">
+    <h2 id="h-cov">Coverage over time</h2>
+    <div class="legend" id="legend"></div>
+    <div class="panel scroll"><div class="tl" id="tl"></div></div>
+    <p class="note">Bands: <b>C</b> = 5 Oct – 1 Nov 2025 (last year's test weeks, new today) · <b>B</b> = August 2026 · <b>A</b> = 7 Sep – 4 Oct 2026 (organisers' validation) · <b>Test</b> = 5 Oct – 1 Nov 2026. Hover or tab to a bar for its dates.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="h-mx">
+    <h2 id="h-mx">What each model reads</h2>
+    <p>team5050 is ½ our model + ½ Frank's. The history model is the one running on the laptop now: in September and August, ½ Frank + ½ history model beats team5050 on every score except one tie.</p>
+    <div class="panel scroll">
+      <table>
+        <thead><tr>
+          <th scope="col">Dataset</th>
+          <th scope="col"><span class="chip" style="background:var(--core)"></span>Our half · P2 INT4+ss</th>
+          <th scope="col"><span class="chip" style="background:var(--frank)"></span>Frank's half · v4_n50</th>
+          <th scope="col"><span class="chip" style="background:var(--new)"></span>New history model</th>
+        </tr></thead>
+        <tbody id="mx"></tbody>
+      </table>
+    </div>
+    <p class="foot">Every row of every source is used only after its <code>first_usable_origin_utc</code>, and every feature passes the leak check. Nord Pool spot prices stay inside the team. ENTSO-E neighbour prices are in the package but no feature uses them yet: they arrive about 2.6 h late and have no history before June.</p>
+  </section>
+</div>
+
+<script>
+const T0 = Date.parse("2025-03-01T00:00Z"), T1 = Date.parse("2026-11-08T00:00Z");
+const pct = d => ((Date.parse(d + "T00:00Z") - T0) / (T1 - T0) * 100);
+const STATUS = {
+  core: "In team5050 · our half",
+  frank: "In team5050 · Frank's half",
+  new: "New history model (added today)",
+  pending: "Downloaded · result pending (LUMI)",
+  dropped: "Tested, not kept",
+  unused: "Downloaded, not used yet",
+};
+const FOLDS = [["C", "2025-10-05", "2025-11-01"], ["B", "2026-08-01", "2026-08-31"], ["A", "2026-09-07", "2026-10-04"], ["Test", "2026-10-05", "2026-11-01", "test"]];
+const EVENTS = [["2025-03-04", "Nordic mFRR market live"], ["2025-10-01", "15-min day-ahead"], ["2026-06-01", "New price rule · package starts"]];
+const P = ["2026-06-01", "2026-11-02"];
+const LA = [["2025-09-01", "2025-12-01"], ["2026-05-25", "2026-11-02"]];
+const G = [
+  ["Starter package (organisers)", [
+    ["Fingrid market series", "imbalance price, mFRR/aFRR prices and volumes, direction, flows, day-ahead forecasts", [[...P, "core"]]],
+    ["Nord Pool spot", "day-ahead price, known D-1 14:00", [[...P, "core"]]],
+    ["ENTSO-E neighbour series", "SE1/SE3/EE imbalance prices, load forecasts, capacities", [[...P, "unused"]]],
+  ]],
+  ["Fingrid Open Data (our downloads)", [
+    ["Market series back to Mar 2025", "same 17 series, identical on the overlap · team5050's history direction blend", [["2025-03-01", "2026-06-01", "core"]]],
+    ["Real-time 3-min data", "198 imbalance, 181 wind, nuclear, hydro, frequency", [["2025-03-01", "2026-05-25", "new"], ["2026-05-25", "2026-11-02", "core"]]],
+    ["aFRR volumes (349/350)", "needed to rebuild the old prices", [["2025-03-01", "2026-06-01", "new"]]],
+    ["Balancing-market internals", "mFRR need, bid volumes, exchange, scheduled vs direct", [["2026-05-25", "2026-11-02", "pending"]]],
+    ["Real-time batch 2", "electric boilers, CHP, border flows · slightly worse in ours", [["2026-05-29", "2026-11-02", "frank"]]],
+    ["Extra series", "BRP plans, wind capacity, bid sum, last-bid prices (need approval)", LA.map(s => [...s, "unused"])],
+  ]],
+  ["Prices rebuilt for history (today)", [
+    ["Spot from Elering", "Nord Pool prices · identical to the package on 14,824 quarters", [["2025-03-01", "2026-06-01", "new"]]],
+    ["Imbalance price, June 2026 rule", "rebuilt from mFRR/aFRR · 99.5 % exact on Jun–Oct 2026", [["2025-03-01", "2026-06-01", "new"]]],
+  ]],
+  ["Weather", [
+    ["ECMWF IFS forecast runs", "wind revision vs the day-ahead forecast", [["2025-03-01", "2026-05-25", "new"], ["2026-05-25", "2026-11-04", "core"]]],
+    ["ICON-EU forecast runs", "second weather model · our raw version hurt August", [["2026-05-25", "2026-11-04", "frank"]]],
+    ["Frank's weather points", "22 points, Nordic wind, OpenStreetMap turbine weights", [["2026-05-25", "2026-11-05", "frank"]]],
+    ["FMI station observations", "measured coastal wind and temperature", LA.map(s => [...s, "dropped"])],
+    ["ERA5 reanalysis", "actual weather, ~5 days late · fitting only", LA.map(s => [...s, "unused"])],
+  ]],
+  ["Outages and neighbours", [
+    ["Nord Pool outage messages", "UMM · no gain on both folds", LA.map(s => [...s, "dropped"])],
+    ["Elering (Estonia)", "system balance · weak, hurts August", LA.map(s => [...s, "dropped"])],
+    ["Energinet (Denmark)", "aFRR activation, DK–SE exchange · weak", LA.map(s => [...s, "dropped"])],
+  ]],
+];
+const fmt = d => new Date(d + "T00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h != null) e.innerHTML = h; return e; };
+
+function backdrop(trk, labels) {
+  for (const [n, a, b, k] of FOLDS) {
+    const d = el("div", "band" + (k ? " test" : "")); d.style.left = pct(a) + "%"; d.style.width = (pct(b) - pct(a)) + "%"; trk.appendChild(d);
+    if (labels) { const l = el("div", "fl", n); l.style.left = `calc(${pct(a)}% + 3px)`; trk.appendChild(l); }
+  }
+  for (const [d] of EVENTS) { const v = el("div", "ev"); v.style.left = pct(d) + "%"; trk.appendChild(v); }
+}
+
+const tl = document.getElementById("tl");
+// axis row
+const ax = el("div", "grp axis"); const axl = el("div", "lab", "dataset"); const axt = el("div", "trk");
+backdrop(axt, true);
+for (let y = 2025, m = 2; ; m++) {
+  if (m > 11) { m = 0; y++; }
+  const d = `${y}-${String(m + 1).padStart(2, "0")}-01`; if (Date.parse(d) >= T1) break;
+  const t = el("div", "tick"); t.style.left = pct(d) + "%"; axt.appendChild(t);
+  const mo = el("div", "mo", "JFMAMJJASOND"[m]); mo.style.left = pct(d) + "%"; axt.appendChild(mo);
+  if (m === 0 || d === "2025-03-01") { const yr = el("div", "yr", y); yr.style.left = pct(d) + "%"; axt.appendChild(yr); }
+}
+ax.append(axl, axt); tl.appendChild(ax);
+// event row
+const er = el("div", "grp evrow"); const erl = el("div", "lab", "market changes"); const ert = el("div", "trk");
+backdrop(ert, false);
+for (const [d, t] of EVENTS) { const l = el("div", "evl", t); l.style.left = pct(d) + "%"; ert.appendChild(l); }
+er.append(erl, ert); tl.appendChild(er);
+
+let used = 0;
+for (const [g, rows] of G) {
+  const gr = el("div", "grp"); const gl = el("div", "lab", g); const gt = el("div", "trk"); backdrop(gt, false);
+  gr.append(gl, gt); tl.appendChild(gr);
+  for (const [n, desc, segs] of rows) {
+    const lab = el("div", "lab row"); lab.append(el("div", "n", n), el("div", "d", desc));
+    const trk = el("div", "trk"); backdrop(trk, false);
+    for (const [a, b, s] of segs) {
+      const bar = el("div", "bar s-" + s); bar.style.left = pct(a) + "%"; bar.style.width = (pct(b) - pct(a)) + "%";
+      bar.tabIndex = 0; bar.title = `${n}: ${fmt(a)} – ${fmt(b)} · ${STATUS[s]}`; bar.setAttribute("aria-label", bar.title);
+      trk.appendChild(bar);
+    }
+    tl.append(lab, trk);
+  }
+}
+const lg = document.getElementById("legend");
+for (const [k, v] of Object.entries(STATUS)) { const s = el("span"); s.append(el("i", "sw s-" + k), document.createTextNode(v)); lg.appendChild(s); }
+
+const MX = [
+  ["Starter package (Fingrid series, spot, calendar)", ["Yes", "Yes", "Yes, plus the history version"]],
+  ["Fingrid real-time 3-min data", ["Yes, all horizons", "Yes, hours 1–2 only", "Yes, from Mar 2025"]],
+  ["Fingrid history (Mar 2025 – May 2026)", ["A direction model fitted on it, blended in at 60 %", null, "Directly as training rows"]],
+  ["Elering spot + rebuilt imbalance price", [null, null, "Yes (the history targets)"]],
+  ["ECMWF IFS runs", ["Wind revision (wind_hat)", "14 points weighted by installed capacity", "Next run (INT4, started 13:40)"]],
+  ["ICON-EU runs", [null, "Wind index, revision, ECMWF disagreement", null]],
+  ["Nordic wind (SE, NO, DK, EE)", [null, "Median only", null]],
+  ["Real-time batch 2 (boilers, CHP, flows)", [null, "Hours 1–2", null]],
+  ["Market-era flags", [null, null, "15-min day-ahead, June 2026 price rule"]],
+];
+const COLS = ["c-core", "c-frank", "c-new"];
+const mx = document.getElementById("mx");
+for (const [n, cells] of MX) {
+  const tr = el("tr"); tr.appendChild(el("th", "", n)); tr.lastChild.scope = "row";
+  cells.forEach((c, i) => { const td = c ? el("td", "yes " + COLS[i], `<span>${c}</span>`) : el("td", "no", "—"); tr.appendChild(td); });
+  mx.appendChild(tr);
+}
+const pr = el("tr", "period"); pr.innerHTML = `<th scope="row">Training period</th><td>2 Jun – 4 Oct 2026 (4 months)</td><td>Jun – Oct 2026</td><td>5 Mar 2025 – 4 Oct 2026 (19 months)</td>`;
+mx.appendChild(pr);
+</script>
+
+</body></html>
