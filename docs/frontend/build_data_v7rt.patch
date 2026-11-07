@@ -1,5 +1,5 @@
 diff --git a/frontend/scripts/build_data.py b/frontend/scripts/build_data.py
-index 7fb1663..7d145a7 100644
+index 7fb1663..583c008 100644
 --- a/frontend/scripts/build_data.py
 +++ b/frontend/scripts/build_data.py
 @@ -5,7 +5,8 @@
@@ -8,7 +8,7 @@ index 7fb1663..7d145a7 100644
      (first_usable_origin_utc), so the page can show only what was known at the review time;
 -  * every hourly forecast (40 quarter-hours): the submitted 50/50 blend of Frank's v4_n50 and our history model,
 +  * every hourly forecast (40 quarter-hours): the submitted blend (1/2 Frank's v7_rt + 1/2 our h_int4ss, P90 stretched
-+    x1.15 away from P50, see Frank's submissions/MANIFEST.md),
++    x1.15 away from P50, spike probabilities capped by the matching direction; see Frank's submissions/MANIFEST.md),
      plus both members' median and direction, so disagreements can be flagged;
    * alerts per forecast hour (spike risk, direction, material change, model conflict, wide uncertainty).
  """
@@ -29,12 +29,13 @@ index 7fb1663..7d145a7 100644
  
  
  def load_member(path: Path) -> pd.DataFrame:
-@@ -48,12 +52,13 @@ def load_member(path: Path) -> pd.DataFrame:
+@@ -48,17 +52,21 @@ def load_member(path: Path) -> pd.DataFrame:
  
  
  def blend(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
 -    """The submission's 50/50 blend (same rules as experiments/lab/combine.py)."""
-+    """The submission's blend: 50/50 (same rules as experiments/lab/combine.py), then P90 stretched by P90_STRETCH."""
++    """The submission's blend: 50/50 (same rules as experiments/lab/combine.py), then P90 stretched by P90_STRETCH
++    and the spike probabilities capped by the matching direction (p_spike_high <= p_up, p_spike_low <= p_down)."""
      out = a[["origin", "step"]].copy()
      for c in COLS:
          out[c] = (a[c].to_numpy(float) + b[c].to_numpy(float)) / 2
@@ -44,12 +45,19 @@ index 7fb1663..7d145a7 100644
      s = out[["p_up", "p_down", "p_none"]].clip(0, 1)
      s = s.div(s.sum(axis=1), axis=0)
      out["p_up"], out["p_down"], out["p_none"] = s["p_up"], s["p_down"], s["p_none"]
-@@ -172,7 +177,7 @@ def main():
+     sl = np.maximum(out.p_spike_high + out.p_spike_low, 1.0)
+     out["p_spike_high"], out["p_spike_low"] = out.p_spike_high / sl, out.p_spike_low / sl
++    out["p_spike_high"] = np.minimum(out["p_spike_high"], out["p_up"])
++    out["p_spike_low"] = np.minimum(out["p_spike_low"], out["p_down"])
+     return out
+ 
+ 
+@@ -172,7 +180,7 @@ def main():
      L = L[L.series_id.isin(["fi_spot_price", "fi_imbalance_price", "fi_mfrr_direction"])].copy()
      L["ts"] = pd.to_datetime(L.timestamp_utc, utc=True)
      L["fu"] = pd.to_datetime(L.first_usable_origin_utc, utc=True)
 -    payload = {"generated": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"), "model": "team_hist",
-+    payload = {"generated": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"), "model": "v7_rt + h_int4ss, P90 x1.15",
++    payload = {"generated": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"), "model": "v7_rt + h_int4ss, P90 x1.15, spike cap",
                 "periods": {}}
      for pid, cfg in PERIODS.items():
          p = period_payload(pid, cfg, L)

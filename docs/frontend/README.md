@@ -20,16 +20,16 @@ Our `v7_rt` files fit as they are:
 - `top_drivers` is filled on every row (1,657 / 1,495 distinct combinations);
 - its own 50/50 `blend()` reproduces `submissions/blend_v7_rt_h_int4ss_*.csv` exactly.
 
-The one gap: the candidate now stretches P90 ×1.15 away from P50 (`submissions/MANIFEST.md`), which `blend()` doesn't do. Unpatched, the dashboard's upper band would be up to 43 €/MWh lower than the submitted forecast.
+The gaps: the candidate now stretches P90 ×1.15 away from P50 and caps each spike probability by its direction (`p_spike_high ≤ p_up`, `p_spike_low ≤ p_down`; `submissions/MANIFEST.md`). `blend()` does neither. Unpatched, the dashboard's upper band would be up to 43 €/MWh lower than the submitted forecast, and some spike risks up to 0.23 higher.
 
 ## The patch
 
 [`build_data_v7rt.patch`](build_data_v7rt.patch) changes only `frontend/scripts/build_data.py`:
 1. The `frank` member points at `external_data/_frank/v7_rt_{validation,test}.csv`.
-2. `blend()` applies `P90_STRETCH = 1.15` after re-sorting the quantiles.
-3. The payload's model label becomes `v7_rt + h_int4ss, P90 x1.15`.
+2. `blend()` applies `P90_STRETCH = 1.15` after re-sorting the quantiles, then the spike cap.
+3. The payload's model label becomes `v7_rt + h_int4ss, P90 x1.15, spike cap`.
 
-With it, the blend matches `submissions/blend_hi15_validation.csv` and `blend_hi15_test.csv` exactly: the dashboard then shows the forecast we submit.
+With it, the blend matches `submissions/blend_hi15_env_validation.csv` and `blend_hi15_env_test.csv` exactly: the dashboard then shows the forecast we submit.
 
 ```bash
 git show origin/brainstorming-frank:submissions/v7_rt_validation.csv > external_data/_frank/v7_rt_validation.csv

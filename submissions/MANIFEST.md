@@ -2,9 +2,27 @@
 
 The exact files behind every number we report, so anyone can check them.
 
-## Team candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`, P90 stretched ×1.15
+## Team candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`, P90 stretched ×1.15, spike probabilities capped by direction
 
-The best model on the team scoreboard: 32.9 % better than the organisers' baseline, weighted by points and averaged over September (36.7 %) and August (29.1 %).
+The best model on the team scoreboard: 33.0 % better than the organisers' baseline, weighted by points and averaged over September (36.9 %) and August (29.1 %).
+
+| | |
+|---|---|
+| Recipe | The P90-stretched blend below, then `p_spike_high = min(p_spike_high, p_up)` and `p_spike_low = min(p_spike_low, p_down)` (`submissions/tools/spike_envelope.py`) |
+| Why | A high spike (price > spot + 50) comes with up-regulation (Sep 324/324, Aug 308/312), a low one with down-regulation (Sep 338/346, Aug 195/197). No parameter fitted. Idea from Jim's branch (experiment E09) |
+| Effect | Spike Brier 0.08403 → 0.08348 (Sep, 3/4 weeks better), 0.06483 → 0.06481 (Aug, 3/5 weeks). Everything else identical |
+
+| File | Period | SHA-256 | Score (organisers' `score.py` 0.1.1): MAE / pinball / spike Brier / direction Brier |
+|---|---|---|---|
+| `blend_hi15_env_validation.csv` | 7 Sep – 4 Oct 2026 | `7f66c536a3442c8a9d81950b3257b2c51be820baea1303c384d78490ab2e8241` | 40.1938 / 11.0270 / 0.0835 / 0.3799 (coverage 0.835) |
+| `blend_hi15_env_august.csv` | August 2026 | `796c2008a0e102ef37e61bd4fc2c1c3099101a1449300294b04f4fbd4a1e0705` | 27.0461 / 6.1530 / 0.0648 / 0.4202 (coverage 0.853) |
+| `blend_hi15_env_test.csv` | 5 Oct – 1 Nov 2026 (the submission) | `ea0198491c78417c2823736aeea44fbc72ecff501b9566ba5aa817e9560b3b57` | Not scored by us. `validate_submission.py`: 26,920 rows, 0 errors, 0 warnings |
+
+To submit, rename `blend_hi15_env_test.csv` to `forecast_backtest.csv`; the bytes must keep the hash above.
+
+## Previous candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss`, P90 stretched ×1.15
+
+32.9 % better than the organisers' baseline, weighted by points and averaged over September (36.7 %) and August (29.1 %).
 
 | | |
 |---|---|
@@ -18,9 +36,9 @@ The best model on the team scoreboard: 32.9 % better than the organisers' baseli
 | `blend_hi15_august.csv` | August 2026 | `7ccabb306f01f4fdc7a71edd124f093cf63cd8aa3dba584d58cb1bae90c9a2ff` | 27.0461 / 6.1530 / 0.0648 / 0.4202 (coverage 0.853) |
 | `blend_hi15_test.csv` | 5 Oct – 1 Nov 2026 (the submission) | `cfc5066113e107a7387f52073a93e1eeb99a09de5c6649f087212c7cd792779c` | Not scored by us. `validate_submission.py`: 26,920 rows, 0 errors, 0 warnings |
 
-To submit, rename `blend_hi15_test.csv` to `forecast_backtest.csv`; the bytes must keep the hash above.
+Fallback 1: rename `blend_hi15_test.csv` to `forecast_backtest.csv`; the bytes must keep the hash above.
 
-## Previous candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss` (no stretch)
+## Older candidate: ½ `v7_rt` + ½ Abdo's `h_int4ss` (no stretch)
 
 32.8 % better than the baseline (September 36.7 %, August 29.0 %).
 
