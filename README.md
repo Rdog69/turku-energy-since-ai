@@ -10,10 +10,30 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 
 💡 **Brainstorm and plan review:** [`brainstorm/00 Brainstorm Hub.md`](brainstorm/00%20Brainstorm%20Hub.md) has feedback on the plan, risks, and ideas per role (draft, not yet in the plan).
 
+📊 **Dashboard:** VAAKA, the situation room built with Lovable. The published preview runs on demo data with a synthetic spot price; real Nord Pool data stays local.
+
+---
+
+## Results at a glance
+
+Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (lower is better):
+
+| Metric | Points | Baseline | **Our model** | Improvement |
+|---|---|---|---|---|
+| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **40.67** | **−39 %** |
+| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.19** | **−54 %** |
+| Exceptional prices: Brier score | 20 | 0.1132 | **0.0856** | **−24 %** |
+| Direction: three-class Brier score | 10 | 0.4509 | **0.3892** | **−14 %** |
+| P10–P90 coverage (target 80 %) | – | 0.68 | **0.77** | slightly narrow |
+
+**Weighted by the points (30/20/20/10), the model is 35.7 % better than the organisers' baseline** (MAE alone: 38.6 %). It's better in every one of the 4 validation weeks, on all four metrics. About 37 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July plus the pre-June history) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
+
 ---
 
 ## Contents
 
+- [Results at a glance](#results-at-a-glance)
+- [The model](#the-model)
 - [The problem](#the-problem)
 - [The challenge](#the-challenge)
 - [Data](#data)
@@ -27,6 +47,79 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 - [Timeline](#timeline)
 - [Rules and licensing](#rules-and-licensing)
 - [Team](#team)
+
+---
+
+## The model
+
+**Idea in one line:** the imbalance price is the day-ahead spot price plus a jump up or down. Spot is known in advance, so we forecast **the jump** (the gap to spot), its uncertainty, and the chance that it's up, down or exceptionally large.
+
+### How it's built
+
+1. **Spot anchor.** Predicting "spot + a typical gap" alone cuts the baseline's error by a third. The baseline repeats the last known imbalance price, which is already over an hour old when it becomes usable.
+2. **Gradient-boosted trees (LightGBM).** These models predict:
+   - the gap's 10th, 50th and 90th percentiles (quantile regression)
+   - the chance of up-regulation
+   - the chance of an exceptionally high or low price, each *given* the direction (`P(up) × P(gap > 50 | up)`). That keeps the probabilities consistent with each other.
+
+   The trees are small and slow-learning (15 leaves, at least 800 rows per leaf). We picked those settings on three training-only folds, not on the validation month.
+3. **Two models by horizon.**
+   - **Hours 1–2:** a model that also sees fresh real-time grid data.
+   - **Hours 3–10:** a model without it, because fresh data turns into noise after about 2 hours.
+4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from. The spike correction is shrunk when those 28 days held few spikes, so a quiet month can't switch the spike warnings off.
+5. **5-seed averaging.** Each model is trained five times with different random seeds and averaged, for steadier forecasts.
+6. **Neighbour wind for the median only.** A twin model that also sees wind in Sweden, Norway, Denmark and Estonia supplies the median (P50). In both September and August that improved the median but made the uncertainty band worse, so the band and the probabilities come from the model without it.
+7. **15 months of history before June.** The trees also learn from March 2025 – May 2026, not just from June onwards. The organisers allow pre-June data (Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
+   - The pricing rule changed on 1 June 2026, so the older imbalance prices are recomputed with the new volume-weighted rule.
+   - A flag tells the model which rule a row was priced under.
+   - It improved both September and August, most of all the uncertainty band (pinball −6 %).
+
+### What it looks at
+
+| Group | Inputs | Source |
+|---|---|---|
+| Known a day ahead | Spot price, spot ramps, day-ahead wind, solar and consumption forecasts, calendar | Starter package |
+| Recent state | Latest gap and regulation direction, plus their 1, 2 and 4-hour averages; mFRR volumes, cross-border flows, neighbour imbalance prices | Starter package |
+| Weather revision | How the newest ECMWF run's wind differs from the run the day-ahead forecast was based on, at 14 points weighted by **installed wind capacity**; temperature; icing risk | Open-Meteo Single Runs + OpenStreetMap turbines |
+| Second weather model | DWD ICON-EU's wind, its revision since the day-ahead forecast, and how far it disagrees with ECMWF | Open-Meteo Single Runs |
+| Learned wind production | Wind production predicted from all 22 weather points, with weights fitted to Fingrid's measured output; its gap to the day-ahead forecast and its revision | Open-Meteo + Fingrid real-time (fit on training data only) |
+| Neighbouring countries (median only) | ECMWF wind and its revision at 12 points in Sweden, Norway, Denmark and Estonia | Open-Meteo Single Runs |
+| Grid right now (hours 1–2) | Measured wind vs. forecast, grid frequency, nuclear changes, hydro, electric boilers, net import, CHP, flows | Fingrid real-time API |
+| History (training only) | The package's Fingrid series and spot price for Mar 2025 – May 2026, with the imbalance price recomputed under the June 2026 rule | Fingrid Open Data + Elering; table built by Abdo's `build_history.py` |
+
+**No data from the future.** Every row is used only after its `first_usable_origin_utc`, including our own sources. Leakage tests (`python -m pytest`) rebuild features after deleting every not-yet-published row and require identical results. The details and assumed publication delays are in [`SOURCES.md`](SOURCES.md).
+
+### What each step added (validation)
+
+| Step | MAE | Pinball | Spikes | Direction |
+|---|---|---|---|---|
+| Baseline (persistence) | 66.20 | 24.18 | 0.1132 | 0.4509 |
+| Spot + constant gap | 44.29 | 14.99 | 0.1132 | 0.4508 |
+| + LightGBM, calibration, direction-aware spikes | 43.22 | 12.44 | 0.0939 | 0.4148 |
+| + weather revision | 43.08 | 12.19 | 0.0932 | 0.4088 |
+| + Fingrid real-time for hours 1–2 (two-model split) | 42.53 | 12.09 | 0.0921 | 0.4011 |
+| + more real-time series, 5 seeds, 28-day calibration | 42.38 | 12.01 | 0.0905 | 0.3938 |
+| + capacity-weighted weather | 42.34 | 12.06 | 0.0900 | 0.3908 |
+| + smaller, slower trees and 4-hour memory | 41.68 | 11.90 | 0.0880 | 0.3888 |
+| + second weather model, ICON-EU | 41.31 | 11.88 | 0.0873 | 0.3902 |
+| + neighbour wind for the median only | 41.21 | 11.88 | 0.0873 | 0.3902 |
+| + steadier spike calibration, learned wind production | 41.08 | 11.88 | 0.0871 | 0.3899 |
+| **+ 15 months of pre-June history, with a pricing-rule flag (final)** | **40.67** | **11.19** | **0.0856** | **0.3892** |
+
+On August (trained on June–July plus the pre-June history) the final model scores 27.74 / 6.59 / 0.0680 / 0.4388. That's 3.1 % better than the model without history, weighted by points, with the band better in all 5 weeks.
+
+Tried and left out, because they didn't win in both September and August:
+- neighbour wind for the band (it stays in the median);
+- a separate model for the first hour;
+- solar and temperature revisions at 8 towns.
+
+The details are in [`docs/RESULTS.md`](docs/RESULTS.md).
+
+### Around the forecast
+
+- **Drivers:** `top_drivers` comes from the model's own SHAP values.
+- **Briefings:** a short LLM briefing per hour (Qwen2.5-32B on Featherless). It's built from facts only: no spot prices are sent, every number must appear in the facts, and wind direction is checked.
+- **Alerts:** an n8n workflow relays alerts when a high-severity situation is coming in the next 3 hours.
 
 ---
 
@@ -83,7 +176,7 @@ Future forecasts can't be scored during the weekend, so we forecast the test per
 | ↳ Validation | 7 Sep – 4 Oct | Part of training, used for our own scoring |
 | **Test** | **5 Oct – 1 Nov** | **673 forecast origins**, scored by the organisers |
 
-The 673 origins run from `2026-10-04T21:00:00Z` to `2026-11-01T21:00:00Z`. **All timestamps are UTC.**
+The 673 origins run from `2026-10-04T21:00:00Z` to `2026-11-01T21:00:00Z`. **All timestamps are UTC.** Pre-June aFRR and mFRR data may also be used for training, but older realised imbalance prices aren't comparable because the pricing rule changed (organisers' Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
 
 ## Data
 
@@ -213,24 +306,35 @@ python -m src.backtest.run --period test --model spot_anchor
 
 Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
 
-The current best model is `split_all`, which needs the two external data tables. They're committed in `external_data/`, so no download is needed. To refresh them:
+The submitted model is `v6_hf`:
+
+```bash
+python -m src.backtest.run --period test --model v6_hf
+```
+
+It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
+
+It also needs the pre-June history: `external_data/history/pkg_history.parquet` or `pkg_history.csv.gz`, built by `experiments/lab/build_history.py` on the `brainstorming-abdo` branch. It isn't committed here, because it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only). To refresh the tables:
 
 ```bash
 python -m src.data.fingrid
 ```
 
-Downloads Fingrid real-time wind, nuclear, frequency and consumption. Needs `FINGRID_API_KEY` in `.env`.
+Downloads the Fingrid real-time series. Needs `FINGRID_API_KEY` in `.env`.
 
 ```bash
-python -m src.data.open_meteo
+python -m src.data.open_meteo --pause 5.5
+python -m src.data.open_meteo --points extra --pause 5.5
+python -m src.data.open_meteo --model icon_eu --pause 5.5
+python -m src.data.open_meteo --points nordic --pause 5.5
 ```
 
-Downloads the ECMWF weather runs from Open-Meteo. No key needed.
+Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbouring countries) and the ICON-EU runs from Open-Meteo. No key needed; the pause keeps under Open-Meteo's rate limit.
 
 **Dashboard data, briefings and alerts:**
 
 ```bash
-python -m src.export.dashboard --model split_all --period test
+python -m src.export.dashboard --model v6_hf --period test
 ```
 
 Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).

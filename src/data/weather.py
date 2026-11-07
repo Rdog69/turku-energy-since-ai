@@ -28,14 +28,78 @@ def power_curve(ws: np.ndarray) -> np.ndarray:
     return np.where(ws >= 25.0, 0.0, p)
 
 
-def summarise_runs(raw: pd.DataFrame) -> pd.DataFrame:
-    """Per (run, valid hour): mean wind power index, wind speed, temperature, icing share."""
+def point_weights() -> dict[str, float] | None:
+    """Share of Finland's wind capacity nearest to each weather point (OpenStreetMap turbines).
+
+    Turbines without a capacity tag get the median tagged capacity. Returns None if the OSM
+    file isn't downloaded (then all points count equally).
+    """
+    from src.data.open_meteo import POINTS, POINTS_EXTRA
+    POINTS = {**POINTS, **POINTS_EXTRA} if (OUT_DIR / "ecmwf_ifs025_extra.parquet").exists() else POINTS
+    path = OUT_DIR.parent / "osm" / "turbines.parquet"
+    if not path.exists():
+        return None
+    from src.data.osm_farms import clean_turbine_capacity
+    t = pd.read_parquet(path)
+    cap = clean_turbine_capacity(t["capacity_mw"])
+    cap = cap.fillna(cap.median())
+    names = list(POINTS)
+    lat = np.array([POINTS[n][0] for n in names])
+    lon = np.array([POINTS[n][1] for n in names])
+    # equirectangular distance is fine at this scale
+    d = (t["lat"].to_numpy()[:, None] - lat) ** 2 + ((t["lon"].to_numpy()[:, None] - lon) * np.cos(np.radians(64))) ** 2
+    nearest = np.array(names)[d.argmin(axis=1)]
+    w = pd.Series(cap.to_numpy()).groupby(nearest).sum()
+    w = w.reindex(names).fillna(0.0)
+    return (w / w.sum()).to_dict()
+
+
+def summarise_runs(raw: pd.DataFrame, weights: dict[str, float] | None = None) -> pd.DataFrame:
+    """Per (run, valid hour): wind power index, wind speed, temperature, icing share.
+
+    weights: per-point weights (e.g. installed wind capacity nearest to each point); default equal.
+    """
     df = raw.copy()
     df["wind_idx"] = power_curve(df["wind_speed_100m"])
     df["icing"] = (df["temperature_2m"].between(-3.0, 1.0) & (df["relative_humidity_2m"] >= 90)).astype(float)
-    g = df.groupby(["run_init", "valid_time", "first_usable_origin_utc"], as_index=False)
-    return g.agg(wind_idx=("wind_idx", "mean"), wind_speed=("wind_speed_100m", "mean"),
-                 temp=("temperature_2m", "mean"), icing=("icing", "mean"))
+    df["w"] = df["point"].map(weights).fillna(0.0) if weights else 1.0
+    cols = {"wind_idx": "wind_idx", "wind_speed_100m": "wind_speed", "temperature_2m": "temp", "icing": "icing"}
+    for src_col in cols:
+        df[src_col + "_w"] = df[src_col] * df["w"]
+    g = df.groupby(["run_init", "valid_time", "first_usable_origin_utc"])
+    wsum = g["w"].sum()
+    out = pd.DataFrame({dst: g[src + "_w"].sum() / wsum for src, dst in cols.items()}).reset_index()
+    return out
+
+
+def summarise_towns(raw: pd.DataFrame) -> pd.DataFrame:
+    """Per (run, valid hour): town means of solar radiation (W/m2), cloud cover (%) and temperature (C).
+
+    The 8 towns (open_meteo.POINTS_SOLAR) count equally.
+    """
+    g = raw.groupby(["run_init", "valid_time", "first_usable_origin_utc"])
+    return pd.DataFrame({"rad": g["shortwave_radiation"].mean(), "cloud": g["cloud_cover"].mean(),
+                         "temp": g["temperature_2m"].mean()}).reset_index()
+
+
+def load_towns(model: str = "ecmwf_ifs025") -> "WeatherIndex | None":
+    """Town weather (radiation, cloud, temperature) as a WeatherIndex with those three variables."""
+    path = OUT_DIR / f"{model}_solar.parquet"
+    if not path.exists():
+        return None
+    return TownIndex(summarise_towns(pd.read_parquet(path)))
+
+
+def load_nordic(model: str = "ecmwf_ifs025") -> dict[str, "WeatherIndex"] | None:
+    """One WeatherIndex per neighbouring area (se / no / dk / ee), points weighted equally."""
+    from src.data.open_meteo import POINT_AREAS
+    path = OUT_DIR / f"{model}_nordic.parquet"
+    if not path.exists():
+        return None
+    raw = pd.read_parquet(path)
+    raw["area"] = raw["point"].map(POINT_AREAS)
+    return {area: WeatherIndex(summarise_runs(g.drop(columns="area")))
+            for area, g in raw.groupby("area")}
 
 
 class WeatherIndex:
@@ -60,9 +124,16 @@ class WeatherIndex:
             self.mats[v] = m
 
     @classmethod
-    def load(cls, model: str = "ecmwf_ifs025", path: Path | None = None) -> "WeatherIndex":
+    def load(cls, model: str = "ecmwf_ifs025", path: Path | None = None,
+             capacity_weighted: bool = False) -> "WeatherIndex":
         raw = pd.read_parquet(path or OUT_DIR / f"{model}.parquet")
-        return cls(summarise_runs(raw))
+        extra = OUT_DIR / f"{model}_extra.parquet"
+        if capacity_weighted and path is None and extra.exists():
+            # same runs, same publication rule; only runs present in both sets are kept
+            ex = pd.read_parquet(extra)
+            both = set(raw["run_init"]) & set(ex["run_init"])
+            raw = pd.concat([raw[raw["run_init"].isin(both)], ex[ex["run_init"].isin(both)]], ignore_index=True)
+        return cls(summarise_runs(raw, point_weights() if capacity_weighted else None))
 
     def truncated(self, origin) -> "WeatherIndex":
         """Copy containing only runs usable at `origin` (for leakage tests)."""
@@ -90,3 +161,8 @@ class WeatherIndex:
         v = np.where(ok & (lo >= 0) & (lo + 1 < n), v, np.nan)
         run = np.where(ok, self.run_init[kc], -1)
         return v.astype(float), run
+
+
+class TownIndex(WeatherIndex):
+    """Same lookups, for the town variables from summarise_towns()."""
+    VARS = ("rad", "cloud", "temp")

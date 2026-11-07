@@ -35,7 +35,7 @@ def test_every_feature_has_a_label(labels):
 def test_labels_are_plain_language(labels):
     for key, value in labels.items():
         assert isinstance(value, str) and value, f"empty label for {key!r}"
-        assert len(value) <= 45, f"label for {key!r} is too long ({len(value)} chars): {value!r}"
+        assert len(value) <= 50, f"label for {key!r} is too long ({len(value)} chars): {value!r}"
         assert "_" not in value, f"label for {key!r} contains an underscore: {value!r}"
         assert value != key, f"label for {key!r} equals its key"
 

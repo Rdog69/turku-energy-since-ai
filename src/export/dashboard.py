@@ -58,9 +58,33 @@ DRIVER_LABELS = {
     "om_wind_rev": "Wind forecast revision", "om_wind_rev_mw": "Wind forecast revision (MW)",
     "om_wind_speed": "Wind speed (weather model)", "om_temp": "Temperature", "om_icing": "Icing risk",
     "om_lead_h": "Weather run age",
-    "om_icon_wind_idx": "Wind (second weather model)",
-    "om_icon_wind_rev": "Wind revision (second weather model)",
+    # Fingrid real-time batch 2
+    "rt_hydro": "Hydro output now", "rt_hydro_chg_1h": "Hydro output change (1 h)",
+    "rt_boilers": "Electric boilers now", "rt_boilers_chg_1h": "Electric boilers change (1 h)",
+    "rt_netimport": "Net cross-border flow now", "rt_netimport_chg_1h": "Net cross-border flow change (1 h)",
+    "rt_flow_se3": "SE3 border flow now", "rt_flow_se3_chg_1h": "SE3 border flow change (1 h)",
+    "rt_flow_ee": "Estonia border flow now", "rt_flow_ee_chg_1h": "Estonia border flow change (1 h)",
+    "rt_chp_chg_1h": "CHP output change (1 h)",
+    # 4-hour memory and the second weather model (ICON-EU)
+    "mean_gap_last16": "Recent imbalance vs. spot (4 h)", "mean_dir_last16": "Recent regulation direction (4 h)",
+    "om_icon_wind_idx": "Wind (second weather model)", "om_icon_wind_rev": "Wind revision (second weather model)",
     "om_model_spread": "Weather models disagree on wind",
+    # Wind in the neighbouring countries (used by the median model only)
+    "om_se_wind_idx": "Wind in Sweden", "om_se_wind_rev": "Wind revision in Sweden",
+    "om_no_wind_idx": "Wind in Norway", "om_no_wind_rev": "Wind revision in Norway",
+    "om_dk_wind_idx": "Wind in Denmark", "om_dk_wind_rev": "Wind revision in Denmark",
+    "om_ee_wind_idx": "Wind in Estonia", "om_ee_wind_rev": "Wind revision in Estonia",
+    "om_nordic_wind_rev": "Wind revision in neighbouring countries",
+    # Learned wind production from the weather points
+    "om_wind_hat": "Wind production from weather models (MW)",
+    "om_wind_hat_err": "Weather models vs. day-ahead wind forecast (MW)",
+    "om_wind_hat_rev": "Wind production revision since day-ahead (MW)",
+    # Town weather
+    "om_rad_rev": "Sunshine revision since day-ahead", "om_solar_rev_mw": "Solar production revision (MW)",
+    "om_temp_town": "Temperature in the towns", "om_temp_rev": "Temperature revision since day-ahead",
+    # Pricing-rule flag of models trained with the pre-June history
+    "regime_2026": "Imbalance pricing rule (since June 2026)",
+    # Live imbalance and plan error (Pavlo's branch, split_all_rt*)
     "rt_sd_last": "Live imbalance vs plan (now)", "rt_sd_mean4": "Live imbalance vs plan (last hour)",
     "rt_sd_trend": "Live imbalance vs plan (trend over 1 h)",
     "rt_sd_cum": "Live imbalance vs plan (cumulative)",

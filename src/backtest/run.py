@@ -5,9 +5,10 @@
 
 Validation: trains on rows whose targets were published by the first validation origin
 (7 Sep 00:00), forecasts 7 Sep - 4 Oct and scores against actuals_validation.csv with the
-organisers' score.py. fold_b: same, for August (cutoff 1 Aug 00:00), actuals built by
-src/backtest/actuals.py. Test: trains on everything published by 5 Oct 00:00 and writes
-results/<model>/test/forecast_backtest.csv, ready for the validator and submission.
+organisers' score.py. fold_b: the same for August (trained on June-July only), scored against
+actuals built from the package by src/backtest/actuals.py. Test: trains on everything published
+by 5 Oct 00:00 and writes results/<model>/test/forecast_backtest.csv, ready for the validator
+and submission.
 """
 from __future__ import annotations
 
@@ -25,16 +26,47 @@ from src.data.availability import build_index
 from src.data.load import load_long, load_long_all
 from src.features.build import build_features
 from src.models.anchor import SpotAnchor
-from src.models.blend import HorizonSplit
-from src.models.gbm import GBMModel
+from src.models.blend import HorizonSplit, MedianFrom
+from src.models.gbm import BASE_PARAMS, GBMModel
 
-def _split_all(name: str, **calib) -> HorizonSplit:
-    """The split_all architecture (short: Fingrid RT + weather, long: weather) with calibration options."""
+TUNED_PARAMS = {**BASE_PARAMS, "num_leaves": 15, "min_child_samples": 800, "learning_rate": 0.03,
+                "n_estimators": 300, "colsample_bytree": 0.6, "reg_lambda": 1.0}
+
+
+def make_final(name: str, tuned: str = "x", memory: bool = False, nordic: bool = False,
+               icon: bool = False, bands4: bool = False, spike_shrink: int | None = None,
+               wind_hat: bool = False, town_solar: bool = False, town_temp: bool = False,
+               history: bool = False, history_flag: bool = False) -> HorizonSplit:
+    """final_capw plus optional round-3/4/5/6 changes. tuned: x = none, l = long model, b = both models.
+
+    bands4: the short model is split again, hours 1 (steps 1-4) and 2 (steps 5-8).
+    spike_shrink: m0 for the shrunk spike calibration (GBMModel.spike_shrink).
+    wind_hat: learned wind production from the weather points (src/models/wind_power.py).
+    town_solar / town_temp: solar and temperature revisions at 8 towns (src/data/weather.load_towns).
+    history: also train on the pre-June history (config.HISTORY_PATH); history_flag adds regime_2026.
+    """
+    def params(on: bool) -> dict:
+        return dict(TUNED_PARAMS if on else BASE_PARAMS)
+    common = dict(calibrate=True, spike_mode="product", holdout_days=28, use_weather=True, n_seeds=5,
+                  use_memory=memory, use_nordic=nordic, use_icon=icon, spike_shrink=spike_shrink,
+                  use_wind_hat=wind_hat, use_town_solar=town_solar, use_town_temp=town_temp,
+                  use_history=history, history_flag=history_flag)
+    short_kw = dict(use_fingrid=True, use_fingrid2=True, params=params(tuned == "b"), **common)
+    if bands4:
+        short = HorizonSplit(name=f"{name}_short", split_step=4,
+                             short=GBMModel(name=f"{name}_hour1", **short_kw),
+                             long=GBMModel(name=f"{name}_hour2", **short_kw))
+    else:
+        short = GBMModel(name=f"{name}_short", **short_kw)
     return HorizonSplit(
-        name=name, split_step=8,
-        short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
-                       use_fingrid=True, use_weather=True, **calib),
-        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True, **calib))
+        name=name, split_step=8, capacity_weighted=True, short=short,
+        long=GBMModel(name=f"{name}_long", params=params(tuned in ("l", "b")), **common))
+
+def _v4_hybrid(name: str, **extra) -> MedianFrom:
+    """v4_n50 (median from the Nordic twin, shrunk spike calibration, learned wind) plus `extra`."""
+    kw = dict(memory=True, icon=True, spike_shrink=50, wind_hat=True, **extra)
+    return MedianFrom(name=name, base=make_final(f"{name}_base", "b", **kw),
+                      median=make_final(f"{name}_median", "b", nordic=True, **kw))
 
 
 # Each entry builds a fresh, unfitted model. Names are used for the results folder.
@@ -62,6 +94,92 @@ MODELS = {
         short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True),
         long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_rt2": lambda: HorizonSplit(
+        name="split_all_rt2", split_step=8,
+        short=GBMModel(name="short_rt2", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_fingrid2=True, use_weather=True),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_seeds": lambda: HorizonSplit(
+        name="split_all_seeds", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_x5", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5", calibrate=True, spike_mode="product", use_weather=True,
+                      n_seeds=5)),
+    "split_all_rt2_seeds": lambda: HorizonSplit(
+        name="split_all_rt2_seeds", split_step=8,
+        short=GBMModel(name="short_rt2_x5", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5", calibrate=True, spike_mode="product", use_weather=True,
+                      n_seeds=5)),
+    "final": lambda: HorizonSplit(
+        name="final", split_step=8, capacity_weighted=False,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5)),
+    "final_capw": lambda: HorizonSplit(
+        name="final_capw", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5)),
+    "final_nordic": lambda: HorizonSplit(
+        name="final_nordic", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28_nordic", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, use_nordic=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28_nordic", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, use_nordic=True, n_seeds=5)),
+    # Round 3 combinations on top of final_capw: t = tuned settings (x = none / l = long model only /
+    # b = both), m = 4-hour memory, n = Nordic weather, i = ICON-EU second weather model (from Pavlo's
+    # branch). E.g. "v3_lm" = tuned long model + memory, "v3_bmi" = both tuned + memory + ICON.
+    **{f"v3_{t}{'m' * m}{'n' * n}{'i' * i}": (lambda t=t, m=m, n=n, i=i: make_final(f"v3_{t}{'m' * m}{'n' * n}{'i' * i}", t, m, n, i))
+       for t in ("x", "l", "b") for m in (False, True) for n in (False, True) for i in (False, True)},
+    # Submitted model: v3_bmi, with the median (P50) and its drivers from the same model plus Nordic
+    # wind. Nordic wind improved the median in September and August but made the band and the spike
+    # probabilities worse in both, so it's used for the median only (docs/RESULTS.md).
+    "v3_bmi_n50": lambda: MedianFrom(name="v3_bmi_n50",
+                                     base=make_final("v3_bmi", "b", memory=True, icon=True),
+                                     median=make_final("v3_bmni", "b", memory=True, nordic=True, icon=True)),
+    # Round 4 experiments: v3_bmi plus exactly one change each, scored on September and August.
+    "v4_b4": lambda: make_final("v4_b4", "b", memory=True, icon=True, bands4=True),
+    "v4_eb": lambda: make_final("v4_eb", "b", memory=True, icon=True, spike_shrink=50),
+    "v4_wh": lambda: make_final("v4_wh", "b", memory=True, icon=True, wind_hat=True),
+    # The two that won in both months (shrunk spike calibration, learned wind production), in the
+    # same median-from-Nordic hybrid as v3_bmi_n50.
+    "v4_n50": lambda: MedianFrom(
+        name="v4_n50",
+        base=make_final("v4_ebwh", "b", memory=True, icon=True, spike_shrink=50, wind_hat=True),
+        median=make_final("v4_ebwhn", "b", memory=True, nordic=True, icon=True, spike_shrink=50, wind_hat=True)),
+    # Round 5: v4_n50 plus town weather, one feature group each (solar revision / temperature revision).
+    "v5_sol": lambda: _v4_hybrid("v5_sol", town_solar=True),
+    "v5_tmp": lambda: _v4_hybrid("v5_tmp", town_temp=True),
+    "v5_st": lambda: _v4_hybrid("v5_st", town_solar=True, town_temp=True),
+    # Round 6: v4_n50 trained on the pre-June history too (Mar 2025 - May 2026, every 3rd hourly
+    # origin), without and with the pricing-rule flag. Needs the organisers' OK on pre-June data.
+    "v6_h": lambda: _v4_hybrid("v6_h", history=True),
+    "v6_hf": lambda: _v4_hybrid("v6_hf", history=True, history_flag=True),
+    # Settings from src/models/tune.py (training-only folds 26 Jul - 6 Sep): smaller, slower trees.
+    "final_tuned": lambda: HorizonSplit(
+        name="final_tuned", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS)),
+        long=GBMModel(name="long_weather_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS))),
+    "final_tuned_long": lambda: HorizonSplit(
+        name="final_tuned_long", split_step=8, capacity_weighted=True,
+        short=GBMModel(name="short_rt2_x5_h28", calibrate=True, spike_mode="product", holdout_days=28,
+                       use_fingrid=True, use_fingrid2=True, use_weather=True, n_seeds=5),
+        long=GBMModel(name="long_weather_x5_h28_tuned", calibrate=True, spike_mode="product", holdout_days=28,
+                      use_weather=True, n_seeds=5, params=dict(TUNED_PARAMS))),
+    # calibration window check: re-tune on the last 21 / 28 training days instead of 14
+    **{f"split_all_h{d}": (lambda d=d: HorizonSplit(
+        name=f"split_all_h{d}", split_step=8,
+        short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, holdout_days=d),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True,
+                      holdout_days=d))) for d in (21, 28)},
+    # Pavlo's branch: live imbalance (Fingrid 198/186, production vs BRP plan, hydro change) in the
+    # short model, ICON-EU in both. Validated on September and August (docs/RESULTS.md).
     "split_all_rt": lambda: HorizonSplit(
         name="split_all_rt", split_step=8,
         short=GBMModel(name="short_fingrid_weather_rt", calibrate=True, spike_mode="product",
@@ -80,32 +198,21 @@ MODELS = {
                        use_fingrid=True, use_weather=True, use_icon=True),
         long=GBMModel(name="long_weather_icon", calibrate=True, spike_mode="product",
                       use_weather=True, use_icon=True)),
-    # Final candidate: ICON in both models + live imbalance in the short model (T4 + T5 combined).
     "split_all_rt_icon": lambda: HorizonSplit(
         name="split_all_rt_icon", split_step=8,
         short=GBMModel(name="short_fingrid_weather_icon_rt", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True, use_icon=True, use_rt_imbalance=True),
         long=GBMModel(name="long_weather_icon", calibrate=True, spike_mode="product",
                       use_weather=True, use_icon=True)),
-    "split_all_spread": lambda: HorizonSplit(
-        name="split_all_spread", split_step=8,
-        short=GBMModel(name="short_fingrid_weather_spread", calibrate=True, spike_mode="product",
-                       use_fingrid=True, use_weather=True, use_icon=True, icon_spread_only=True),
-        long=GBMModel(name="long_weather_spread", calibrate=True, spike_mode="product",
-                      use_weather=True, use_icon=True, icon_spread_only=True)),
-    # split_all with pooled out-of-time calibration: 3 rolling 14-day holdouts ending at the cutoff
-    # instead of the single last 14 days (T1; see docs/RESULTS.md).
-    "split_all_pcal": lambda: _split_all("split_all_pcal", calib_mode="pooled", calib_folds=3),
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
-NO_CUTOFF_BEFORE = pd.Timestamp("2000-01-01", tz="UTC")   # earlier than any real data
 SUBMISSION_TS = ("forecast_origin_utc", "delivery_start_utc", "data_cutoff_utc")
+NO_CUTOFF_BEFORE = pd.Timestamp("2000-01-01", tz="UTC")   # earlier than any real data
 # Inputs saved next to the forecast so the dashboard can explain it.
 DASHBOARD_INPUTS = ["spot", "wind_fc", "cons_fc", "solar_fc", "spot_abs_ramp", "hour", "last_gap",
                     "last_dir", "last_imb", "rt_wind_err", "rt_freq_dev", "rt_nuclear",
-                    "rt_nuclear_change_6h", "rt_cons_err", "rt_sd_last", "rt_sd_mean4", "rt_plan_err",
-                    "rt_hydro_change_1h", "om_wind_rev", "om_wind_rev_mw",
+                    "rt_nuclear_change_6h", "rt_cons_err", "om_wind_rev", "om_wind_rev_mw",
                     "om_icing", "om_temp"]
 
 
@@ -133,11 +240,21 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     return out / "forecast_origins.csv", out / "sample_submission.csv"
 
 
-def training_table(long, index, cutoff: pd.Timestamp, weather=None, weather2=None) -> pd.DataFrame:
-    """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
+def training_table(long, index, cutoff: pd.Timestamp, weather=None, nordic=None, weather2=None,
+                   wind_map=None, towns=None, history: bool = False) -> pd.DataFrame:
+    """All (origin, step) rows with origin < cutoff whose targets were published by cutoff.
+
+    history: also every HISTORY_EVERY_H-th hourly origin from HISTORY_START until the package
+    starts (long must then include the history rows, see src.data.load.with_history).
+    """
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
-    f = build_features(long, origins, index=index, weather=weather, weather2=weather2)
+    if history:
+        early = pd.date_range(config.HISTORY_START + pd.Timedelta(hours=6), first,
+                              freq=f"{config.HISTORY_EVERY_H}h", inclusive="left")
+        origins = early.append(origins)
+    f = build_features(long, origins, index=index, weather=weather, nordic=nordic, weather2=weather2,
+                       wind_map=wind_map, towns=towns)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -187,28 +304,53 @@ def main(argv=None) -> int:
 
     pkg = config.package_dir()
     model = MODELS[args.model]()
-    long = (load_long_all() if getattr(model, "use_fingrid", False)
+    long = (load_long_all() if getattr(model, "use_fingrid", False) or getattr(model, "use_wind_hat", False)
             or getattr(model, "use_rt_imbalance", False) else load_long())
+    history = getattr(model, "use_history", False)
+    if history:
+        from src.data.load import with_history
+        long = with_history(long)
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))
     cutoff = origins.min() if args.period != "test" else config.TRAIN_CUTOFF
     assert cutoff <= config.TRAIN_CUTOFF
+    if args.period != "test":
+        assert cutoff == config.PERIODS[args.period]["first_origin"], "template origins don't match the period"
 
     weather = None
     if getattr(model, "use_weather", False):
         from src.data.weather import WeatherIndex
-        weather = WeatherIndex.load("ecmwf_ifs025")
+        weather = WeatherIndex.load("ecmwf_ifs025",
+                                    capacity_weighted=getattr(model, "capacity_weighted", False))
+    nordic = None
+    if getattr(model, "use_nordic", False):
+        from src.data.weather import load_nordic
+        nordic = load_nordic("ecmwf_ifs025")
     weather2 = None
     if getattr(model, "use_icon", False):
+        from src.data.weather import WeatherIndex
+        # Only the 8 main points were downloaded for ICON, so its points count equally
+        # (capacity weights are defined over ECMWF's 14 points).
         weather2 = WeatherIndex.load("icon_eu")
-    train = training_table(long, index, cutoff, weather, weather2)
+    wind_map = None
+    if getattr(model, "use_wind_hat", False):
+        from src.models.wind_power import WindPowerMap, load_points
+        wind_map = WindPowerMap(load_points()).fit(index, cutoff)   # data published by the cutoff only
+        print(wind_map.describe())
+    towns = None
+    if getattr(model, "use_towns", False):
+        from src.data.weather import load_towns
+        towns = load_towns()
+        if towns is None:
+            raise FileNotFoundError("town weather missing: python -m src.data.open_meteo --points solar")
+    train = training_table(long, index, cutoff, weather, nordic, weather2, wind_map, towns, history)
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
-    feats = build_features(long, origins, index=index, with_targets=False, weather=weather,
-                           weather2=weather2)
+    feats = build_features(long, origins, index=index, with_targets=False, weather=weather, nordic=nordic,
+                           weather2=weather2, wind_map=wind_map, towns=towns)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"
@@ -226,13 +368,12 @@ def main(argv=None) -> int:
         return rc
     if args.period != "test":
         if args.period == "validation":
-            actuals = "data/actuals_validation.csv"        # the organisers' file
+            actuals = "data/actuals_validation.csv"            # the organisers' own file
             baseline = pkg / "baseline_output" / "validation" / "score" / "score_summary.csv"
             extra = ["--baseline-summary", str(baseline)] if baseline.exists() else []
         else:
             from src.backtest.actuals import write_actuals
-            actuals = str(write_actuals(args.period))      # built from the package long data
-            extra = []
+            actuals, extra = str(write_actuals(args.period)), []   # built from the package
         rc = run_script(pkg, "score.py", "--submission", str(sub_path), "--actuals", actuals,
                         "--spike-margin", str(int(config.SPIKE_MARGIN)),
                         "--output-dir", str(out_dir / "score"), *extra)

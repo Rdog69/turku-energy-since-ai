@@ -17,8 +17,13 @@ app_demo_data/
 # (exceptions must come after the rule they override)
 !external_data/fingrid/fingrid_rt.parquet
 !external_data/open_meteo/ecmwf_ifs025.parquet
+!external_data/open_meteo/ecmwf_ifs025_extra.parquet
 !external_data/open_meteo/icon_eu.parquet
+!external_data/open_meteo/ecmwf_ifs025_nordic.parquet
+!external_data/osm/*.parquet
 spot_nordpool*.csv
+# pre-June history: holds 2025 spot prices (Elering, from Nord Pool), team-internal only
+external_data/history/
 actuals_*.csv
 forecast_backtest*.csv
 results/

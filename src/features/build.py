@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import HORIZON_STEPS, SPIKE_MARGIN, STEP
+from src.config import DATA_START, HORIZON_STEPS, SPIKE_MARGIN, STEP
 from src.data.availability import SeriesIndex, build_index, to_ns
 from src.data.load import DIRECTION, IMBALANCE, SPOT
 
@@ -89,6 +89,89 @@ def add_weather(f: pd.DataFrame, index: dict[str, SeriesIndex], weather) -> pd.D
     return f
 
 
+NORDIC_AREAS = ("se", "no", "dk", "ee")
+
+
+def add_weather_nordic(f: pd.DataFrame, index: dict[str, SeriesIndex], nordic: dict) -> pd.DataFrame:
+    """Neighbouring areas' wind and its revision since the day-ahead forecast was made.
+
+    Same availability rule as the Finnish weather: newest run usable at the origin, compared with
+    the run usable when Fingrid published its day-ahead wind forecast for that quarter.
+    """
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    revs = []
+    for area in NORDIC_AREAS:
+        w = nordic.get(area)
+        if w is None:
+            f[f"om_{area}_wind_idx"] = np.nan
+            f[f"om_{area}_wind_rev"] = np.nan
+            continue
+        now, _ = w.lookup(o, d, "wind_idx")
+        then, _ = w.lookup(da_time, d, "wind_idx")
+        f[f"om_{area}_wind_idx"] = now
+        f[f"om_{area}_wind_rev"] = now - then
+        revs.append(now - then)
+    f["om_nordic_wind_rev"] = np.nanmean(np.vstack(revs), axis=0) if revs else np.nan
+    return f
+
+
+def add_weather2(f: pd.DataFrame, index: dict[str, SeriesIndex], weather, icon) -> pd.DataFrame:
+    """Second weather model (ICON-EU) and its disagreement with ECMWF.
+
+    Ported from Pavlo's branch (femboystorming-pavlo, split_all_icon). Same availability-aware
+    lookups as add_weather: the newest ICON run usable at the origin, and the ICON run usable when
+    Fingrid published its day-ahead wind forecast.
+    """
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    wind, _ = icon.lookup(o, d, "wind_idx")
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    wind_da, _ = icon.lookup(da_time, d, "wind_idx")
+    f["om_icon_wind_idx"] = wind
+    f["om_icon_wind_rev"] = wind - wind_da
+    ecmwf = weather.lookup(o, d, "wind_idx")[0] if weather is not None else np.nan
+    f["om_model_spread"] = np.abs(ecmwf - wind)
+    return f
+
+
+def add_wind_hat(f: pd.DataFrame, index: dict[str, SeriesIndex], wind_map) -> pd.DataFrame:
+    """Wind production predicted by the learned point weights (src/models/wind_power.py), its gap
+    to Fingrid's day-ahead wind forecast, and its revision since that forecast was published."""
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    hat = wind_map.predict(o, d)
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    f["om_wind_hat"] = hat
+    f["om_wind_hat_err"] = hat - f["wind_fc"].to_numpy(dtype=float)
+    f["om_wind_hat_rev"] = hat - wind_map.predict(da_time, d)
+    return f
+
+
+def add_towns(f: pd.DataFrame, index: dict[str, SeriesIndex], towns) -> pd.DataFrame:
+    """Town weather (src/data/weather.load_towns): solar radiation and temperature, and how much the
+    newest usable run revised them since Fingrid published its day-ahead solar and consumption
+    forecasts. Same availability rule as add_weather: runs usable at the origin, and the
+    day-ahead comparison point is never later than the origin."""
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    rad, _ = towns.lookup(o, d, "rad")
+    rad_da, _ = towns.lookup(np.minimum(index["fi_solar_fc_da"].first_usable_at(d), o), d, "rad")
+    temp, _ = towns.lookup(o, d, "temp")
+    temp_da, _ = towns.lookup(np.minimum(index["fi_consumption_fc_da"].first_usable_at(d), o), d, "temp")
+    f["om_rad_rev"] = rad - rad_da
+    # Revision scaled to MW with the day-ahead solar forecast; the 50 W/m2 floor keeps dawn and
+    # dusk from blowing the ratio up.
+    f["om_solar_rev_mw"] = f["solar_fc"].to_numpy(dtype=float) * np.clip(
+        (rad - rad_da) / np.fmax(rad_da, 50.0), -1.0, 2.0)
+    f["om_temp_town"] = temp
+    f["om_temp_rev"] = temp - temp_da
+    return f
+
+
+# Live imbalance (Pavlo's branch, split_all_rt): Fingrid series from the master external tables
+# (src/data/external_long.py).
 RT_SD = "fg198_surplus_deficit_rt"        # measured net import minus the exchange plan (MW)
 RT_SD_CUM = "fg186_surplus_deficit_cum_rt"
 RT_PROD = "fg192_production_rt"
@@ -134,25 +217,13 @@ def add_rt_imbalance(per_origin: pd.DataFrame, index: dict[str, SeriesIndex], or
         per_origin["rt_hydro_change_1h"] = h[0] - h[1]
 
 
-def add_weather2(f: pd.DataFrame, index: dict[str, SeriesIndex], weather, icon) -> pd.DataFrame:
-    """Second weather model (ICON-EU) and model disagreement. Same availability-aware lookups:
-    both the ECMWF and the ICON run are the newest one usable at the origin."""
-    o = to_ns(f["origin"])
-    d = to_ns(f["delivery"])
-    wind, _ = icon.lookup(o, d, "wind_idx")
-    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
-    wind_da, _ = icon.lookup(da_time, d, "wind_idx")
-    f["om_icon_wind_idx"] = wind
-    f["om_icon_wind_rev"] = wind - wind_da
-    f["om_model_spread"] = np.abs(weather.lookup(o, d, "wind_idx")[0] - wind)
-    return f
-
-
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
-                   with_targets: bool = True, weather=None, weather2=None) -> pd.DataFrame:
+                   with_targets: bool = True, weather=None, nordic=None, weather2=None,
+                   wind_map=None, towns=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
 
     weather: optional WeatherIndex (src/data/weather.py) to add the om_* columns.
+    weather2: optional second-model WeatherIndex (ICON-EU) for the om_icon_* / spread columns.
     """
     index = index or build_index(long)
     origins = pd.DatetimeIndex(origins).tz_convert("UTC").as_unit("ns")
@@ -184,6 +255,9 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
     f["wind_share"] = f["wind_fc"] / f["cons_fc"]
     f["residual_load_fc"] = f["cons_fc"] - f["wind_fc"] - f["solar_fc"]
     f["quarter"] = pd.DatetimeIndex(g["delivery"]).minute // 15
+    # 1 for deliveries under the 1 June 2026 imbalance pricing rule (the package period), 0 for the
+    # pre-June history rows. Only models trained with history use it (HISTORY_COLUMNS).
+    f["regime_2026"] = (d_ns >= DATA_START.value).astype(float)
 
     # --- newest usable realised values at the origin (same for every step of an origin) ---
     per_origin = pd.DataFrame(index=origins)
@@ -208,7 +282,7 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     # Short trailing means of the gap and direction over the newest usable quarters.
     # value_at() applies the availability mask, so a quarter that wasn't published yet is NaN.
-    for n in (4, 8):
+    for n in (4, 8, 16):   # 1 h, 2 h and 4 h of the newest usable quarters
         gaps, dirs = [], []
         for j in range(n):
             ts_j = imb_ts - j * NS_PER_QUARTER
@@ -219,20 +293,32 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
         per_origin[f"mean_gap_last{n}"] = np.nanmean(np.vstack(gaps), axis=0)
         per_origin[f"mean_dir_last{n}"] = np.nanmean(np.vstack(dirs), axis=0)
     # --- Fingrid real-time series (only if downloaded; see src/data/fingrid.py) ---
-    if "fg_wind_rt" in index:
-        def latest_pair(sid, ref_sid=None, lags=(0,)):
-            """Mean over the newest usable quarters of sid (minus ref_sid at the same quarter)."""
-            ts, _ = index[sid].latest(origins)
-            latest_ts.append(ts)
-            vals = []
-            for j in lags:
-                t_j = ts - j * NS_PER_QUARTER
-                v = index[sid].value_at(t_j, origin_ns)
-                if ref_sid:
-                    v = v - index[ref_sid].value_at(t_j, origin_ns)
-                vals.append(v)
-            return np.nanmean(np.vstack(vals), axis=0)
+    def latest_pair(sid, ref_sid=None, lags=(0,)):
+        """Mean over the newest usable quarters of sid (minus ref_sid at the same quarter)."""
+        ts, _ = index[sid].latest(origins)
+        latest_ts.append(ts)
+        vals = []
+        for j in lags:
+            t_j = ts - j * NS_PER_QUARTER
+            v = index[sid].value_at(t_j, origin_ns)   # availability-masked
+            if ref_sid:
+                v = v - index[ref_sid].value_at(t_j, origin_ns)
+            vals.append(v)
+        return np.nanmean(np.vstack(vals), axis=0)
 
+    if "fg_hydro_rt" in index:
+        # Level and 1-hour change: balancing shows up as plants and loads moving right now.
+        for sid, name in (("fg_hydro_rt", "rt_hydro"), ("fg_boilers_rt", "rt_boilers"),
+                          ("fg_netimport_rt", "rt_netimport"), ("fg_flow_se3_rt", "rt_flow_se3"),
+                          ("fg_flow_ee_rt", "rt_flow_ee")):
+            now = latest_pair(sid)
+            per_origin[name] = now
+            per_origin[name + "_chg_1h"] = now - latest_pair(sid, lags=(4,))
+        chp = latest_pair("fg_chp_dh_rt") + latest_pair("fg_chp_ind_rt")
+        chp_1h = latest_pair("fg_chp_dh_rt", lags=(4,)) + latest_pair("fg_chp_ind_rt", lags=(4,))
+        per_origin["rt_chp_chg_1h"] = chp - chp_1h
+
+    if "fg_wind_rt" in index:
         per_origin["rt_wind_err"] = latest_pair("fg_wind_rt", "fi_wind_fc_da")
         per_origin["rt_wind_err_last4"] = latest_pair("fg_wind_rt", "fi_wind_fc_da", range(4))
         per_origin["rt_cons_err"] = latest_pair("fg_cons_rt", "fi_consumption_fc_da")
@@ -256,8 +342,14 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     if weather is not None:
         f = add_weather(f, index, weather)
-        if weather2 is not None:
-            f = add_weather2(f, index, weather, weather2)
+    if nordic is not None:
+        f = add_weather_nordic(f, index, nordic)
+    if weather2 is not None:
+        f = add_weather2(f, index, weather, weather2)
+    if wind_map is not None:
+        f = add_wind_hat(f, index, wind_map)
+    if towns is not None:
+        f = add_towns(f, index, towns)
     if with_targets:
         f = add_targets(f, index)
     return f
@@ -306,16 +398,37 @@ FINGRID_RT_COLUMNS = [
     "rt_nuclear", "rt_nuclear_change_6h",
 ]
 
+FINGRID_RT2_COLUMNS = [
+    "rt_hydro", "rt_hydro_chg_1h", "rt_boilers", "rt_boilers_chg_1h", "rt_netimport",
+    "rt_netimport_chg_1h", "rt_flow_se3", "rt_flow_se3_chg_1h", "rt_flow_ee", "rt_flow_ee_chg_1h",
+    "rt_chp_chg_1h",
+]
+
+# Live imbalance and plan error (add_rt_imbalance), short model only.
 RT_IMBALANCE_COLUMNS = [
     "rt_sd_last", "rt_sd_mean4", "rt_sd_trend", "rt_sd_cum", "rt_plan_err", "rt_plan_err_mean4",
     "rt_hydro_change_1h",
 ]
 
+# Longer memory: 4-hour averages beat the newest quarter at every horizon (training data, 7 Nov).
+MEMORY_COLUMNS = ["mean_gap_last16", "mean_dir_last16"]
+
+NORDIC_COLUMNS = [f"om_{a}_wind_{k}" for a in NORDIC_AREAS for k in ("idx", "rev")] + ["om_nordic_wind_rev"]
+
+# Second weather model (ICON-EU) and ECMWF-vs-ICON disagreement (Pavlo's split_all_icon).
+WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
+
+# Learned wind production (MW) from the weather points (src/models/wind_power.py).
+WINDHAT_COLUMNS = ["om_wind_hat", "om_wind_hat_err", "om_wind_hat_rev"]
+
+# Pricing-rule flag for models trained with the pre-June history (see regime_2026 above).
+HISTORY_COLUMNS = ["regime_2026"]
+
+# Town weather: solar revision and temperature (heating demand) revision since the day-ahead forecasts.
+TOWN_SOLAR_COLUMNS = ["om_rad_rev", "om_solar_rev_mw"]
+TOWN_TEMP_COLUMNS = ["om_temp_town", "om_temp_rev"]
+
 WEATHER_COLUMNS = [
     "om_wind_idx", "om_wind_idx_da", "om_wind_rev", "om_wind_rev_mw", "om_wind_speed",
     "om_temp", "om_icing", "om_lead_h",
 ]
-
-# Second weather model (ICON-EU) and ECMWF-vs-ICON disagreement.
-WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
-WEATHER2_SPREAD_COLUMNS = ["om_model_spread"]

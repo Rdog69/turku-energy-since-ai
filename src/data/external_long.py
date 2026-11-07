@@ -23,10 +23,11 @@ Differences found when comparing the overlap: identical fu everywhere; values id
 5 frequency quarters (max |diff| 0.0064 Hz) and 1 consumption quarter (3.6 MW), because Frank
 requires >= 3 of the 5 samples per quarter and the master files average whatever samples exist.
 
-PENDING ORGANISER APPROVAL: history from before the package starts (1 Jun 2026) - that is, the
-`last_autumn` period (Sep-Nov 2025) and the `history` period (package series Mar 2025 - May 2026) -
-is NOT loaded by default. Load it only with an explicit `period="last_autumn"` / `"history"`
-argument, and only after the organisers have confirmed that such data may be used.
+Pre-June history (the `last_autumn` period, Sep-Nov 2025, and the `history` period, package
+series Mar 2025 - May 2026) is NOT loaded by default. The organisers allowed pre-June data on
+7 Nov (QUESTIONS.md Q1), but no model reads these tables: the submitted v6_hf trains on Abdo's
+separate package-format history (src.data.load.load_history). Pass `period="last_autumn"` /
+`"history"` explicitly to load them.
 """
 from __future__ import annotations
 
@@ -125,8 +126,7 @@ def load_external_long(groups=DEFAULT_GROUPS, period="main", drop_frank_duplicat
     groups: any of "fingrid_rt", "fingrid_extra", "fingrid_package".
     period: "main" (default; 25 May - 2 Nov 2026) is the only period loaded by default.
         "last_autumn" (Sep-Nov 2025) and "history" (package series Mar 2025 - May 2026, group
-        "fingrid_package" only) are PENDING ORGANISER APPROVAL: pass them explicitly, and
-        only once the organisers have confirmed that pre-June data may be used. A tuple
+        "fingrid_package" only) are loaded only when passed explicitly (no model uses them). A tuple
         such as ("main", "last_autumn") loads both.
     drop_frank_duplicates: drop datasets 181/188/177/193 (Frank's fg_*_rt series are the
         canonical copies).
@@ -161,7 +161,7 @@ def load_external_long(groups=DEFAULT_GROUPS, period="main", drop_frank_duplicat
 def fu_audit(groups=GROUPS, period=PERIODS) -> dict[str, int]:
     """Rows per series whose file fu is EARLIER than the documented rule (should be empty/0).
 
-    Reads the pending-approval periods too; a diagnostic only, nothing is returned as data.
+    Reads the pre-June periods too; a diagnostic only, nothing is returned as data.
     """
     out: dict[str, int] = {}
     load_external_long(groups, period, report=out)

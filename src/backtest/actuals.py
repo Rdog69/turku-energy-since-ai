@@ -1,17 +1,19 @@
-"""Build the scoring actuals file for any period from the package's long data.
+"""Build a scoring actuals file for any backtest period from the package's long data.
 
-Same format as starter_package/data/actuals_validation.csv:
+Same format as the organisers' data/actuals_validation.csv:
 
     delivery_start_utc, imbalance_price, spot_price, direction, first_usable_origin_utc
 
-* imbalance_price: fi_imbalance_price (EUR/MWh); spot_price: fi_spot_price; direction: the
-  dominating mFRR direction fi_mfrr_direction (1 = up, -1 = down, 0 = none).
-* first_usable_origin_utc: when the imbalance price (the actual) is first usable. The package's
-  own file uses this and `tests/test_actuals.py` checks our builder reproduces it exactly.
-* One row per quarter-hour from 00:00 local on `test_start` to 24:00 local on `test_end`.
+* imbalance_price = fi_imbalance_price, spot_price = fi_spot_price (EUR/MWh);
+  direction = fi_mfrr_direction (1 = up, -1 = down, 0 = none).
+* first_usable_origin_utc: when the imbalance price became usable.
+* One row per quarter-hour from 00:00 local on the first date to 24:00 local on the last.
 
-Actuals are only used for scoring, never as features. The output holds spot prices, so it lives in
-results/ (git-ignored) and is never published.
+tests/test_actuals.py checks that this reproduces the organisers' validation file exactly.
+Approach from Pavlo's branch (femboystorming-pavlo, src/backtest/actuals.py).
+
+Actuals are only used for scoring, never as features. The file holds spot prices, so it stays
+in results/ (git-ignored) and is never published.
 
     python -m src.backtest.actuals --period fold_b
 """
@@ -31,11 +33,11 @@ FLOAT_FORMAT = "%.10g"      # the organisers' file writes 28 and 10.3, not 28.0 
 COLUMNS = ["delivery_start_utc", "imbalance_price", "spot_price", "direction", "first_usable_origin_utc"]
 
 
-def build_actuals(long: pd.DataFrame, test_start: str, test_end: str,
+def build_actuals(long: pd.DataFrame, first_date: str, last_date: str,
                   timezone: str = "Europe/Helsinki") -> pd.DataFrame:
-    """Actuals for the local dates test_start..test_end inclusive (all quarter-hours)."""
-    first = pd.Timestamp(test_start).tz_localize(timezone).tz_convert("UTC")
-    end = (pd.Timestamp(test_end) + pd.Timedelta(days=1)).tz_localize(timezone).tz_convert("UTC")
+    """Actuals for every quarter-hour of the local dates first_date..last_date (inclusive)."""
+    first = pd.Timestamp(first_date).tz_localize(timezone).tz_convert("UTC")
+    end = (pd.Timestamp(last_date) + pd.Timedelta(days=1)).tz_localize(timezone).tz_convert("UTC")
     rows = long.loc[long["series_id"].isin([IMBALANCE, DIRECTION, SPOT])
                     & (long["timestamp_utc"] >= first) & (long["timestamp_utc"] < end)]
     value = rows.pivot(index="timestamp_utc", columns="series_id", values="value")
@@ -63,7 +65,7 @@ def write_actuals(period: str, path: Path | None = None) -> Path:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--period", choices=sorted(p for p in config.PERIODS if p != "test"), required=True)
+    ap.add_argument("--period", choices=sorted(config.PERIODS), required=True)
     args = ap.parse_args(argv)
     print(f"wrote {write_actuals(args.period)}")
     return 0

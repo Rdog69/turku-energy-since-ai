@@ -16,18 +16,36 @@ class HorizonSplit:
     long: object
     split_step: int = 8
     name: str = "horizon_split"
+    capacity_weighted: bool = False   # weather averaged by OSM wind capacity (src/data/weather.py)
 
     @property
     def use_weather(self) -> bool:
         return getattr(self.short, "use_weather", False) or getattr(self.long, "use_weather", False)
 
     @property
+    def use_nordic(self) -> bool:
+        return getattr(self.short, "use_nordic", False) or getattr(self.long, "use_nordic", False)
+
+    @property
     def use_icon(self) -> bool:
         return getattr(self.short, "use_icon", False) or getattr(self.long, "use_icon", False)
 
     @property
+    def use_wind_hat(self) -> bool:
+        return getattr(self.short, "use_wind_hat", False) or getattr(self.long, "use_wind_hat", False)
+
+    @property
+    def use_towns(self) -> bool:
+        return any(getattr(m, a, False) for m in (self.short, self.long)
+                   for a in ("use_towns", "use_town_solar", "use_town_temp"))
+
+    @property
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
+
+    @property
+    def use_history(self) -> bool:
+        return getattr(self.short, "use_history", False) or getattr(self.long, "use_history", False)
 
     @property
     def use_rt_imbalance(self) -> bool:
@@ -49,3 +67,79 @@ class HorizonSplit:
     def describe(self) -> str:
         return (f"{self.name}: steps 1-{self.split_step} from [{self.short.describe()}]\n"
                 f"  steps {self.split_step + 1}-40 from [{self.long.describe()}]")
+
+
+@dataclass
+class MedianFrom:
+    """P50 (and its drivers) from one model, everything else from another.
+
+    Wind in the neighbouring countries sharpens the median in both September and August, but
+    makes the P10-P90 band and the spike probabilities noisier (docs/RESULTS.md). So the final
+    model takes only the median from the variant that sees it.
+    """
+    base: object
+    median: object
+    name: str = "median_from"
+
+    def _either(self, attr: str) -> bool:
+        return getattr(self.base, attr, False) or getattr(self.median, attr, False)
+
+    @property
+    def use_weather(self) -> bool:
+        return self._either("use_weather")
+
+    @property
+    def use_nordic(self) -> bool:
+        return self._either("use_nordic")
+
+    @property
+    def use_icon(self) -> bool:
+        return self._either("use_icon")
+
+    @property
+    def use_wind_hat(self) -> bool:
+        return self._either("use_wind_hat")
+
+    @property
+    def use_towns(self) -> bool:
+        return self._either("use_towns")
+
+    @property
+    def use_fingrid(self) -> bool:
+        return self._either("use_fingrid")
+
+    @property
+    def use_rt_imbalance(self) -> bool:
+        return self._either("use_rt_imbalance")
+
+    @property
+    def use_history(self) -> bool:
+        # One training table serves both models, so history rows would reach both.
+        a, b = getattr(self.base, "use_history", False), getattr(self.median, "use_history", False)
+        if a != b:
+            raise ValueError("MedianFrom: base and median must both use the history, or neither")
+        return a
+
+    @property
+    def capacity_weighted(self) -> bool:
+        both = {getattr(self.base, "capacity_weighted", False), getattr(self.median, "capacity_weighted", False)}
+        if len(both) != 1:
+            raise ValueError("both models must weight the weather points the same way")
+        return both.pop()
+
+    def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "MedianFrom":
+        self.base.fit(train, cutoff)
+        self.median.fit(train, cutoff)
+        return self
+
+    def predict(self, feats: pd.DataFrame) -> pd.DataFrame:
+        out = self.base.predict(feats)
+        med = self.median.predict(feats)
+        out["p50"] = med["p50"].to_numpy()
+        if "top_drivers" in med:            # the drivers explain the median
+            out["top_drivers"] = med["top_drivers"].to_numpy()
+        return out
+
+    def describe(self) -> str:
+        return (f"{self.name}: P50 and drivers from [{self.median.describe()}]\n"
+                f"  everything else from [{self.base.describe()}]")

@@ -4,30 +4,49 @@
 >
 > Conventions (same as the docs): ✔ checked in the repo or in the organisers' documents, ☐ assumption or not verified. Status words are used in a fixed sense:
 >
-> - **Used** = read by the current best model, `split_all` (`src/backtest/run.py`).
-> - **Fetched, not used yet** = the data is in `external_data/` (or the fetcher exists), but `split_all` does not read it. Some of it is used in experiments only (`experiments/lab/`).
+> - **Used** = read by a validated model in `src/backtest/run.py`: the submitted `v6_hf` (Frank's branch) or `split_all_rt_icon` (best of Pavlo's branch).
+> - **Fetched, not used yet** = the data is in `external_data/` (or the fetcher exists), but no model in `src/` reads it. Some of it is used in experiments only (`experiments/lab/`).
 > - **Not used** = checked and rejected, or never fetched.
 >
 > **The rule for every row, package or external:** it may be used at forecast origin `t` only if `first_usable_origin_utc ≤ t`. Every external row carries that column, computed from a **conservative** publication delay and rounded **up** to the next full hour, like the starter package. The package's own column is binding for package rows.
 
 ## 1. Summary
 
+### What the submitted model uses (`v6_hf`, `src/backtest/run.py`)
+
+| Source | What we use | Licence | Availability rule in the backtest |
+|---|---|---|---|
+| **Starter package: Fingrid Open Data** | Imbalance price (319), mFRR/aFRR prices and volumes, direction (369), consumption and production, cross-border flows, day-ahead consumption/wind/solar forecasts (165, 246, 247) | CC BY 4.0 | The package's `first_usable_origin_utc` per row (binding) |
+| **Starter package: ENTSO-E Transparency Platform** | SE1/SE3/EE imbalance prices, load forecasts, FI–EE capacity | CC BY 4.0 | The package's `first_usable_origin_utc` per row |
+| **Starter package: Nord Pool** | Finnish day-ahead spot price | Licensed to Turku Energia for hackathon use only; not redistributed; committed only in this private repo (section 8); deleted after the event | The package's `first_usable_origin_utc` per row |
+| **Starter package: calendar** | Local hour, weekday, holidays, DST | – | Known in advance |
+| **Fingrid Open Data API** (downloaded by us, not in the package) | Real-time wind production (181), nuclear production (188), grid frequency (177), consumption (193); 1–3 min data averaged to quarter-hours. Wind production (181) also fits the weights of our learned wind-production model, using only data published before each training cutoff. | CC BY 4.0 | The organisers' rule for measured Fingrid data (availability.csv): 30 min after the end of the quarter, rounded up to the next full hour. Fingrid publishes these every 1–3 min, so this is conservative. |
+| **Fingrid Open Data API, second batch** | Real-time hydro (191), total production (192), net import (194), electric boilers (371), district-heating and industrial CHP (201, 202), cross-border flows FI–SE1/SE3/EE/NO (87, 89, 180, 187) | CC BY 4.0 | Same 30-min rule. **Not used** without the organisers' OK: 397 "Calculated imbalance", 22/251 last activated bid prices, 400–402 real-time mFRR prices (near-copies of the target, which the package gives with a 60-min delay). |
+| **OpenStreetMap** (Overpass API) | 1,865 wind turbines (355 farms after grouping) and 85 solar parks in Finland: location, capacity where tagged | ODbL, © OpenStreetMap contributors | Installed plants: static, no timing issue. Capacity tags cleaned (values above 20 MW per turbine were kW without a unit). Used to weight weather points by installed wind capacity and for the dashboard map. |
+| **Open-Meteo Single Runs API**: ECMWF IFS 0.25° (`ecmwf_ifs025`), 14 points | Wind speed at 100 m, 2 m temperature, relative humidity at 14 points in Finland (8 in the main wind clusters, 6 more spread across the country), weighted by the installed wind capacity nearest to each point; runs 00/06/12/18 UTC, 72 h each. Weather data by [Open-Meteo.com](https://open-meteo.com/), based on ECMWF open data. | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 | **Our assumption:** run initialisation + 8 h, rounded up to the next full hour. Open-Meteo states a 00 UTC run is generally accessible from about 04–06 UTC, so 8 h is conservative. Each forecast uses the newest run usable at its origin. We do **not** use the Historical Forecast API, which stitches runs together and leaks future information. |
+| **Open-Meteo Single Runs API**: DWD ICON-EU (`icon_eu`), 8 points | The same variables at the 8 wind-cluster points (equal weights), as a second weather model: its wind index, its revision since the day-ahead forecast, and how far it disagrees with ECMWF. Runs 25 May – 2 Nov 2026, 00/06/12/18 UTC, 72 h each (647 of 648 runs; 11 Jun 06 UTC missing). Table and features from Pavlo's branch (`femboystorming-pavlo`). Weather data by [Open-Meteo.com](https://open-meteo.com/), based on Deutscher Wetterdienst (DWD) open data. | CC BY 4.0 (Open-Meteo) | **Our assumption:** run initialisation + 5 h, rounded up to the next full hour. Open-Meteo's model metadata showed a 3.9 h delay for ICON-EU when measured on 6 Nov 2026, so 5 h is conservative. |
+| **Open-Meteo Single Runs API**: ECMWF IFS 0.25° at 8 Finnish towns | Shortwave radiation, cloud cover and 2 m temperature, for solar and heating-demand revisions. **Tested, not used in the submitted model:** no gain in both validation months (`docs/RESULTS.md`, round 5). | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 | Same 8 h rule as the other ECMWF runs. |
+| **Pre-June history** (training only), package format, 1 Mar 2025 – 31 May 2026 | The package's Fingrid series (mFRR/aFRR prices and volumes, direction, consumption, production, flows, day-ahead forecasts) and the spot price, with the imbalance price recomputed under the 1 June 2026 volume-weighted rule (matches the official price on 99.5 % of Jun–Oct 2026 quarters). Table built by Abdo's `experiments/lab/build_history.py` (`brainstorming-abdo`). Allowed by the organisers (Q&A answer, 7 Nov 2026, [`QUESTIONS.md`](QUESTIONS.md) Q1). | Fingrid CC BY 4.0; spot from Elering's Nord Pool price API (originates from Nord Pool: team-internal use only; committed only in this private repo, `external_data/history/pkg_history.csv.gz` and `external_data/elering/fi_spot_history.csv.gz`) | Every measured row is usable no earlier than the package's own rule for the same minute of the hour (`load_history` in `src/data/load.py`); day-ahead rows keep their D-1 publication times. Only for training: every origin we forecast is after June. |
+| **Open-Meteo Single Runs API**: ECMWF IFS 0.25° at 12 points in Sweden, Norway, Denmark and Estonia | Neighbouring areas' wind and its revision. **Used for the median (P50) only:** in September and August it improved the median but made the P10–P90 band worse, so the band and the probabilities come from the model without it. | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 | Same 8 h rule as the Finnish ECMWF runs. |
+
+### Status of every fetched source
+
 | # | Source | Status | Licence |
 |---|---|---|---|
 | 1 | Starter package: Fingrid, ENTSO-E, Nord Pool spot, calendar | **Used** | CC BY 4.0 (Fingrid, ENTSO-E); Nord Pool spot is licensed data, see section 8 |
 | 2 | Fingrid Open Data, real-time 3-min: wind (181), nuclear (188), frequency (177), consumption (193) | **Used** (steps 1–8 only) | CC BY 4.0 |
 | 3 | Open-Meteo Single Runs: ECMWF IFS 0.25° (`ecmwf_ifs025`), main period | **Used** | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 ☐ |
-| 4 | Fingrid real-time, other datasets: surplus/deficit (198, 186), production (192), hydro (191); also 194, 209 | **Used** (198, 186, 192, 191; steps 1–8 only, final model `split_all_rt_icon`); 194 and 209 not used | CC BY 4.0 |
+| 4 | Fingrid real-time, other datasets: surplus/deficit (198, 186), production (192), hydro (191); also 194, 209 | **Used by `split_all_rt_icon`** (198, 186, 192, 191; steps 1–8 only). The submitted `v6_hf` reads hydro, production and net import from Frank's own download (table above). 209 not used | CC BY 4.0 |
 | 5 | Fingrid "extra" series (BRP plans, wind capacity, mFRR bids, …) | **Used:** BRP production plans (242), for the plan error in steps 1–8. Others fetched, not used | CC BY 4.0 |
-| 6 | Open-Meteo: ICON-EU, MET Nordic runs | ICON-EU single runs 25 May - 2 Nov 2026 (00/06/12/18 UTC, 647 of 648 runs; 11 Jun 06 UTC missing), first usable = init + 5 h, in `external_data/open_meteo/icon_eu.parquet`; used by `split_all_icon` and the final model `split_all_rt_icon` (small gain on both folds). MET Nordic: no data, not used | CC BY 4.0 |
+| 6 | Open-Meteo: ICON-EU, MET Nordic runs | ICON-EU single runs 25 May - 2 Nov 2026 (00/06/12/18 UTC, 647 of 648 runs; 11 Jun 06 UTC missing), first usable = init + 5 h, in `external_data/open_meteo/icon_eu.parquet`; used by the submitted `v6_hf` and by `split_all_icon` / `split_all_rt_icon` (gain on both folds). MET Nordic: no data, not used | CC BY 4.0 |
 | 7 | ERA5 reanalysis (via Open-Meteo) | Fetched, not used yet | Copernicus licence (attribution) ☐ |
 | 8 | Nord Pool UMM outage messages | Fetched, not used yet | ☐ public REMIT data; terms unconfirmed |
 | 9 | FMI 10-min observations | Fetched, not used yet | CC BY 4.0 |
 | 10 | Elering (Estonia) system data | Fetched, not used yet | ☐ open data with attribution |
 | 11 | Energinet `PowerSystemRightNow` (Denmark) | Fetched, not used yet | ☐ open data with attribution |
-| 12 | **Pre-June history:** `last_autumn` (1 Sep – 30 Nov 2025) tables and `package_history` (Fingrid package series, 1 Mar 2025 – 1 Jun 2026) | Fetched, **not used until the organisers approve** | as the source of each table |
+| 12 | **Pre-June history:** `last_autumn` (1 Sep – 30 Nov 2025) tables and `package_history` (Fingrid package series, 1 Mar 2025 – 1 Jun 2026) | **Allowed by the organisers on 7 Nov** (`QUESTIONS.md` Q1). The history the submitted `v6_hf` trains on is Abdo's package-format table (table above); these master tables are not read by any model | as the source of each table |
 
-"Pre-June history" matters because the organisers' README says to train only on 1 Jun – 4 Oct 2026. We read that as "not the test period", but we have not had an answer (PLAN §12, question E1). Until we do, **no model that is submitted may read any `last_autumn` or `package_history` table**. `split_all` does not. ☐ The experiment lab (`experiments/lab/data.py`) can load these tables; its results are not part of the submission.
+"Pre-June history" matters because the organisers' README says to train only on 1 Jun – 4 Oct 2026. **The organisers allowed pre-June data on 7 Nov** (`QUESTIONS.md` Q1). The submitted `v6_hf` trains on Abdo's package-format history (`config.HISTORY_PATH`, read by `load_history` in `src/data/load.py`, which never makes a row usable earlier than the package's own rule). The master `last_autumn` and `package_history` tables listed here are not read by any model in `src/`; `src/data/external_long.py` loads them only when asked explicitly.
 
 ### Two fetcher families, and which file made which table
 
@@ -89,7 +108,7 @@ Only 242 (BRP production plans) is used: the plan error is measured production (
 | 176 | Imbalance power Finland–Sweden | ☐ period end + 60 min; unverified |
 | 75 | Wind power, 15-min averages | period end + 30 min |
 
-`package_history.csv.gz` holds the same 17 series as the starter package (319, 369, 244, 106, 375, 376, 347, 348, 124, 74, 61, 57, 60, 55, 165, 246, 247) for 1 Mar 2025 – 1 Jun 2026, with the package's delays (60 min for prices and volumes, 30 min for measured series, day-ahead forecasts at 13:00 local on D-1 ☐ verify against `availability.csv`). **Not used until the organisers approve** (see section 1). The imbalance-price formula changed on 1 Jun 2026, so older rows are for direction and wind-error models, not for price levels. The 2025 spot price is not available, so the 2025 gap cannot be computed.
+`package_history.csv.gz` holds the same 17 series as the starter package (319, 369, 244, 106, 375, 376, 347, 348, 124, 74, 61, 57, 60, 55, 165, 246, 247) for 1 Mar 2025 – 1 Jun 2026, with the package's delays (60 min for prices and volumes, 30 min for measured series, day-ahead forecasts at 13:00 local on D-1 ☐ verify against `availability.csv`). Not read by any model in `src/` (the submitted `v6_hf` uses Abdo's separate history table, see section 1). The imbalance-price formula changed on 1 Jun 2026, so older rows are for direction and wind-error models, not for price levels. The 2025 spot price is not available, so the 2025 gap cannot be computed.
 
 Never used: Fingrid's continuously updated forecasts (245 wind, 241 production). Only the latest version is stored, so their history would leak.
 

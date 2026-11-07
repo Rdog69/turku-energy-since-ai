@@ -1,0 +1,30 @@
+{
+  "owner": "Frank",
+  "model": "v6_hf",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 40.668296,
+  "pinball": 11.191676,
+  "spike_brier": 0.085581,
+  "direction_brier": 0.389186,
+  "coverage": 0.771311,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "v4_n50 also trained on Mar 2025 - May 2026 history, with a pricing-rule flag",
+  "notes": "History imbalance prices recomputed with the June 2026 rule (Abdo's build_history.py). Same real-time ids as v4_n50.",
+  "forecast_file": "",
+  "branch": "brainstorming-frank",
+  "commit": "fe230bf",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T12:47:30Z"
+}

@@ -29,6 +29,12 @@ ALLOWED_RAW_READS = {
     ("backtest/run.py", "pd.read_csv(origins_csv)"): "forecast origins",
     ("export/dashboard.py", "pd.read_parquet(src)"): "our own forecast_full.parquet",
     ("export/dashboard.py", "pd.read_csv(metrics_path)"): "score summary of our own forecast",
+    # Frank's pipeline (reviewed 7 Nov): none of these bypass the availability rule
+    ("config.py", "HISTORY_PATH = REPO_ROOT"): "a path constant, not a read",
+    ("export/map_layer.py", "pd.read_parquet(OUT_DIR / \"ecmwf_ifs025.parquet\")"): "map display; picks the newest run usable at each origin",
+    ("export/map_layer.py", "pd.read_parquet(extra)"): "map display; same run selection",
+    ("models/tune.py", "pd.read_parquet(path)"): "cached feature table built by build_features",
+    ("models/wind_power.py", "pd.read_parquet(OUT_DIR / f)"): "weather runs wrapped in WeatherIndex (run_fu lookups); fit uses rows with fu <= cutoff",
 }
 
 

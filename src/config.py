@@ -47,18 +47,25 @@ TEST_LAST_ORIGIN = pd.Timestamp("2026-11-01T21:00:00Z")         # 1 Nov 23:00
 # Train only on data up to the end of 4 Oct (README section 3).
 TRAIN_CUTOFF = TEST_FIRST_ORIGIN
 
-# Second validation fold ("fold B"): August, local dates 1-31 Aug. Origins 2026-07-31T21:00Z to
-# 2026-08-31T20:00Z. Train cutoff = first origin, the same honest rule as validation.
-FOLD_B_FIRST_ORIGIN = pd.Timestamp("2026-07-31T21:00:00Z")      # 1 Aug 00:00
-FOLD_B_LAST_ORIGIN = pd.Timestamp("2026-08-31T20:00:00Z")       # 31 Aug 23:00
+# Second check period, August ("fold B", the name Pavlo's and Abdo's branches use). Trained on
+# June-July only: the training cutoff is the first origin, the same honest rule as validation.
+FOLD_B_FIRST_ORIGIN = pd.Timestamp("2026-07-31T21:00:00Z")     # 1 Aug 00:00
+FOLD_B_LAST_ORIGIN = pd.Timestamp("2026-08-31T20:00:00Z")      # 31 Aug 23:00
 
-# Backtest periods: local start/end dates (inclusive) for make_templates.py and the actuals
-# builder. "test" uses the organisers' forecast_origins.csv / sample_submission.csv instead.
+# Pre-June history (package format, 1 Mar 2025 - 31 May 2026), built by Abdo's
+# experiments/lab/build_history.py on brainstorming-abdo: Fingrid package series, Elering spot and
+# the imbalance price recomputed with the 1 June 2026 rule. Local and git-ignored (it holds spot
+# prices). Only models with use_history read it. The README (section 3) says to train on
+# 1 Jun - 4 Oct 2026 only, so these models need the organisers' OK before they're submitted.
+HISTORY_PATH = REPO_ROOT / "external_data" / "history" / "pkg_history.parquet"
+# The history's mFRR activation series start on 4 Mar 2025 12:00 UTC (the Nordic mFRR energy
+# market); training origins start the next day.
+HISTORY_START = pd.Timestamp("2025-03-05T00:00:00Z")
+HISTORY_EVERY_H = 3            # use every 3rd hourly origin before June (neighbours overlap heavily)
+
+# Backtest periods as local dates (inclusive), for make_templates.py and the actuals builder.
+# "test" uses the organisers' forecast_origins.csv and sample_submission.csv instead.
 PERIODS = {
-    "validation": dict(start="2026-09-07", end="2026-10-04", first_origin=VALIDATION_FIRST_ORIGIN,
-                       last_origin=VALIDATION_LAST_ORIGIN),
-    "fold_b": dict(start="2026-08-01", end="2026-08-31", first_origin=FOLD_B_FIRST_ORIGIN,
-                   last_origin=FOLD_B_LAST_ORIGIN),
-    "test": dict(start="2026-10-05", end="2026-11-01", first_origin=TEST_FIRST_ORIGIN,
-                 last_origin=TEST_LAST_ORIGIN),
+    "validation": dict(start="2026-09-07", end="2026-10-04", first_origin=VALIDATION_FIRST_ORIGIN),
+    "fold_b": dict(start="2026-08-01", end="2026-08-31", first_origin=FOLD_B_FIRST_ORIGIN),
 }

@@ -17,6 +17,7 @@ CC BY 4.0. Raw pages are cached in external_data/fingrid/raw/ (git-ignored).
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import time
 import urllib.error
@@ -37,7 +38,21 @@ DATASETS = {
     188: ("fg_nuclear_rt", "MW"),      # nuclear power production, real-time
     177: ("fg_freq_rt", "Hz"),         # grid frequency, real-time
     193: ("fg_cons_rt", "MW"),         # consumption in Finland, real-time
+    # second batch (measured physical data, same 30-min rule)
+    191: ("fg_hydro_rt", "MW"),        # hydro production: the main balancing resource
+    192: ("fg_prod_rt", "MW"),         # total production
+    194: ("fg_netimport_rt", "MW"),    # net import/export
+    371: ("fg_boilers_rt", "MW"),      # electric boiler consumption: flexible load
+    201: ("fg_chp_dh_rt", "MW"),       # district-heating cogeneration
+    202: ("fg_chp_ind_rt", "MW"),      # industrial cogeneration
+    87: ("fg_flow_se1_rt", "MW"),      # FI-SE1 transmission
+    89: ("fg_flow_se3_rt", "MW"),      # FI-SE3 transmission
+    180: ("fg_flow_ee_rt", "MW"),      # FI-EE transmission
+    187: ("fg_flow_no_rt", "MW"),      # FI-NO transmission
 }
+# Deliberately NOT used without the organisers' OK: 397 "Calculated imbalance", 22/251 last
+# activated bid prices, 400-402 real-time mFRR prices. They are near-copies of the target that the
+# package only provides with a 60-min delay, and fetching them faster could look like gaming the rule.
 
 
 def api_key() -> str:
@@ -66,7 +81,7 @@ def _get(url: str, key: str) -> dict:
                 time.sleep(wait)
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as e:
             time.sleep(5 * (attempt + 1))
     raise RuntimeError(f"giving up on {url}")
 
