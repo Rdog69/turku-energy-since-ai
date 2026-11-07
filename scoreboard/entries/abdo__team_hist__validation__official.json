@@ -1,0 +1,31 @@
+{
+  "owner": "Abdo",
+  "model": "team_hist",
+  "period": "validation",
+  "scorer": "official",
+  "mae": 40.211377,
+  "pinball": 11.264163,
+  "spike_brier": 0.08458,
+  "direction_brier": 0.379132,
+  "coverage": 0.819139,
+  "pre_june_data": true,
+  "sources": [
+    "package",
+    "fingrid_rt",
+    "fingrid_198_186",
+    "ecmwf",
+    "icon_eu",
+    "nordic_wind",
+    "osm_capacity",
+    "wind_map",
+    "pre_june_history",
+    "elering_spot"
+  ],
+  "description": "Half Frank's v4_n50, half Abdo's history-mode INT4",
+  "notes": "Rescored by Frank's session from Abdo's committed file; matches his lab numbers.",
+  "forecast_file": "brainstorming-abdo:submissions/validation_team_hist.csv",
+  "branch": "brainstorming-abdo",
+  "commit": "95d21c0",
+  "logged_by": "Claude (Frank's session)",
+  "logged_at_utc": "2026-11-07T14:55:07Z"
+}
