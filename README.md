@@ -107,33 +107,32 @@ flowchart LR
     A4["19 months of history<br/>prices rebuilt under<br/>the June 2026 rule"]
   end
   IN --> F["Features for each of<br/>the next 40 quarter-hours"]
-  F --> M1["Model A<br/>gap quantiles · direction · spikes"]
-  F --> M2["Model B<br/>direction × price-gap mixture"]
-  M1 --> B(("50/50"))
-  M2 --> B
-  B --> O1["forecast_backtest.csv"]
-  B --> O2["Tasehinta dashboard"]
+  F --> M["<b>Tasehinta model</b><br/>gradient-boosting ensemble<br/>(two components, averaged)"]
+  M --> O1["forecast_backtest.csv<br/>price · range · direction · spike risk"]
+  M --> O2["Tasehinta dashboard"]
 ```
 
-1. **Forecast the gap, not the price.** The day-ahead price is known the afternoon before, so both models predict how far the imbalance price will land from it.
-2. **Direction drives everything.** Short of power, the price jumps above spot; in surplus, it falls below. The models forecast direction and gap together, so price, range, direction and spike risk tell one consistent story.
-3. **Two different models, averaged.** Built independently by two team members with different features and structures; their errors partly cancel.
+1. **Forecast the gap, not the price.** The day-ahead price is known the afternoon before, so the model predicts how far the imbalance price will land from it.
+2. **Direction drives everything.** Short of power, the price jumps above spot; in surplus, it falls below. The model forecasts direction and gap together, so price, range, direction and spike risk tell one consistent story.
+3. **One model, built as an ensemble.** Inside, two gradient-boosting components with different features and structures each forecast all 40 quarter-hours, and the model averages them. Their errors partly cancel, so the ensemble beats either part on its own.
 4. **Strictly no hindsight.** Every input row is used only from its `first_usable_origin_utc`: real-time data 30 minutes after the quarter or later, weather runs 8 h (ECMWF) or 5 h (ICON-EU) after they start. Leakage tests guard it.
 5. **What moves it most:** the spot level, the latest gap to spot, **wind in Sweden**, the expected error of the day-ahead wind forecast, and grid frequency in the first hour.
 
 <details>
-<summary><b>The two models in a little more detail</b></summary>
+<summary><b>Inside the model: its two components</b></summary>
 
 <br/>
 
-| | Model A · Frank (`v7_rt`) | Model B · Abdo (`h_int4ss`) |
+| | Component A (`v7_rt`, built by Frank) | Component B (`h_int4ss`, built by Abdo) |
 |---|---|---|
 | Shape | Separate LightGBM models for hours 1–2 (real-time grid) and hours 3–10 (weather); the median from a twin that also sees Nordic wind | A mixture: P(up/down/none) × the price gap in each direction |
 | Inputs | Package, Fingrid real-time, ECMWF + ICON-EU runs, Nordic wind, learned wind power, neighbour imbalance prices | Package, its own history features and volatility regimes |
 | Calibration | Last 28 days before the cutoff: Platt scaling for probabilities, quantile offsets per horizon | Its own holdout calibration |
-| Alone | 30.9 % better than the baseline | 32.4 % better |
+| On its own | 30.9 % better than the baseline | 32.4 % better |
 
-Everything about the models (every feature, the settings, the drivers): [`model/README.md`](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/model/README.md).
+**The ensemble of the two: 32.8 % better**, averaged over September and August, more than either part alone.
+
+Everything about the model (every feature, the settings, the drivers): [`model/README.md`](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/model/README.md).
 
 </details>
 
@@ -147,7 +146,7 @@ Submitted through the Since AI platform by **Sunday 8 November, 10:00**. Require
 | 📝 | [**Evaluation report**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/report/evaluation_report.md) | The reasoning chain, the factors behind the forecast, and the validation results |
 | 🧠 | [**Model description**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/model/README.md) | How it works, the data, every feature, the settings, the drivers |
 | 🔗 | [**Sources and licences**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/sources/SOURCES_AND_LICENCES.md) | Every data source, external service, model and software component, with its usage rights |
-| 💻 | [**Code and run instructions**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/code/README.md) | Both models and the blend, step by step |
+| 💻 | [**Code and run instructions**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/code/README.md) | The model, step by step |
 | 🖥️ | [**Dashboard**](https://tasehinta.lovable.app) | The situational view (Level 2), live; source in [`frontend/`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-frank/frontend) |
 | 🎬 | [**Demo video**](#-demo-video) | Five minutes: the forecast, its uncertainty, the alerts and the drivers |
 | 📊 | [**Slides**](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/slides/README.md) | 5–8 slides |
@@ -171,9 +170,9 @@ python -m pytest                                    # leakage tests: must all pa
 Unzip the organisers' starter package into `starter_package/`, then:
 
 ```bash
-python -m src.backtest.run --model v7_rt --period test          # model A: the test-month forecast, validated
-python -m src.backtest.run --model v7_rt --period validation    # model A on September, scored with score.py
-python -I submissions/tools/blend_period.py . v7_rt test submissions/forecast_backtest_h_int4ss.csv final  # the 50/50 blend
+python -m src.backtest.run --model v7_rt --period test          # component A: the test-month forecast, validated
+python -m src.backtest.run --model v7_rt --period validation    # component A on September, scored with score.py
+python -I submissions/tools/blend_period.py . v7_rt test submissions/forecast_backtest_h_int4ss.csv final  # the final model: both components averaged
 ```
 
 The dashboard (Node 20.19+):
@@ -183,7 +182,7 @@ python frontend/scripts/build_data.py
 cd frontend && npx -y pnpm@9.15.9 install --frozen-lockfile && npx -y pnpm@9.15.9 dev
 ```
 
-Model B and the full run order: [`code/README.md`](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/code/README.md).
+Component B and the full run order: [`code/README.md`](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/code/README.md).
 
 <details>
 <summary><b>Where things are</b></summary>
@@ -194,8 +193,8 @@ Model B and the full run order: [`code/README.md`](https://github.com/Rdog69/tur
 |---|---|
 | `master` | This page, the screenshots, the team scoreboard |
 | [`deliverables`](https://github.com/Rdog69/turku-energy-since-ai/tree/deliverables) | Everything we submit: forecast, report, model description, sources, code guide |
-| [`brainstorming-frank`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-frank) | Model A (`src/`), the final forecast files and blend tools (`submissions/`), the dashboard (`frontend/`), the results log (`docs/RESULTS.md`) |
-| [`brainstorming-abdo`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-abdo) | Model B (`experiments/lab/`) and the history dataset |
+| [`brainstorming-frank`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-frank) | Component A (`src/`), the final forecast files and ensemble tools (`submissions/`), the dashboard (`frontend/`), the results log (`docs/RESULTS.md`) |
+| [`brainstorming-abdo`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-abdo) | Component B (`experiments/lab/`) and the history dataset |
 | [`front-end`](https://github.com/Rdog69/turku-energy-since-ai/tree/front-end) | The dashboard's first version |
 
 </details>
@@ -210,8 +209,8 @@ Model B and the full run order: [`code/README.md`](https://github.com/Rdog69/tur
 
 <table>
 <tr>
-<td align="center"><b>Frank</b><br/><sub>Model A · blend & submission files · scoreboard · dashboard design</sub></td>
-<td align="center"><b>Abdo</b><br/><sub>Model B · history dataset · dashboard · deliverables & report</sub></td>
+<td align="center"><b>Frank</b><br/><sub>Model component A · ensemble & submission files · scoreboard · dashboard design</sub></td>
+<td align="center"><b>Abdo</b><br/><sub>Model component B · history dataset · dashboard · deliverables & report</sub></td>
 <td align="center"><b>Jim</b><br/><sub>Evaluation framework · alerts · API · slides & video</sub></td>
 <td align="center"><b>Pavlo</b><br/><sub>Data map · ICON-EU weather · leakage review · sources</sub></td>
 <td align="center"><b>Pavel</b><br/><sub>Model audits · tuning trials · provider questions</sub></td>
