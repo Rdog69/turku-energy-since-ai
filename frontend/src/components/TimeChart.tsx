@@ -12,8 +12,8 @@ import { useSmoothRange } from "@/lib/useSmooth";
 const H_MS = 3600_000;
 export const H = H_MS;
 export const BACK = 0.375; // share of the window left of "now"
-const M = { l: 134, r: 96, t: 42 };
-const PLOT_H = 268, DIR_GAP = 24, DIR_H = 24, RISK_GAP = 30, RISK_HALF = 30, AXIS_H = 36;
+const M = { l: 134, r: 96, t: 70 };   // top margin holds the hover card, so it never covers the data
+const PLOT_H = 244, DIR_GAP = 24, DIR_H = 24, RISK_GAP = 30, RISK_HALF = 30, AXIS_H = 36;
 const HI_THR = 0.4, LO_THR = 0.5; // the alert thresholds for high- and low-price risk
 
 const fmt0 = (v: number) => Math.round(v).toLocaleString("en-US").replace(/,/g, " ");
@@ -344,43 +344,55 @@ export function TimeChart({ p, i, tNow, win, lang, focus, zones, onPan, onZoom, 
         ))}
       </svg>
 
-      {hover !== null && !dragging && (hs !== null || hp) && (
-        <div className="pointer-events-none absolute top-12 z-10 min-w-[224px] rounded-xl border border-rule bg-sheet/95 px-3.5 py-3 text-[13px] shadow-[0_10px_30px_-12px_rgba(20,34,51,0.45)] backdrop-blur-sm"
-          style={{ left: Math.min(W - 240, Math.max(0, x(qMs(p, hover)) + 18)) }}>
-          <div className="num mb-1.5 flex items-center justify-between gap-3 font-semibold text-ink">
-            <span>{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] ${hs !== null ? "bg-bank/10 text-bank" : "bg-paper text-ink-3"}`}>{t(lang, hs !== null ? "tcForecast" : "tcKnown")}</span>
+      {hover !== null && !dragging && (hs !== null || hp) && (() => {
+        // compact card in the margin above the plot, centred on the hovered quarter, with a pointer down to it
+        const cw = hs !== null ? 540 : 400;
+        const xc = x(qMs(p, hover) + Q_MS / 2);
+        const left = Math.max(0, Math.min(W - cw, xc - cw / 2));
+        const top = (svgRef.current && wrap.current ? svgRef.current.getBoundingClientRect().top - wrap.current.getBoundingClientRect().top : 40) + 4;
+        return (
+          <div className="pointer-events-none absolute z-10 rounded-lg border border-rule bg-sheet px-3 py-1.5 text-[12.5px] shadow-[0_6px_18px_-10px_rgba(20,34,51,0.45)]"
+            style={{ left, top, width: cw }}>
+            <span className="absolute -bottom-[5px] h-2.5 w-2.5 rotate-45 border-b border-r border-rule bg-sheet" style={{ left: Math.max(8, Math.min(cw - 18, xc - left - 5)) }} />
+            <div className="num flex items-center gap-x-3 whitespace-nowrap text-ink-2">
+              <span className="font-semibold text-ink">{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</span>
+              <span className={`rounded-full px-1.5 py-px text-[10.5px] font-semibold ${hs !== null ? "bg-bank/10 text-bank" : "bg-paper text-ink-3"}`}>{t(lang, hs !== null ? "tcForecast" : "tcKnown")}</span>
+              {hs === null && hp && (
+                <>
+                  <span>{t(lang, "realised")} <b className="text-ink">{hp.y === null ? (hover < o ? t(lang, "tcNotYet") : "–") : `${fmt0(hp.y)} €/MWh`}</b></span>
+                  <span>{t(lang, "tcDayAhead")} {hp.spot === null ? "–" : `${fmt0(hp.spot)} €/MWh`}</span>
+                </>
+              )}
+              {hs !== null && (
+                <>
+                  <span>{t(lang, "tcExpected")} <b className="text-ink">{fmt0(F.p50[hs])} €/MWh</b></span>
+                  <span>{t(lang, "tcRange")} {fmt0(F.p10[hs])}–{fmt0(F.p90[hs])}</span>
+                  {hp?.spot !== null && hp?.spot !== undefined && <span>{t(lang, "tcDayAhead")} {fmt0(hp.spot)}</span>}
+                </>
+              )}
+            </div>
+            <div className="num mt-0.5 flex items-center gap-x-3 whitespace-nowrap text-ink-2">
+              {hs === null && hp && <span>{t(lang, "direction")}: {hp.dir === null ? "–" : t(lang, hp.dir > 0 ? "up" : hp.dir < 0 ? "down" : "none")}</span>}
+              {hs !== null && (
+                <>
+                  <span className="inline-flex h-1.5 w-14 overflow-hidden rounded-full">
+                    <span className="bg-verm" style={{ width: `${F.pu[hs] * 100}%` }} /><span className="bg-rule" style={{ width: `${F.pn[hs] * 100}%` }} /><span className="bg-teal" style={{ width: `${F.pd[hs] * 100}%` }} />
+                  </span>
+                  <span><span className="text-verm">{t(lang, "up")} {pct(F.pu[hs])}</span> · <span className="text-teal">{t(lang, "down")} {pct(F.pd[hs])}</span></span>
+                  <span className="text-verm">{t(lang, "tcHiShort")} {pct(F.hi[hs])}<Delta v={F.hi[hs]} prev={prevAt("hi", hs)} /></span>
+                  <span className="text-teal">{t(lang, "tcLoShort")} {pct(F.lo[hs])}<Delta v={F.lo[hs]} prev={prevAt("lo", hs)} /></span>
+                  <span className="ml-auto inline-flex items-center gap-1 font-semibold text-bank"><MousePointerClick size={12} strokeWidth={2} />{t(lang, "tcClick")}</span>
+                </>
+              )}
+            </div>
           </div>
-          {hs === null && hp && (
-            <>
-              <Row k={t(lang, "realised")} v={hp.y === null ? (hover < o ? t(lang, "tcNotYet") : "–") : `${fmt0(hp.y)} €/MWh`} strong />
-              <Row k={t(lang, "sSpot")} v={hp.spot === null ? "–" : `${fmt0(hp.spot)} €/MWh`} />
-              {hp.dir !== null && <Row k={t(lang, "direction")} v={t(lang, hp.dir > 0 ? "up" : hp.dir < 0 ? "down" : "none")} />}
-            </>
-          )}
-          {hs !== null && (
-            <>
-              <Row k={t(lang, "sMedian")} v={`${fmt0(F.p50[hs])} €/MWh`} strong />
-              <Row k={t(lang, "sBand")} v={`${fmt0(F.p10[hs])} – ${fmt0(F.p90[hs])}`} />
-              {hp?.spot !== null && hp?.spot !== undefined && <Row k={t(lang, "sSpot")} v={`${fmt0(hp.spot)} €/MWh`} />}
-              <div className="mt-2 flex h-2 overflow-hidden rounded-full">
-                <span className="bg-verm" style={{ width: `${F.pu[hs] * 100}%` }} /><span className="bg-rule" style={{ width: `${F.pn[hs] * 100}%` }} /><span className="bg-teal" style={{ width: `${F.pd[hs] * 100}%` }} />
-              </div>
-              <div className="num mt-1 flex justify-between text-[12px]"><span className="text-verm">{t(lang, "up")} {pct(F.pu[hs])}</span><span className="text-teal">{t(lang, "down")} {pct(F.pd[hs])}</span></div>
-              <Risk label={t(lang, "highRisk")} v={F.hi[hs]} prev={prevAt("hi", hs)} cls="text-verm" since={prevLabel} lang={lang} />
-              <Risk label={t(lang, "lowRisk")} v={F.lo[hs]} prev={prevAt("lo", hs)} cls="text-teal" since={prevLabel} lang={lang} />
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-bank px-2 py-1 text-[11.5px] font-semibold text-white">
-                <MousePointerClick size={13} strokeWidth={2} />{t(lang, "tcClick")}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
 
-function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+export function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return (
     <div className={`flex justify-between gap-4 ${strong ? "font-semibold text-ink" : "text-ink-2"}`}>
       <span>{k}</span><span className="num">{v}</span>
@@ -388,7 +400,12 @@ function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   );
 }
 
-function Risk({ label, v, prev, cls, since, lang }: { label: string; v: number; prev: number | null; cls: string; since: string; lang: Lang }) {
+function Delta({ v, prev }: { v: number; prev: number | null }) {
+  const d = prev === null ? 0 : Math.round((v - prev) * 100);
+  return d === 0 ? null : <span className="ml-1 text-[11px] text-ink-3">{d > 0 ? "▲" : "▼"}{Math.abs(d)}</span>;
+}
+
+export function Risk({ label, v, prev, cls, since, lang }: { label: string; v: number; prev: number | null; cls: string; since: string; lang: Lang }) {
   const d = prev === null ? null : Math.round((v - prev) * 100);
   return (
     <div className={`num mt-0.5 flex justify-between gap-4 ${cls}`}>
