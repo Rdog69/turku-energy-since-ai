@@ -74,13 +74,13 @@ Every feature group and architectural improvement was evaluated on the official 
 | **4. Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | Inverting bimodal CDF expands P10-P90 coverage. |
 | **5. Mixture + CatBoost Blend** | 42.88 | 12.80 | 0.0965 | 0.4244 | 60/40 blend captures center & dampens spikes. |
 | **6. Fingrid RT Wind Error + Step Bands + Autumn Prior** | 41.81 | 12.01 | 0.0907 | 0.3895 | Real-time plan error nowcasting + seasonal prior. |
-| **7. Grand Champion Ensemble (Full Stack + TreeSHAP)** | **`41.71`** | **`12.04`** | **`0.0900`** | **`0.3893`** | **🏆 Best Overall Score (-37.0% MAE, -50.2% Pinball).** |
+| **7. Grand Champion Ensemble (Full Stack + TreeSHAP)** | **`41.71`** | **`11.95`** | **`0.0898`** | **`0.3884`** | **🏆 Best Overall Score (-37.0% MAE, -50.6% Pinball).** |
 
 ### Net Score Improvement Over Baseline:
 * **Accuracy (MAE):** Reduced by **24.49 €/MWh (-36.99%)**
-* **Calibration (Pinball):** Reduced by **12.14 (-50.21%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-20.50%**
-* **Balancing Direction (Brier):** Improved by **-13.66%**
+* **Calibration (Pinball):** Reduced by **12.23 (-50.58%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-20.67%**
+* **Balancing Direction (Brier):** Improved by **-13.86%**
 
 ---
 

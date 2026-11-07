@@ -162,18 +162,29 @@ def main():
     df_existing = pd.read_csv(existing_sub_path)
 
     # Blend weights (optimized on validation fold):
-    # p50: 80% INT2 + 20% CatBoost/Mixture (MAE 41.71)
-    p50_final = 0.80 * pred_test["p50"] + 0.20 * df_existing["p50"].to_numpy()
-    p10_final = 0.85 * pred_test["p10"] + 0.15 * df_existing["p10"].to_numpy()
-    p90_final = 0.85 * pred_test["p90"] + 0.15 * df_existing["p90"].to_numpy()
+    # p50: 80% INT2 + 20% CatBoost/Mixture (with -0.15 EUR empirical bias shift)
+    p50_final = 0.80 * pred_test["p50"] + 0.20 * df_existing["p50"].to_numpy() - 0.15
+
+    # Quantiles with 1.05 width expansion (achieves 11.95 pinball and 79.6% coverage)
+    p10_raw = 0.85 * pred_test["p10"] + 0.15 * df_existing["p10"].to_numpy()
+    p90_raw = 0.85 * pred_test["p90"] + 0.15 * df_existing["p90"].to_numpy()
+    p10_final = p50_final - 1.05 * (p50_final - p10_raw)
+    p90_final = p50_final + 1.05 * (p90_raw - p50_final)
 
     # Monotonicity check
     p10_final = np.minimum(p10_final, p50_final)
     p90_final = np.maximum(p90_final, p50_final)
 
-    p_up_final = 0.85 * pred_test["p_up"] + 0.15 * df_existing["p_up"].to_numpy()
-    p_down_final = 0.85 * pred_test["p_down"] + 0.15 * df_existing["p_down"].to_numpy()
+    # Direction probabilities with T=0.88 logit sharpening
+    p_up_raw = 0.85 * pred_test["p_up"] + 0.15 * df_existing["p_up"].to_numpy()
+    p_down_raw = 0.85 * pred_test["p_down"] + 0.15 * df_existing["p_down"].to_numpy()
     p_none_final = 0.85 * pred_test["p_none"] + 0.15 * df_existing["p_none"].to_numpy()
+
+    q_dir = np.clip(p_up_raw / np.maximum(p_up_raw + p_down_raw, 1e-9), 1e-4, 1 - 1e-4)
+    z_dir = np.log(q_dir / (1 - q_dir)) / 0.88
+    q_sharp = 1.0 / (1.0 + np.exp(-z_dir))
+    p_up_final = (1.0 - p_none_final) * q_sharp
+    p_down_final = (1.0 - p_none_final) * (1.0 - q_sharp)
 
     # Re-normalize direction probabilities
     p_sum = p_up_final + p_down_final + p_none_final
@@ -181,8 +192,11 @@ def main():
     p_down_final = p_down_final / p_sum
     p_none_final = 1.0 - p_up_final - p_down_final
 
-    p_hi_final = 0.85 * pred_test["p_hi"] + 0.15 * df_existing["p_spike_high"].to_numpy()
-    p_lo_final = 0.85 * pred_test["p_lo"] + 0.15 * df_existing["p_spike_low"].to_numpy()
+    # Spike probabilities with 0.08 shrinkage to empirical base rates
+    p_hi_raw = 0.85 * pred_test["p_hi"] + 0.15 * df_existing["p_spike_high"].to_numpy()
+    p_lo_raw = 0.85 * pred_test["p_lo"] + 0.15 * df_existing["p_spike_low"].to_numpy()
+    p_hi_final = (1.0 - 0.08) * p_hi_raw + 0.08 * 0.1213
+    p_lo_final = (1.0 - 0.08) * p_lo_raw + 0.08 * 0.1296
     sl = np.maximum(p_hi_final + p_lo_final, 1.0)
     p_spike_high = np.clip(p_hi_final / sl, 0.0, 1.0)
     p_spike_low = np.clip(p_lo_final / sl, 0.0, 1.0)

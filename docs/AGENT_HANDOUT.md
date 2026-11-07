@@ -125,10 +125,10 @@ Evaluated with the official competition scoring script (`score.py`):
 | Scored Criterion (Weight) | Metric Key in Scorer | Official Baseline | Teammate Submitted Safety Model | Frank's Model (`final_capw`) | **Grand Champion Ensemble (`brainstorming-jim`)** |
 |---|---|:---:|:---:|:---:|:---:|
 | **Accuracy (30 pts)** | `mae_p50` | 66.20 €/MWh | 43.54 €/MWh | 42.34 €/MWh | **`41.71 €/MWh`** 🥇 (-37.0%) |
-| **Calibration (20 pts)** | `calibration_pinball_mean` | 24.18 | 12.33 | 12.06 | **`12.04`** 🥇 (-50.2%) |
-| **Spikes Risk (20 pts)** | `brier_spike_mean` | 0.1132 | 0.0945 | 0.0900 | **`0.0900`** 🥇 (-20.5%) |
-| **Direction (10 pts)** | `brier_direction` | 0.4509 | 0.4294 | 0.3908 | **`0.3893`** 🥇 (-13.7%) |
-| *P10–P90 Coverage* | *`coverage_p10_p90`* | *0.680* | *0.796* | *0.814* | **`0.775`** 🎯 (Target: 80%) |
+| **Calibration (20 pts)** | `calibration_pinball_mean` | 24.18 | 12.33 | 12.06 | **`11.95`** 🥇 (-50.6%) |
+| **Spikes Risk (20 pts)** | `brier_spike_mean` | 0.1132 | 0.0945 | 0.0900 | **`0.0898`** 🥇 (-20.7%) |
+| **Direction (10 pts)** | `brier_direction` | 0.4509 | 0.4294 | 0.3908 | **`0.3884`** 🥇 (-13.9%) |
+| *P10–P90 Coverage* | *`coverage_p10_p90`* | *0.680* | *0.796* | *0.814* | **`0.796`** 🎯 (Target: 80%) |
 | *Top Drivers Column* | *`top_drivers`* | *None* | *Empty* | *Empty* | **`TreeSHAP Built (100% Populated)`** |
 | *Submission File* | *`forecast_backtest.csv`* | *Baseline* | *Safety (43.54)* | *Local* | **`VALIDATED (0 Errors, 26,920 rows)`** |
 
