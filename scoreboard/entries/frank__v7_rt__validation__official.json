@@ -21,10 +21,10 @@
     "elering_spot"
   ],
   "description": "v6_hf with Fingrid real-time series on the 2025 history rows too",
-  "notes": "Real-time history: all 14 Fingrid ids, Mar 2025 - May 2026, same 30-min rule.",
-  "forecast_file": "",
+  "notes": "Real-time history: all 14 Fingrid ids, Mar 2025 - May 2026, same 30-min rule. SHA-256 in submissions/MANIFEST.md.",
+  "forecast_file": "brainstorming-frank:submissions/v7_rt_validation.csv",
   "branch": "brainstorming-frank",
-  "commit": "e3e5272",
+  "commit": "18ca9f6",
   "logged_by": "Claude (Frank's session)",
-  "logged_at_utc": "2026-11-07T14:32:06Z"
+  "logged_at_utc": "2026-11-07T14:44:32Z"
 }

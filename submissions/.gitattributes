@@ -1,0 +1,2 @@
+# keep forecast files byte-exact on every checkout, so their SHA-256 matches MANIFEST.md
+*.csv -text
