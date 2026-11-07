@@ -1,6 +1,6 @@
 # Situational view (Level 2)
 
-**Built:** branch `front-end`, folder `frontend/` ("Tasehinta"). Frank's branch has a copy fed with the submitted model. Point it at the final forecast before recording the demo.
+**Built:** branch `front-end`, folder `frontend/` ("Tasehinta"), commit `19d667c`. It shows the submitted model: the same files as `forecast/forecast_backtest.csv`, plus its two members for the "models disagree" alert. Replay periods: September, August and the forecast period.
 
 - **Views:**
   - **Simple:** status badge, 10-hour traffic light (15 min or 1 h), plain glossary, track record.
@@ -17,4 +17,4 @@ python frontend/scripts/build_data.py          # local data, git-ignored (licens
 cd frontend && pnpm install && pnpm build && cd dist && python3 -m http.server 8080
 ```
 
-To do: switch `build_data.py` to the final blend's files (currently ½ `v4_n50` + ½ `h_int4ss`).
+The page shows only what was published by the moment you are looking at. Scrolling moves through time in 15-minute steps, and the strip under the graph shows where you are in the whole period.

@@ -4,13 +4,13 @@ What we hand in on the Since AI platform, one folder per deliverable (challenge 
 
 | # | Deliverable | Folder | Status | Owner |
 |---|---|---|---|---|
-| 1 | Forecast file `forecast_backtest.csv` (validated) | [`forecast/`](forecast/) | Candidate in place: ½ Frank `v7_rt` + ½ Abdo `h_int4ss` | Team decision |
-| 2 | Source code and instructions for running it | [`code/`](code/) | Placeholder | Abdo + Frank |
-| 3 | Short evaluation report: reasoning chain, drivers, validation metrics | [`report/`](report/) | Skeleton with the validation numbers | Jim (draft on `brainstorming-jim`) |
-| 4 | Data sources, external services, models, software, licences | [`sources/`](sources/) | Pre-filled list | Abdo |
+| 1 | Forecast file `forecast_backtest.csv` (validated) | [`forecast/`](forecast/) | **Final:** ½ Frank `v7_rt` + ½ Abdo `h_int4ss` | Team |
+| 2 | Source code and instructions for running it | [`code/`](code/) | Run order and commands written; freeze commits | Abdo + Frank |
+| 3 | Short evaluation report: reasoning chain, drivers, validation metrics | [`report/`](report/) | **Written:** reasoning chain, data, both models, drivers, validation, limits | Abdo (merge Jim's points) |
+| 4 | Data sources, external services, models, software, licences | [`sources/`](sources/) | **Written** | Abdo |
 | 5 | 5–8 presentation slides | [`slides/`](slides/) | Placeholder | Jim (draft on `brainstorming-jim`) |
 | 6 | Demo video, at most 5 minutes | [`video/`](video/) | Placeholder (script outline) | Team |
-| L2 | Situational view (dashboard) | [`dashboard/`](dashboard/) | Built: branch `front-end` | Abdo + Frank |
+| L2 | Situational view (dashboard) | [`dashboard/`](dashboard/) | **Built:** branch `front-end`, shows the submitted model | Abdo + Frank |
 
 ## Scoring reminders (challenge brief, section 06)
 
