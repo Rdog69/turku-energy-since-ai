@@ -1,0 +1,22 @@
+{
+  "candidate": "/home/dedok/.local/share/turku-autonomy/lanes/lane-3/worktrees/candidate-10-1",
+  "model": "gbm_cal_product_norecency",
+  "status": "passed",
+  "started_epoch": 1794023119.1553571,
+  "stages": {
+    "tests": 0,
+    "model": 0,
+    "validate": 0,
+    "score": 0
+  },
+  "forecast_sha256": "7f781e6ee6ad1bb6fafd8ff414134a1182a2ba6a9964fd20339292569b985adb",
+  "metrics": {
+    "mae_p50": 43.019105604344574,
+    "calibration_pinball_mean": 12.381527638941948,
+    "coverage_p10_p90": 0.8002247191011236,
+    "brier_spike_mean": 0.09454456131570665,
+    "brier_direction": 0.4177469489601392,
+    "rows_scored_price": 26700.0
+  },
+  "finished_epoch": 1794023379.4945138
+}
