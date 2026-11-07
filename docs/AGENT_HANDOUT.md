@@ -188,3 +188,4 @@ pip install -r Dataset/starter_package_v1/requirements.txt lightgbm catboost xgb
 6. [x] **Demo Video Script**: Timed 5:00 speaker script ready in [`reports/demo_video_script.md`](../reports/demo_video_script.md).
 7. [ ] **Video Recording**: Record a $\le 5$-minute screencast using `app/dashboard.py` and upload to Loom/YouTube.
 8. [ ] **Platform Upload**: Upload CSV, video link, slide PDF, and GitHub repository URL via the Since AI app.
+
