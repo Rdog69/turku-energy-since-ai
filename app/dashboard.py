@@ -88,7 +88,28 @@ def load_forecast_and_spot():
     return df_fc, spot
 
 
+@st.cache_data
+def load_frank_predictions():
+    f_path = WORKSPACE_DIR / "results" / "v4_n50" / "test" / "forecast_backtest.csv"
+    if not f_path.exists():
+        f_path = WORKSPACE_DIR / "results" / "v4_n50" / "validation" / "forecast_backtest.csv"
+    if f_path.exists():
+        df = pd.read_csv(f_path)
+        return df.set_index(["forecast_origin_utc", "step"])
+    return None
+
+
+@st.cache_data
+def load_actuals_file():
+    val_path = WORKSPACE_DIR / "Dataset" / "starter_package_v1" / "data" / "actuals_validation.csv"
+    if val_path.exists():
+        return pd.read_csv(val_path).set_index("delivery_start_utc")
+    return None
+
+
 df_forecast, df_spot = load_forecast_and_spot()
+df_frank_pred = load_frank_predictions()
+df_actuals_all = load_actuals_file()
 origins = sorted(df_forecast["forecast_origin_utc"].unique().tolist())
 
 # Sidebar: Time Travel Controls & Golden Scenario Bookmarks
@@ -121,20 +142,27 @@ cutoff_time = origin_data.loc[0, "data_cutoff_utc"] if "data_cutoff_utc" in orig
 
 st.sidebar.info(f"**Viewing Origin:**\n`{selected_origin}`\n\n**Data Cut-off (Latest Usable):**\n`{cutoff_time}`")
 
+st.sidebar.markdown("### 🔍 Verification & Audit Mode")
+show_actuals = st.sidebar.checkbox(
+    "☑️ Overlay Realized Actuals",
+    value=False,
+    help="Jury Verification Mode: Overlays true settled imbalance prices and audits window performance"
+)
+
 # Header Section
 st.title("⚡ Turku Energia Situation Room")
 st.markdown(f"**Operational 10-Hour Imbalance Price & Risk Forecast** | Origin: `{selected_origin}`")
 
-# Metrics Banner (Grand Champion V2)
+# Metrics Banner (Grand Champion Final)
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Model MAE ($p_{50}$)", "40.73 €/MWh", "-38.5% vs Baseline (66.20)")
+    st.metric("Model MAE ($p_{50}$)", "40.97 €/MWh", "-38.1% vs Baseline (66.20)")
 with col2:
-    st.metric("Calibration Pinball ($p_{10}/p_{90}$)", "11.76", "-51.4% (Coverage: 80.0%)")
+    st.metric("Calibration Pinball ($p_{10}/p_{90}$)", "11.61", "-52.0% (Coverage: 80.1%)")
 with col3:
-    st.metric("Spike Brier Score", "0.0862", "-23.9% vs Baseline (0.1132)")
+    st.metric("Spike Brier Score", "0.0860", "-24.0% vs Baseline (0.1132)")
 with col4:
-    st.metric("Direction Brier Score", "0.3812", "-15.5% vs Baseline (0.4509)")
+    st.metric("Direction Brier Score", "0.3803", "-15.7% vs Baseline (0.4509)")
 
 # Previous Origin Revision Detection (Origin t vs Origin t - 1h)
 origin_ts = pd.to_datetime(selected_origin)
@@ -186,6 +214,42 @@ if has_conflict:
         """,
         unsafe_allow_html=True,
     )
+
+# Consensus Strip (Dual-NWP Weather vs. Real-Time Grid Telemetry)
+if df_frank_pred is not None:
+    frank_p50s = []
+    for step_num in origin_data["step"]:
+        k = (selected_origin, step_num)
+        if k in df_frank_pred.index:
+            frank_p50s.append(float(df_frank_pred.loc[k, "p50"]))
+        else:
+            frank_p50s.append(float(origin_data.loc[origin_data["step"] == step_num, "p50"].iloc[0]))
+    frank_p50s = np.array(frank_p50s)
+    p50_blend = origin_data["p50"].values
+    deltas = 2.0 * np.abs(p50_blend - frank_p50s)
+    max_div = float(np.max(deltas)) if len(deltas) > 0 else 0.0
+    div_step = int(origin_data["step"].iloc[int(np.argmax(deltas))]) if len(deltas) > 0 else 1
+
+    if max_div < 15.0:
+        st.markdown(
+            f"""
+            <div style="background-color: #14281E; border-left: 5px solid #52C41A; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;">
+                <b style="color: #52C41A;">🟢 High Model Consensus (NWP Weather vs. Real-Time Telemetry)</b><br>
+                <span style="font-size: 0.9em; color: #D9D9D9;">Dual-NWP wind fleet model (Frank) and Fingrid real-time telemetry (Abdo) closely align (Max |Δp50|: <b>{max_div:.1f} €/MWh</b>). High operational confidence in baseline positions.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="background-color: #2D271E; border-left: 5px solid #FAAD14; padding: 10px 14px; border-radius: 6px; margin-bottom: 12px;">
+                <b style="color: #FAAD14;">🟡 Weather vs. Real-Time Telemetry Divergence (|Δp50| ≥ 15 €/MWh)</b><br>
+                <span style="font-size: 0.9em; color: #D9D9D9;">Fingrid real-time nowcasting deviates from NWP day-ahead wind ramp by up to <b>{max_div:.1f} €/MWh</b> (at step {div_step}). Expert review recommended before locking intraday bids.</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 # Alert & Operational Suggestions
 st.markdown("### 🔍 Operator Action & Situational Brief")
@@ -256,6 +320,34 @@ with sugg_col2:
             unsafe_allow_html=True,
         )
 
+# Live Actuals Audit (Jury Verification Mode)
+actual_sub = None
+if show_actuals and df_actuals_all is not None:
+    matched = origin_data["delivery_start_utc"].isin(df_actuals_all.index)
+    if matched.any():
+        actual_sub = df_actuals_all.loc[df_actuals_all.index.intersection(origin_data["delivery_start_utc"])].reset_index()
+        if not actual_sub.empty:
+            merged_act = origin_data.merge(actual_sub, on="delivery_start_utc")
+            if not merged_act.empty:
+                w_mae = (merged_act["imbalance_price"] - merged_act["p50"]).abs().mean()
+                w_cov = ((merged_act["p10"] <= merged_act["imbalance_price"]) & (merged_act["imbalance_price"] <= merged_act["p90"])).mean() * 100
+                n_in = int(((merged_act["p10"] <= merged_act["imbalance_price"]) & (merged_act["imbalance_price"] <= merged_act["p90"])).sum())
+                st.markdown(
+                    f"""
+                    <div style="background-color: #162436; border: 1px solid #1890FF; border-radius: 8px; padding: 12px 18px; margin-bottom: 14px;">
+                        <b style="color: #40A9FF; font-size: 1.05em;">🎯 Live 10-Hour Window Audit (Jury Verification Mode)</b>
+                        <div style="display: flex; gap: 30px; margin-top: 8px; flex-wrap: wrap;">
+                            <div>Window MAE: <b style="color: #52C41A;">{w_mae:.2f} €/MWh</b></div>
+                            <div>P10–P90 Coverage: <b>{w_cov:.1f}%</b> ({n_in}/{len(merged_act)} quarters inside band)</div>
+                            <div>Settled Quarters Audited: <b>{len(merged_act)} / 40</b></div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.sidebar.caption("ℹ️ Actuals unavailable for unlabelled test period.")
+
 # Main Forecast Fan Chart
 st.markdown("### 📈 10-Hour Forecast Fan Chart (P10 – P50 – P90 vs Spot & Run-to-Run Delta)")
 
@@ -324,6 +416,36 @@ if df_spot is not None and not df_spot.empty:
                 name="Day-Ahead Spot Price (Anchor)",
             )
         )
+
+# Realized Actuals Overlay (Jury Verification Mode)
+if actual_sub is not None and not actual_sub.empty:
+    actual_sub["delivery_dt"] = pd.to_datetime(actual_sub["delivery_start_utc"])
+    actual_sub = actual_sub.sort_values("delivery_dt")
+    fig.add_trace(
+        go.Scatter(
+            x=actual_sub["delivery_dt"],
+            y=actual_sub["imbalance_price"],
+            mode="lines+markers",
+            line=dict(color="#FF4D4F", width=2.5),
+            marker=dict(size=7, symbol="diamond", color="#FF4D4F"),
+            name="Realized Actual Imbalance Price (Settled)",
+        )
+    )
+
+# Highlight primary action window (Steps 4-12: 1h-3h pre-gate closure)
+if len(deliveries) >= 12:
+    fig.add_vrect(
+        x0=deliveries.iloc[3],
+        x1=deliveries.iloc[11],
+        fillcolor="rgba(250, 173, 20, 0.08)",
+        layer="below",
+        line_width=1,
+        line_dash="dash",
+        line_color="rgba(250, 173, 20, 0.4)",
+        annotation_text="⚡ Primary Action Window (1h–3h Pre-Gate Closure)",
+        annotation_position="top left",
+        annotation=dict(font_size=10, font_color="#FAAD14"),
+    )
 
 fig.update_layout(
     template="plotly_dark",

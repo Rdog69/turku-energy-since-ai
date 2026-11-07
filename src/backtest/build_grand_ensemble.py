@@ -58,6 +58,10 @@ def build_grand_ensemble():
     probs = out[["p_up", "p_down", "p_none"]].clip(0, 1)
     out[["p_up", "p_down", "p_none"]] = probs.div(probs.sum(axis=1), axis=0)
 
+    # Physical Direction Envelope (Experiment 1D): A price spike cannot exceed parent direction probability
+    out["p_spike_high"] = np.minimum(out["p_spike_high"], out["p_up"])
+    out["p_spike_low"] = np.minimum(out["p_spike_low"], out["p_down"])
+
     # Spike guard: ensure p_spike_high + p_spike_low <= 1.0
     s = out["p_spike_high"] + out["p_spike_low"]
     scale = np.where(s > 1.0, 1.0 / s, 1.0)
@@ -111,6 +115,8 @@ def build_grand_ensemble():
     frank_val_path = REPO_ROOT / "results" / "v4_n50" / "validation" / "forecast_backtest.csv"
     df_frank_val = pd.read_csv(frank_val_path)
     val_team5050["top_drivers"] = df_frank_val["top_drivers"].fillna("spot;wind_fc;cons_fc")
+    val_team5050["p_spike_high"] = np.minimum(val_team5050["p_spike_high"], val_team5050["p_up"])
+    val_team5050["p_spike_low"] = np.minimum(val_team5050["p_spike_low"], val_team5050["p_down"])
 
     VAL_OUT_DIR.mkdir(parents=True, exist_ok=True)
     val_file = VAL_OUT_DIR / "forecast_backtest.csv"
