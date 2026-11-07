@@ -154,7 +154,9 @@ Submitted through the Since AI platform by **Sunday 8 November, 10:00**. Require
 
 ## 🎬 Demo video
 
-<p align="center"><a href="media/tasehinta-demo.mp4"><b>▶ media/tasehinta-demo.mp4</b></a></p>
+<video src="media/tasehinta-demo.mp4" controls width="100%"></video>
+
+<p align="center"><a href="media/tasehinta-demo.mp4"><b>▶ If the player doesn't load: open or download the video</b></a></p>
 
 ## 🚀 Run it
 
