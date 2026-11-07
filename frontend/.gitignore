@@ -24,6 +24,6 @@ dist-ssr
 *.sw?
 
 # local only: licensed Nord Pool spot prices (frontend/scripts/build_data.py)
-src/data/payload.js
+public/payload.json
 bundle.html
 .parcel-cache

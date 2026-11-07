@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "bundle": "vite build --mode single && rm -f dist/payload.json && node scripts/inline_payload.mjs"
   },
   "dependencies": {
     "@fontsource-variable/source-sans-3": "^5.3.1",
@@ -72,6 +73,7 @@
     "tailwindcss": "3.4.1",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vite-plugin-singlefile": "^2.3.4"
   }
 }

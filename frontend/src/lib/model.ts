@@ -1,10 +1,17 @@
-import payload from "@/data/payload.js";
-import type { Alert, FcKey, Period } from "@/data/payload";
+import type { Alert, FcKey, Payload, Period } from "@/data/types";
 import { Q_MS } from "./time";
 
 export const STEPS = 40;
-export const PAYLOAD = payload;
-export const PERIOD_IDS = ["val", "test"].filter((k) => k in payload.periods);
+export let PAYLOAD: Payload;
+export let PERIOD_IDS: string[] = [];
+
+/** the data: inlined in bundle.html (<script id="payload" type="application/json">), else public/payload.json */
+export async function loadPayload(): Promise<void> {
+  const el = document.getElementById("payload");
+  const p: Payload = el?.textContent ? JSON.parse(el.textContent) : await (await fetch("payload.json")).json();
+  PAYLOAD = p;
+  PERIOD_IDS = ["val", "test"].filter((k) => k in p.periods);
+}
 
 export const qMs = (p: Period, gi: number) => p.t0 + gi * Q_MS;
 /** review time of forecast hour i, in minutes from t0 (the forecast origin) */

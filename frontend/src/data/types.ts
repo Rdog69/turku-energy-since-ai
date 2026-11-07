@@ -1,4 +1,4 @@
-// Shape of src/data/payload.js, written by frontend/scripts/build_data.py.
+// Shape of public/payload.json, written by frontend/scripts/build_data.py (inlined into bundle.html by `pnpm bundle`).
 // Times on the quarter grid are indices (15 min each) from `t0`; publication times (`*_fu`, `cutoff`) are minutes from `t0`.
 
 export type AlertKind = "spike_high" | "spike_low" | "dir_up" | "changed" | "conflict" | "review";
@@ -40,5 +40,3 @@ export interface Payload {
   periods: Record<string, Period>;
 }
 
-declare const payload: Payload;
-export default payload;

@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pause, Play } from "lucide-react";
 import * as Slider from "@radix-ui/react-slider";
-import type { Period } from "@/data/payload";
+import type { Period } from "@/data/types";
 import { alertWeights, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { dateShort, dayLong, hhmm, hourOf, type Lang } from "@/lib/time";

@@ -1,4 +1,4 @@
-import type { Alert, Period } from "@/data/payload";
+import type { Alert, Period } from "@/data/types";
 import { qMs, reviewMs, windowDrivers } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
 import { Q_MS, hhmm, type Lang } from "@/lib/time";

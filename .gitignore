@@ -59,4 +59,4 @@ external_data/history/package_ext/
 
 # front-end: keep the type declarations, never the generated payload (licensed spot prices)
 !frontend/src/data/
-frontend/src/data/payload.js
+frontend/public/payload.json

@@ -1,4 +1,4 @@
-import type { Alert, Period } from "@/data/payload";
+import type { Alert, Period } from "@/data/types";
 import { STEPS, driverTokens, forecastAt, known, qMs, reviewMin } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
 import { hhmm, type Lang } from "@/lib/time";

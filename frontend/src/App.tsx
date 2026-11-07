@@ -5,7 +5,7 @@ import { ChartLegend, FanChart } from "@/components/FanChart";
 import { AlertList, alertKey } from "@/components/AlertList";
 import { QuarterTable } from "@/components/QuarterTable";
 import { Hindsight } from "@/components/Hindsight";
-import type { Alert } from "@/data/payload";
+import type { Alert } from "@/data/types";
 import { PAYLOAD, PERIOD_IDS, defaultHour, sortedAlerts } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/time";

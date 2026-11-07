@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scaleLinear } from "d3-scale";
 import { area, curveStepAfter, line } from "d3-shape";
-import type { Period } from "@/data/payload";
+import type { Period } from "@/data/types";
 import { hindsight, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
 import { Q_MS, dateShort, hourOf, type Lang } from "@/lib/time";
