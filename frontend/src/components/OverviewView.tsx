@@ -86,7 +86,7 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
             onPan={pan} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
             onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
         </div>
-        <div className="mt-2"><PeriodStrip p={p} tNow={T} view={view} lang={lang} onPan={pan} onJump={jump} /></div>
+        <div className="mt-2"><PeriodStrip p={p} i={i} now={T} view={view} lang={lang} onPan={pan} onPanEnd={() => { rest.current = 0; }} onJump={jump} /></div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />
         </div>

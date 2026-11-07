@@ -169,6 +169,7 @@ const en: Dict = {
   level_medium: "watch",
   level_info: "info",
   // united overview page
+  oPeriod: "Whole period",
   tcRange: "Range",
   tcHiShort: "High risk",
   tcLoShort: "Low risk",
@@ -379,6 +380,7 @@ const fi: Dict = {
   level_medium: "seuraa",
   level_info: "tieto",
   // yhdistetty yleisnäkymä
+  oPeriod: "Koko jakso",
   tcRange: "Väli",
   tcHiShort: "Korkea riski",
   tcLoShort: "Matala riski",

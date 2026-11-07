@@ -13,6 +13,7 @@ const H_MS = 3600_000;
 export const H = H_MS;
 export const BACK = 0.375; // share of the window left of "now"
 const M = { l: 134, r: 96, t: 70 };   // top margin holds the hover card, so it never covers the data
+export const PLOT_MARGIN = { l: M.l, r: M.r };   // the period strip lines up with the plot area
 const PLOT_H = 244, DIR_GAP = 24, DIR_H = 24, RISK_GAP = 30, RISK_HALF = 30, AXIS_H = 36;
 const HI_THR = 0.4, LO_THR = 0.5; // the alert thresholds for high- and low-price risk
 
