@@ -208,3 +208,41 @@ def test_external_series_ignore_unpublished_rows():
             np.testing.assert_array_equal(idx.latest(t)[0], part[sid].latest(t)[0], err_msg=f"{sid} {t}")
             np.testing.assert_allclose(idx.value_at(times, t), part[sid].value_at(times, t),
                                        equal_nan=True, err_msg=f"{sid} {t}")
+
+
+def _icon():
+    from src.data.open_meteo import OUT_DIR
+    from src.data.weather import WeatherIndex
+    path = OUT_DIR / "icon_eu.parquet"
+    if not path.exists():
+        pytest.skip("ICON-EU runs not downloaded (python -m src.data.open_meteo --model icon_eu)")
+    return WeatherIndex.load(path=path)
+
+
+def test_icon_features_ignore_unpublished_runs():
+    """Truncate BOTH weather indices to runs usable at t: ICON and spread features must not change."""
+    from src.features.build import WEATHER2_COLUMNS, WEATHER_COLUMNS
+    weather, icon = _weather(), _icon()
+    origins = _origins(n_random=8, seed=3)
+    full = build_features(LONG, origins, with_targets=False, weather=weather, weather2=icon)
+    assert full["om_icon_wind_idx"].notna().mean() > 0.95, "ICON coverage unexpectedly low"
+    cols = WEATHER_COLUMNS + WEATHER2_COLUMNS
+    for t in origins:
+        truncated = LONG.loc[LONG["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False,
+                              weather=weather.truncated(t), weather2=icon.truncated(t))
+        a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
+        b = part[cols].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"icon features at {t}")
+
+
+def test_icon_run_used_was_published():
+    from src.data.availability import to_ns
+    icon = _icon()
+    o = to_ns(_origins(n_random=20, seed=4))
+    _, run = icon.lookup(o, o, "wind_idx")
+    found = run >= 0
+    fu = icon.run_fu[np.searchsorted(icon.run_init, run[found])]
+    assert (fu <= o[found]).all()
+    # ICON delay rule: first usable = ceil_hour(run init + 5 h)
+    assert ((icon.run_fu - icon.run_init) == 5 * 3_600_000_000_000).all()

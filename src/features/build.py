@@ -134,8 +134,22 @@ def add_rt_imbalance(per_origin: pd.DataFrame, index: dict[str, SeriesIndex], or
         per_origin["rt_hydro_change_1h"] = h[0] - h[1]
 
 
+def add_weather2(f: pd.DataFrame, index: dict[str, SeriesIndex], weather, icon) -> pd.DataFrame:
+    """Second weather model (ICON-EU) and model disagreement. Same availability-aware lookups:
+    both the ECMWF and the ICON run are the newest one usable at the origin."""
+    o = to_ns(f["origin"])
+    d = to_ns(f["delivery"])
+    wind, _ = icon.lookup(o, d, "wind_idx")
+    da_time = np.minimum(index["fi_wind_fc_da"].first_usable_at(d), o)
+    wind_da, _ = icon.lookup(da_time, d, "wind_idx")
+    f["om_icon_wind_idx"] = wind
+    f["om_icon_wind_rev"] = wind - wind_da
+    f["om_model_spread"] = np.abs(weather.lookup(o, d, "wind_idx")[0] - wind)
+    return f
+
+
 def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | None = None,
-                   with_targets: bool = True, weather=None) -> pd.DataFrame:
+                   with_targets: bool = True, weather=None, weather2=None) -> pd.DataFrame:
     """Feature (and optional target) table for the given hourly origins.
 
     weather: optional WeatherIndex (src/data/weather.py) to add the om_* columns.
@@ -242,6 +256,8 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
 
     if weather is not None:
         f = add_weather(f, index, weather)
+        if weather2 is not None:
+            f = add_weather2(f, index, weather, weather2)
     if with_targets:
         f = add_targets(f, index)
     return f
@@ -299,3 +315,7 @@ WEATHER_COLUMNS = [
     "om_wind_idx", "om_wind_idx_da", "om_wind_rev", "om_wind_rev_mw", "om_wind_speed",
     "om_temp", "om_icing", "om_lead_h",
 ]
+
+# Second weather model (ICON-EU) and ECMWF-vs-ICON disagreement.
+WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
+WEATHER2_SPREAD_COLUMNS = ["om_model_spread"]
