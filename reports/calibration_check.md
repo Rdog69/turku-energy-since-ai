@@ -1,6 +1,6 @@
 # Reliability check of the probabilities (validation period, 7 Sep - 4 Oct 2026)
 
-Quarter-hours are binned by forecast probability (all 40 steps pooled); `pred` is the mean forecast in the bin, `obs` the observed frequency, `n` the number of rows. A calibrated model has obs close to pred. Rows within a bin are strongly autocorrelated (40 origins forecast each quarter-hour), so the effective sample is much smaller than `n`.
+Quarter-hours are binned by forecast probability (all 40 steps pooled); `pred` is the mean forecast in the bin, `obs` the observed frequency, `n` the number of rows. A calibrated model has obs close to pred. Rows within a bin are strongly autocorrelated (10 hourly origins forecast each quarter-hour), so the effective sample is much smaller than `n`.
 
 ## split_all
 
@@ -50,5 +50,5 @@ Quarter-hours are binned by forecast probability (all 40 steps pooled); `pred` i
 - **High spikes**: close to calibrated, slightly under-confident at the low end (forecast 0.01-0.07, observed 0.02-0.11) and over-confident at the top (forecast 0.58, observed 0.47). Mean forecast 0.114 vs observed 0.121.
 - **Low spikes**: over-forecast across the whole range (mean forecast 0.183 vs observed 0.130). Forecasts of 0.03-0.12 almost never happened (observed 0.00-0.05), and the 0.57 bin realised 0.46. The probabilities are over-confident, so low-spike Brier (0.0866) leaves room.
 - **Direction (p_up)**: reliable in the middle, but over-confident at both ends. Forecast 0.11 realised 0.18, and forecasts of 0.74 and 0.84 realised 0.64 and 0.76. Shrinking the extremes would help a little.
-- Bins are strongly autocorrelated (each quarter-hour is forecast from 40 origins), so deviations of a few points in the thin bins are not significant.
+- Bins are strongly autocorrelated (each quarter-hour is forecast from 10 hourly origins), so deviations of a few points in the thin bins are not significant.
 - Only split_all is plotted. A second series for pooled calibration (split_all_pcal) can be added with the same script once its validation forecast exists.
