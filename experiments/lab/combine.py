@@ -65,7 +65,15 @@ def combine(recipe: dict, mode: str, tag: str) -> Path:
     out["p_spike_high"], out["p_spike_low"] = out.p_spike_high / sl, out.p_spike_low / sl
     for c in ["p10", "p50", "p90", "p_up", "p_down", "p_none", "p_spike_high", "p_spike_low"]:
         out[c] = out[c].round(6)
+    # optional columns: drivers from the first member that has them (Frank's TreeSHAP drivers), freshest data cutoff
     out["top_drivers"] = ""
+    for n in names:
+        if "top_drivers" in frames[n] and frames[n]["top_drivers"].notna().any():
+            out["top_drivers"] = frames[n].loc[out.index, "top_drivers"].fillna("").to_numpy()
+            break
+    cuts = [frames[n].loc[out.index, "data_cutoff_utc"] for n in names if "data_cutoff_utc" in frames[n]]
+    if cuts:
+        out["data_cutoff_utc"] = pd.concat(cuts, axis=1).max(axis=1).to_numpy()   # ISO strings sort as times
     out = out.reset_index()[list(pd.read_csv(member_file(names[0], mode), nrows=1).columns)]
     path = SUB / (f"forecast_backtest_{tag}.csv" if mode == "test" else f"validation_{tag}.csv")
     out.to_csv(path, index=False, lineterminator="\n")
