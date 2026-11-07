@@ -1,13 +1,13 @@
-# Slides (5–8)
+# Slides
 
-**Placeholder.** Jim's draft is on `brainstorming-jim`: `reports/slides.md`, `.html` and `.pdf`. Put the final PDF here as `slides.pdf`.
+**The pitch deck:** [`tasehinta_pitch_deck.pdf`](tasehinta_pitch_deck.pdf) (7 slides), with the editable [`tasehinta_pitch_deck.pptx`](tasehinta_pitch_deck.pptx). Speaker notes are in the PowerPoint file.
 
-Suggested flow, one idea per slide:
+1. **Tasehinta:** the one-line promise and the headline result
+2. **The problem:** a missed plan is settled at a price nobody knows yet
+3. **Our solution:** every hour, 40 quarter-hours, four answers each
+4. **How it works:** one ensemble model, built only from what was known at the time
+5. **Results:** 36.7 % better than the baseline (September), 29.0 % (August)
+6. **The situational view:** the live dashboard
+7. **What's next:** from "check this" to "offer this"
 
-1. **The problem:** a forecast error is settled at the imbalance price, which follows the grid's balancing direction.
-2. **Our approach:** direction first, then the price gap for each direction, giving one consistent forecast.
-3. **Data, only as known at the time:** the package, Fingrid real-time, weather-run revisions, 19 months of history with the June price rule rebuilt.
-4. **Results:** September and August against the baseline (the table in `report/`).
-5. **What drives the price:** drivers in plain language.
-6. **The situational view:** Simple / Trader / Production views, time travel, hindsight.
-7. **Limits and next steps.**
+Photos: Oulunsalo wind farm by Estormiz (CC0); Kashima Power Line 07 by Σ64 (CC BY 4.0); both via Wikimedia Commons.
