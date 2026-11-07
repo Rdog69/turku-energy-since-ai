@@ -3,8 +3,6 @@ import type { Lang } from "./time";
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  tcReset: "Reset view",
-  tcHover: "Point at the graph to read any quarter-hour.",
   zoomIn: "Zoom in",
   zoomOut: "Zoom out",
   zoomReset: "Show everything",
@@ -209,8 +207,6 @@ const en: Dict = {
 };
 
 const fi: Dict = {
-  tcReset: "Palauta näkymä",
-  tcHover: "Osoita kaaviota nähdäksesi minkä tahansa vartin arvot.",
   zoomIn: "Lähennä",
   zoomOut: "Loitonna",
   zoomReset: "Näytä kaikki",

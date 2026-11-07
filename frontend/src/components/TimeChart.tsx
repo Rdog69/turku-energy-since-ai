@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { scaleLinear } from "d3-scale";
 import { area, curveMonotoneX, curveStepAfter, line } from "d3-shape";
-import { ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
 import { STEPS, forecastAt, known, qMs, reviewMin, reviewMs } from "@/lib/model";
 import { t } from "@/lib/i18n";
@@ -21,12 +21,12 @@ const pct = (v: number) => `${Math.round(v * 100)} %`;
  * the review moment ("now") travels with the view, so nothing published after it is ever shown.
  * Left of "now": what was known (realised price, realised direction). Right: the forecast made at "now".
  */
-export function TimeChart({ p, i, win, lang, focus, zones, onPan, onPanEnd, onZoom, onResetZoom, span, onQuarter, nowOffset = 0, manipulated = false }: {
+export function TimeChart({ p, i, win, lang, focus, zones, onPan, onPanEnd, onZoom, onResetZoom, span, onQuarter, nowOffset = 0 }: {
   p: Period; i: number; win: [number, number]; lang: Lang; focus: Alert | null; zones: boolean;
   onPan: (ms: number) => void; onPanEnd: () => void; onZoom: (factor: number) => void; onResetZoom: () => void;
   span: number; onQuarter: (s: number) => void;
-  /** minutes past the forecast hour the review moment sits at (scrolling moves in 15-minute steps) */
-  nowOffset?: number; manipulated?: boolean;
+  /** ms past forecast hour i where the review moment sits (scrolling moves in 15-minute steps) */
+  nowOffset?: number;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -73,7 +73,6 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onPanEnd, onZo
     return ((e.clientX - r.left) / r.width) * W;
   };
 
-  // the review moment: the forecast hour plus the 15-minute steps scrolled past it (the newest forecast is still hour i's)
   const T = reviewMs(p, i) + nowOffset;
   const Tmin = reviewMin(p, i) + nowOffset / 60_000;
   const o = p.origins[i];
@@ -179,13 +178,11 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onPanEnd, onZo
 
   return (
     <div ref={wrap} className="relative w-full select-none">
-      <div className="flex h-[54px] items-center justify-between gap-4 overflow-hidden border-b border-rule/70 pb-1">
-        <Readout p={p} hover={hover} hs={hs} hp={hp} F={F} o={o} lang={lang} />
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span className="num mr-1 text-[12.5px] text-ink-3">{t(lang, "tcSpan", { h: spanH })}</span>
-          <button type="button" className={btn} onClick={() => onZoom(0.5)} aria-label={t(lang, "zoomIn")} title={t(lang, "zoomIn")}><ZoomIn size={16} strokeWidth={1.75} /></button>
-          <button type="button" className={btn} onClick={() => onZoom(2)} aria-label={t(lang, "zoomOut")} title={t(lang, "zoomOut")}><ZoomOut size={16} strokeWidth={1.75} /></button>
-        </div>
+      <div className="absolute right-0 top-0 z-[2] flex items-center gap-1.5">
+        <span className="num mr-1 text-[12.5px] text-ink-3">{t(lang, "tcSpan", { h: spanH })}</span>
+        <button type="button" className={btn} onClick={() => onZoom(0.5)} aria-label={t(lang, "zoomIn")} title={t(lang, "zoomIn")}><ZoomIn size={16} strokeWidth={1.75} /></button>
+        <button type="button" className={btn} onClick={() => onZoom(2)} aria-label={t(lang, "zoomOut")} title={t(lang, "zoomOut")}><ZoomOut size={16} strokeWidth={1.75} /></button>
+        <button type="button" className={btn} onClick={onResetZoom} aria-label={t(lang, "zoomReset")} title={t(lang, "zoomReset")}><Maximize2 size={15} strokeWidth={1.75} /></button>
       </div>
 
       <svg ref={svgRef} width={W} height={Hgt} viewBox={`0 0 ${W} ${Hgt}`} role="img"
@@ -296,44 +293,37 @@ export function TimeChart({ p, i, win, lang, focus, zones, onPan, onPanEnd, onZo
         ))}
       </svg>
 
-      {/* reset: small grey text under the right end of the graph, only after the view was moved or zoomed */}
-      <div className="flex h-5 justify-end pr-[92px]">
-        {manipulated && (
-          <button type="button" onClick={onResetZoom} className="text-[12.5px] text-ink-3 underline-offset-2 transition-colors duration-150 hover:text-ink-2 hover:underline">
-            {t(lang, "tcReset")}
-          </button>
-        )}
-      </div>
+      {hover !== null && (hs !== null || hp) && (
+        <div className="pointer-events-none absolute top-10 z-10 min-w-[210px] rounded-lg border border-rule bg-sheet px-3.5 py-2.5 text-[13px] shadow-[0_8px_24px_-10px_rgba(20,34,51,0.4)]"
+          style={{ left: Math.min(W - 230, Math.max(0, x(qMs(p, hover)) + 16)) }}>
+          <div className="num mb-1.5 font-semibold text-ink">{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</div>
+          {hs === null && hp && (
+            <>
+              <Row k={t(lang, "realised")} v={hp.y === null ? (hover < o ? t(lang, "tcNotYet") : "–") : `${fmt0(hp.y)} €/MWh`} strong />
+              <Row k={t(lang, "sSpot")} v={hp.spot === null ? "–" : `${fmt0(hp.spot)} €/MWh`} />
+              {hp.dir !== null && <Row k={t(lang, "direction")} v={t(lang, hp.dir > 0 ? "up" : hp.dir < 0 ? "down" : "none")} />}
+            </>
+          )}
+          {hs !== null && (
+            <>
+              <Row k={t(lang, "sMedian")} v={`${fmt0(F.p50[hs])} €/MWh`} strong />
+              <Row k={t(lang, "sBand")} v={`${fmt0(F.p10[hs])} – ${fmt0(F.p90[hs])}`} />
+              {hp?.spot !== null && hp?.spot !== undefined && <Row k={t(lang, "sSpot")} v={`${fmt0(hp.spot)} €/MWh`} />}
+              <div className="mt-1.5 flex justify-between gap-4"><span className="text-verm">{t(lang, "up")} {pct(F.pu[hs])}</span><span className="text-teal">{t(lang, "down")} {pct(F.pd[hs])}</span></div>
+              <div className="flex justify-between gap-4 text-ink-2"><span>{t(lang, "highRisk")} {pct(F.hi[hs])}</span><span>{t(lang, "lowRisk")} {pct(F.lo[hs])}</span></div>
+              <div className="mt-1.5 text-[12px] text-ink-3">{t(lang, "tcClick")}</div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-/** the values under the pointer, in a fixed line above the plot so nothing covers the graph */
-function Readout({ p, hover, hs, hp, F, o, lang }: {
-  p: Period; hover: number | null; hs: number | null; hp: { y: number | null; spot: number | null; dir: number | null } | undefined;
-  F: ReturnType<typeof forecastAt>; o: number; lang: Lang;
-}) {
-  if (hover === null || (hs === null && !hp)) return <p className="text-[13px] text-ink-3">{t(lang, "tcHover")}</p>;
-  const Item = ({ k, v, c = "text-ink" }: { k: string; v: string; c?: string }) => (
-    <span className="inline-flex items-baseline gap-1.5"><span className="text-[12px] text-ink-3">{k}</span><span className={`num text-[14px] font-semibold ${c}`}>{v}</span></span>
-  );
+function Row({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-0.5">
-      <span className="num text-[14px] font-bold text-ink">{hhmm(qMs(p, hover), lang)}–{hhmm(qMs(p, hover + 1), lang)}</span>
-      {hs === null && hp && (<>
-        <Item k={t(lang, "realised")} v={hp.y === null ? (hover < o ? t(lang, "tcNotYet") : "–") : `${fmt0(hp.y)} €/MWh`} />
-        <Item k={t(lang, "sSpot")} v={hp.spot === null ? "–" : `${fmt0(hp.spot)}`} c="text-ink-2" />
-        {hp.dir !== null && <Item k={t(lang, "direction")} v={t(lang, hp.dir > 0 ? "up" : hp.dir < 0 ? "down" : "none")} c={hp.dir > 0 ? "text-verm" : "text-teal"} />}
-      </>)}
-      {hs !== null && (<>
-        <Item k={t(lang, "sMedian")} v={`${fmt0(F.p50[hs])} €/MWh`} c="text-bank" />
-        <Item k={t(lang, "sBand")} v={`${fmt0(F.p10[hs])}–${fmt0(F.p90[hs])}`} c="text-ink-2" />
-        {hp?.spot !== null && hp?.spot !== undefined && <Item k={t(lang, "sSpot")} v={fmt0(hp.spot)} c="text-ink-2" />}
-        <Item k={t(lang, "up")} v={pct(F.pu[hs])} c="text-verm" />
-        <Item k={t(lang, "down")} v={pct(F.pd[hs])} c="text-teal" />
-        <Item k={t(lang, "highRisk")} v={pct(F.hi[hs])} c={F.hi[hs] >= 0.4 ? "text-verm" : "text-ink-2"} />
-        <Item k={t(lang, "lowRisk")} v={pct(F.lo[hs])} c={F.lo[hs] >= 0.5 ? "text-teal" : "text-ink-2"} />
-      </>)}
+    <div className={`flex justify-between gap-4 ${strong ? "font-semibold text-ink" : "text-ink-2"}`}>
+      <span>{k}</span><span className="num">{v}</span>
     </div>
   );
 }

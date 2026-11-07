@@ -2,7 +2,6 @@ import { Factory, Info, LayoutDashboard, Lock, ShieldCheck, type LucideIcon } fr
 import { PAYLOAD, PERIOD_IDS } from "@/lib/model";
 import { Tip } from "./Bits";
 import { t } from "@/lib/i18n";
-import { LogoMark, Wordmark } from "./Brand";
 import type { Lang } from "@/lib/time";
 
 // Simple and Trader were united into one Overview page (team feedback, 7 Nov); their components stay in the code.
@@ -20,10 +19,7 @@ export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
   return (
     <aside className="flex flex-col gap-8 bg-bank px-5 py-6 text-bank-ink lg:sticky lg:top-0 lg:h-screen lg:w-[244px] lg:shrink-0">
       <div>
-        <p className="flex items-center gap-2.5 text-white">
-          <LogoMark size={30} className="shrink-0" />
-          <Wordmark className="text-[19px] leading-none" />
-        </p>
+        <p className="text-[26px] font-bold leading-none tracking-[-0.01em] text-white">Tasehinta</p>
         <p className="mt-1.5 text-[14px] text-bank-ink2">{t(lang, "tagline")}</p>
       </div>
 

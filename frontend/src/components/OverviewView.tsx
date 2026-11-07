@@ -23,8 +23,8 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
 }) {
   const [panel, setPanel] = useState<{ kind: "alert"; a: Alert } | { kind: "quarter"; s: number } | { kind: "all" } | null>(null);
   const [zones, setZones] = useState(false);
-  // the graph window: "now" sits at BACK of the width. Scrolling, dragging and playback move "now" through time;
-  // it rests on 15-minute steps past the forecast hour (the newest forecast is still that hour's).
+  // the graph window: "now" sits at BACK of the width. Scrolling or dragging moves "now" through time and it rests on
+  // 15-minute steps past the forecast hour (the data change every quarter-hour; the newest forecast is that hour's).
   const Q = 15 * 60_000;
   const [span, setSpan] = useState(16 * H);
   const [offset, setOffset] = useState(0);            // 0 .. 45 min past forecast hour i
@@ -44,24 +44,9 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
   const panEnd = useCallback(() => shift(Math.round(offRef.current / Q) * Q - offRef.current), [shift, Q]);
   const jump = useCallback((v: number) => { offRef.current = 0; setOffset(0); setI(v); }, [setI]);
   useEffect(() => { offRef.current = 0; setOffset(0); }, [p]);
-
-  // playback: a smooth glide, 15 minutes every 0.6 s (one forecast hour in 2.4 s); pausing rests on a quarter-hour
-  useEffect(() => {
-    if (!playing) return;
-    let raf = 0, last = performance.now();
-    const tick = (now: number) => {
-      const dt = Math.min(64, now - last); last = now;
-      if (iRef.current >= n - 1 && offRef.current >= 3 * Q) { setPlaying(false); return; }
-      shift(dt * (Q / 600));
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => { cancelAnimationFrame(raf); shift(Math.round(offRef.current / Q) * Q - offRef.current); };
-  }, [playing, n, shift, setPlaying, Q]);
-
+  useEffect(() => { if (playing) { offRef.current = 0; setOffset(0); } }, [playing]);
   const center = reviewMs(p, i) + offset;
   const view: [number, number] = [center - BACK * span, center + (1 - BACK) * span];
-  const manipulated = span !== 16 * H || offset !== 0;
   const [details, setDetails] = useState(false);
   const alerts = useMemo(() => sortedAlerts(p, i), [p, i]);
   const major = alerts.filter((a) => a.level === "high" || a.kind === "spike_high" || a.kind === "spike_low");
@@ -88,10 +73,9 @@ export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           <TimeChart p={p} i={i} win={view} lang={lang} focus={focus} zones={zones} span={span}
             onPan={pan} onPanEnd={panEnd} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
-            onResetZoom={() => { setSpan(16 * H); offRef.current = 0; setOffset(0); }} onQuarter={(s) => setPanel({ kind: "quarter", s })}
-            nowOffset={offset} manipulated={manipulated} />
+            onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} nowOffset={offset} />
         </div>
-        {/* where the graph sits in the whole period: a half-transparent window on the period strip */}
+        {/* the whole period with the days: the half-transparent window is the part the graph shows */}
         <PeriodStrip p={p} i={i} win={view} onJump={(v) => { setPlaying(false); jump(v); }} lang={lang} />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <BalanceSummary p={p} i={i} lang={lang} />

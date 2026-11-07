@@ -36,9 +36,9 @@ export default function App() {
 
   const step = useCallback((d: number) => setI((v) => Math.max(0, Math.min(p.origins.length - 1, v + d))), [p]);
 
-  // play: one forecast hour every 0.7 s (the Overview page runs its own smooth 15-minute glide)
+  // play: one forecast hour every 0.7 s
   useEffect(() => {
-    if (!playing || view === "overview") return;
+    if (!playing) return;
     const id = window.setInterval(() => {
       setI((v) => {
         if (v >= p.origins.length - 1) { setPlaying(false); return v; }
@@ -46,7 +46,7 @@ export default function App() {
       });
     }, 700);
     return () => window.clearInterval(id);
-  }, [playing, p, view]);
+  }, [playing, p]);
 
   // keyboard: arrows move an hour, shift+arrows a day, space plays
   useEffect(() => {
