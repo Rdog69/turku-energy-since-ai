@@ -1,0 +1,91 @@
+import type { Alert, Period } from "@/data/payload";
+import { qMs, reviewMs, windowDrivers } from "@/lib/model";
+import { driverLabel, t } from "@/lib/i18n";
+import { Q_MS, hhmm, type Lang } from "@/lib/time";
+
+const MARK: Record<Alert["kind"], string> = {
+  spike_high: "bg-verm",
+  spike_low: "bg-teal",
+  dir_up: "bg-verm/45",
+  changed: "bg-ochre",
+  conflict: "bg-ochre",
+  review: "bg-ink-2",
+};
+
+export function alertKey(a: Alert) {
+  return `${a.kind}:${a.a}:${a.b}`;
+}
+
+export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
+  p: Period; i: number; alerts: Alert[]; lang: Lang; focus: Alert | null; onFocus: (a: Alert | null) => void;
+}) {
+  const o = p.origins[i];
+  const prev = hhmm(reviewMs(p, i) - 3600_000, lang);
+  const win = (a: Alert) => ({ a: hhmm(qMs(p, o + a.a), lang), b: hhmm(qMs(p, o + a.b) + Q_MS, lang) });
+
+  return (
+    <section aria-labelledby="worth-h" className="flex h-full flex-col">
+      <div className="flex items-baseline justify-between border-b border-rule pb-2">
+        <h2 id="worth-h" className="text-[18px] font-bold text-ink">{t(lang, "worth")}</h2>
+        <span className="num text-[13px] text-ink-3">
+          {alerts.length === 1 ? t(lang, "worthOne") : t(lang, "worthCount", { n: alerts.length })}
+        </span>
+      </div>
+
+      {alerts.length === 0 ? (
+        <div className="py-6">
+          <p className="text-[15px] font-semibold text-ink">{t(lang, "quiet")}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{t(lang, "quietSub")}</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-rule">
+          {alerts.map((a) => {
+            const k = alertKey(a);
+            const open = focus !== null && alertKey(focus) === k;
+            const dim = focus !== null && !open;
+            const w = win(a);
+            const pv = Math.round(a.value * 100);
+            const v = Math.round(Math.abs(a.value));
+            const title = t(lang, `t.${a.kind}`, { ...w, v: a.kind === "changed" ? `${a.value > 0 ? "+" : "−"}${v}` : v });
+            const detail = t(lang, `d.${a.kind}`, { p: pv, v, prev });
+            const rise = a.rise !== null && a.rise !== undefined && Math.abs(a.rise) >= 0.05
+              ? t(lang, a.rise > 0 ? "rise" : "fall", { d: Math.round(Math.abs(a.rise) * 100), prev }) : null;
+            const drivers = windowDrivers(p, i, a.a, a.b).map((d) => driverLabel(d, lang));
+            return (
+              <li key={k} className={`transition-opacity duration-150 ease-out ${dim ? "opacity-50" : "opacity-100"}`}>
+                <button type="button" aria-expanded={open} onClick={() => onFocus(open ? null : a)}
+                  className="group flex w-full items-start gap-3 py-3 text-left">
+                  <span className={`mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px] ${MARK[a.kind]}`} aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="num text-[15px] font-semibold leading-snug text-ink group-hover:text-bank">{title}</span>
+                      <span className={`shrink-0 text-[12px] font-semibold ${a.level === "high" ? "text-verm" : "text-ink-3"}`}>
+                        {t(lang, `level_${a.level}`)}
+                      </span>
+                    </span>
+                    {(a.kind === "spike_high" || a.kind === "spike_low" || a.kind === "dir_up") && (
+                      <span className={`num mt-0.5 block text-[13px] ${a.kind === "spike_low" ? "text-teal" : "text-verm"}`}>
+                        {pv} %.{rise && <span className="text-ink-2"> {rise}</span>}
+                      </span>
+                    )}
+                    {open && (
+                      <span className="mt-2 block space-y-2 text-[14px] text-ink-2">
+                        <span className="block">{detail}</span>
+                        {drivers.length > 0 && (
+                          <span className="block"><span className="font-semibold text-ink">{t(lang, "drivers")}: </span>{drivers.join(", ")}</span>
+                        )}
+                        <span className="block rounded-[4px] bg-paper px-2.5 py-2 font-semibold text-ink">
+                          {t(lang, `s.${a.kind}`, w)}
+                        </span>
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
