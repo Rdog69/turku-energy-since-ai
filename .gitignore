@@ -1,6 +1,8 @@
 # --- Licensed / organiser data: NEVER commit (Nord Pool spot data is licensed) ---
 /Dataset/
-/starter_package/
+/starter_package
+starter_package
+_cache/
 /starter_package_v1/
 /TurkuEnergia_SinceAI2026/
 *.zip
