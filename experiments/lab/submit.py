@@ -69,25 +69,30 @@ def data_cutoff(rows: pd.DataFrame, data: Data) -> pd.Series:
     return pd.Series(cut.reindex(U(rows["origin"])).to_numpy(), index=rows.index)
 
 
-def sub_fit(fns, Xb, train, Xr, rows, model, target, hgb, cal):
-    """fit on train, predict rows; optional calibration on the last 14 days of the (given) training rows."""
+def sub_fit(fns, Xb, train, Xr, rows, model, target, hgb, cal, calib=None, cal_days=14):
+    """fit on train, predict rows; optional calibration on the last `cal_days` of the (given) training rows.
+    calib="eb50": probs' EB-shrunk Platt + multiplicative widths (experiments/lab/calib_eb.py), as in combo.py."""
     pred = fit_predict(Xb.loc[train.index], train, Xr, rows, model=model, target=target, hgb=hgb)
     if cal:
-        c0 = train.delivery.max() - pd.Timedelta(days=14)
+        c0 = train.delivery.max() - pd.Timedelta(days=cal_days)
         inner, calw = train[train.origin < c0 - pd.Timedelta(hours=10)], train[train.origin >= c0]
         pc = fit_predict(Xb.loc[inner.index], inner, Xb.loc[calw.index], calw, model=model, target=target, hgb=hgb)
-        pred = calibrate(pc, calw, pred, rows)
+        if calib == "eb50":
+            from .calib_eb import calibrate_eb
+            pred = calibrate_eb(pc, calw, pred, rows)
+        else:
+            pred = calibrate(pc, calw, pred, rows)
     return pred
 
 
-def sub_bands(pred, fns, Xb, train, Xr, rows, bands, model, target, hgb, cal):
+def sub_bands(pred, fns, Xb, train, Xr, rows, bands, model, target, hgb, cal, calib=None, cal_days=14):
     """Per step band refit on the submission training rows (submission analogue of combo.band_post)."""
     out = {k: np.asarray(v, float).copy() for k, v in pred.items()}
     for a, b in bands:
         trb = train[train.step.between(a, b)]
         mv = rows.step.between(a, b).to_numpy()
         rb = rows[mv]
-        pb = sub_fit(fns, Xb, trb, Xr.loc[rb.index], rb, model, target, hgb, cal)
+        pb = sub_fit(fns, Xb, trb, Xr.loc[rb.index], rb, model, target, hgb, cal, calib, cal_days)
         for k in out:
             out[k][mv] = pb[k]
     return out
@@ -125,9 +130,10 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
         for fn in fns:                           # leak-check on the submission origins themselves
             leakcheck(fn, rows.drop(columns="spot"), Data(), n=8, seed=7)
         Xb, Xr = feats(fns, base, data), feats(fns, rows.drop(columns="spot"), data)
-        pred = sub_fit(fns, Xb, train, Xr, rows, m, t, hgb, c)
+        calib, cal_days = sp.get("calib"), int(sp.get("cal_days", 14))
+        pred = sub_fit(fns, Xb, train, Xr, rows, m, t, hgb, c, calib, cal_days)
         if sp.get("bands"):
-            pred = sub_bands(pred, fns, Xb, train, Xr, rows, [tuple(x) for x in sp["bands"]], m, t, hgb, c)
+            pred = sub_bands(pred, fns, Xb, train, Xr, rows, [tuple(x) for x in sp["bands"]], m, t, hgb, c, calib, cal_days)
         if sp.get("hist_blend"):
             from .exp_history import blend_post
             pred = blend_post(float(sp["hist_blend"]))(pred, rows, Xr)

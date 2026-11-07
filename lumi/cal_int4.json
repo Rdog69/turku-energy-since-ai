@@ -1,0 +1,1 @@
+{"name": "CAL INT4 eb50", "features": ["rt_imb", "rt_wind", "rt_misc", "runs", "dir", "wind_hat"], "model": "mixture", "target": "gap", "hgb": {"max_leaf_nodes": 15, "min_samples_leaf": 400, "max_iter": 150}, "bands": [[1,4],[5,8],[9,16]], "hist_blend": 0.6, "calib": "eb50"}
