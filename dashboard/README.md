@@ -2,12 +2,15 @@
 
 **Built:** branch `front-end`, folder `frontend/` ("Tasehinta"), commit `19d667c`. It shows the submitted model: the same files as `forecast/forecast_backtest.csv`, plus its two members for the "models disagree" alert. Replay periods: September, August and the forecast period.
 
-- **Views:**
-  - **Simple:** status badge, 10-hour traffic light (15 min or 1 h), plain glossary, track record.
-  - **Trader:** fan chart with direction and spike-risk strips; "Worth checking" with icons and drivers; details on demand.
-  - **Production:** balancing need and flexibility checks.
-- **Time travel:** a slider over every forecast hour, Play, arrow keys. Every view shows only data published by the review time.
-- **Hindsight:** median error against the day-ahead price, band coverage, flagged high-price quarters, direction hits; zoomable chart.
+- **Overview** (the main page):
+  - a headline for the next 10 hours;
+  - "Worth checking" chips that open a side panel with the window, the probability, the drivers and what to check;
+  - one chart on one time axis: the realised price, the forecast with its likely range, the day-ahead price, a price-risk row and the balancing need (grid short or surplus) quarter by quarter;
+  - click any quarter for its detail;
+  - the factors that move the forecast;
+  - quarter tables and hindsight on demand.
+- **Production:** the balancing need hour by hour, and where flexibility could pay (CHP, electric boilers).
+- **Time travel:** scroll or drag the chart in 15-minute steps, Play, or use the period strip under the graph. It shows the whole period with a window marking what the chart shows.
 - **English and Finnish**, keyboard accessible.
 
 Run (from the `front-end` branch):
