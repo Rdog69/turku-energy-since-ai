@@ -7,7 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 
 WORKSPACE_DIR = Path(__file__).resolve().parents[1]
-COMPOSITE_FILE = WORKSPACE_DIR / "results" / "composite" / "forecast_backtest.csv"
+COMPOSITE_FILE = WORKSPACE_DIR / "forecast_backtest.csv"
+if not COMPOSITE_FILE.exists():
+    COMPOSITE_FILE = WORKSPACE_DIR / "results" / "composite" / "forecast_backtest.csv"
 if not COMPOSITE_FILE.exists():
     COMPOSITE_FILE = WORKSPACE_DIR / "results" / "mixture" / "forecast_backtest.csv"
 
@@ -154,17 +156,17 @@ def get_validation_metrics():
             "mean_spike_brier": 0.1132,
             "direction_brier": 0.4509,
         },
-        "composite_model": {
-            "mae": 43.05,
-            "mean_pinball": 12.82,
-            "mean_spike_brier": 0.0965,
-            "direction_brier": 0.4244,
+        "grand_champion_ensemble": {
+            "mae": 40.95,
+            "mean_pinball": 11.77,
+            "mean_spike_brier": 0.0865,
+            "direction_brier": 0.3818,
         },
         "improvements": {
-            "mae_reduction_pct": 35.0,
-            "pinball_loss_reduction_pct": 47.0,
-            "spike_brier_improvement_pct": 14.8,
-            "direction_brier_improvement_pct": 5.9,
+            "mae_reduction_pct": 38.1,
+            "pinball_loss_reduction_pct": 51.3,
+            "spike_brier_improvement_pct": 23.6,
+            "direction_brier_improvement_pct": 15.3,
         },
     }
 

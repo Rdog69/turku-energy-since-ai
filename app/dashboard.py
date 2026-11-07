@@ -52,7 +52,9 @@ st.markdown(
 
 @st.cache_data
 def load_forecast_and_spot():
-    comp_file = WORKSPACE_DIR / "results" / "composite" / "forecast_backtest.csv"
+    comp_file = WORKSPACE_DIR / "forecast_backtest.csv"
+    if not comp_file.exists():
+        comp_file = WORKSPACE_DIR / "results" / "composite" / "forecast_backtest.csv"
     if not comp_file.exists():
         comp_file = WORKSPACE_DIR / "results" / "mixture" / "forecast_backtest.csv"
     df_fc = pd.read_csv(comp_file)
@@ -81,13 +83,13 @@ st.markdown(f"**Operational 10-Hour Imbalance Price & Risk Forecast** | Origin: 
 # Metrics Banner
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Model MAE ($p_{50}$)", "43.05 €/MWh", "-35.0% vs Baseline (66.20)")
+    st.metric("Model MAE ($p_{50}$)", "40.95 €/MWh", "-38.1% vs Baseline (66.20)")
 with col2:
-    st.metric("Calibration Pinball ($p_{10}/p_{90}$)", "12.82", "-47.0% vs Baseline (24.18)")
+    st.metric("Calibration Pinball ($p_{10}/p_{90}$)", "11.77", "-51.3% vs Baseline (24.18)")
 with col3:
-    st.metric("Spike Brier Score", "0.0965", "-14.8% vs Baseline (0.1132)")
+    st.metric("Spike Brier Score", "0.0865", "-23.6% vs Baseline (0.1132)")
 with col4:
-    st.metric("Direction Brier Score", "0.4244", "-5.9% vs Baseline (0.4509)")
+    st.metric("Direction Brier Score", "0.3818", "-15.3% vs Baseline (0.4509)")
 
 # Alert & Operational Suggestions
 st.markdown("### 🔍 Operator Action & Situational Brief")
