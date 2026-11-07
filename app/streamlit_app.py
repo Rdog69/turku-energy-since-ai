@@ -115,7 +115,7 @@ fig.add_trace(go.Scatter(x=df.time, y=df.p50, name="P50", line=dict(color="#1f77
 fig.add_trace(go.Scatter(x=df.time, y=df.spot, name="Spot", line=dict(color="#444", dash="dot")))
 fig.update_layout(height=380, margin=dict(t=10, b=10), xaxis_title=f"Time ({TZ})", yaxis_title="EUR/MWh",
                   legend=dict(orientation="h"))
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # ---------------- probabilities ----------------
 st.subheader("Regulation direction and spike risk per quarter")
@@ -125,11 +125,11 @@ f2.add_bar(x=df.time, y=df.p_up, name="P(up-regulation)", marker_color="#d55e00"
 f2.add_bar(x=df.time, y=df.p_down, name="P(down-regulation)", marker_color="#0072b2")
 f2.update_layout(barmode="group", height=300, margin=dict(t=10, b=10), yaxis=dict(range=[0, 1], tickformat=".0%"),
                  legend=dict(orientation="h"))
-left.plotly_chart(f2, use_container_width=True)
+left.plotly_chart(f2, width="stretch")
 f3 = go.Figure(go.Heatmap(x=df.time, y=["Spike high", "Spike low"], z=[df.p_spike_high, df.p_spike_low],
                           colorscale="Reds", zmin=0, zmax=max(0.5, mx), colorbar=dict(tickformat=".0%")))
 f3.update_layout(height=300, margin=dict(t=10, b=10))
-right.plotly_chart(f3, use_container_width=True)
+right.plotly_chart(f3, width="stretch")
 
 # ---------------- what changed ----------------
 st.subheader("What changed vs. previous update")
@@ -150,7 +150,7 @@ else:
                           "d spike low (pp)": (m.dSpikeLow * 100).round(1)})
         bigv = big.values
         st.dataframe(t.style.apply(lambda r: ["background-color:#ffe9a8" if bigv[r.name] else "" for _ in r], axis=1),
-                     use_container_width=True, hide_index=True, height=260)
+                     width="stretch", hide_index=True, height=260)
 
 # ---------------- track record ----------------
 st.subheader("Track record")
@@ -180,12 +180,12 @@ else:
         f4.add_scatter(x=tr.day, y=tr.mae_persistence, name="Persistence", line=dict(color="#d55e00"))
         f4.update_layout(height=300, margin=dict(t=10, b=10), yaxis_title="MAE (EUR/MWh)", legend=dict(orientation="h"))
         cl, cr = st.columns(2)
-        cl.plotly_chart(f4, use_container_width=True)
+        cl.plotly_chart(f4, width="stretch")
         f5 = go.Figure(go.Scatter(x=tr.day, y=tr.coverage, mode="lines+markers", line=dict(color="#1f77b4")))
         f5.add_hline(y=0.8, line_dash="dash", annotation_text="nominal 80%")
         f5.update_layout(height=300, margin=dict(t=10, b=10), yaxis=dict(range=[0, 1], tickformat=".0%"),
                          yaxis_title="P10-P90 coverage")
-        cr.plotly_chart(f5, use_container_width=True)
+        cr.plotly_chart(f5, width="stretch")
 vm = index.get("validation_metrics")
 if vm:
     with st.expander("Validation metrics (from index.json)"):

@@ -31,7 +31,7 @@ def test_forty_unique_deliveries_per_origin(feats):
 def test_calendar_matches_helsinki_local(feats):
     loc = feats["delivery"].dt.tz_convert("Europe/Helsinki")
     assert (feats["hour"] == loc.dt.hour).all()
-    assert (feats["weekday"] == loc.dt.weekday).all()
+    assert (feats["weekday"] == loc.dt.day_of_week).all()
 
 
 def test_dst_flag_changes_at_clock_change(feats):
