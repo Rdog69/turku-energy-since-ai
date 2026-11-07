@@ -115,6 +115,19 @@ def grid_statements(ctx: dict) -> list[str]:
     n = ctx.get("nuclear_change_6h_mw")
     if n is not None and abs(n) >= 200:
         out.append(f"Nuclear output is {abs(n):.0f} MW {'higher' if n > 0 else 'lower'} than 6 hours ago.")
+    sd = ctx.get("live_imbalance_vs_plan_mw")
+    if sd is not None:
+        # Magnitude only: the sign convention of Fingrid's surplus/deficit series is not verified.
+        out.append("Finland's measured net import differs from its exchange plan "
+                   + ("only slightly (within 100 MW)" if abs(sd) < 100 else f"by about {abs(sd):.0f} MW")
+                   + " over the last hour (Fingrid's live surplus/deficit series).")
+    pe = ctx.get("production_vs_plan_mw")
+    if pe is not None and abs(pe) >= 150:
+        out.append(f"Measured production is {abs(pe):.0f} MW {'ABOVE' if pe > 0 else 'BELOW'} the balance "
+                   "responsible parties' day-ahead production plans (last hour).")
+    h = ctx.get("hydro_change_1h_mw")
+    if h is not None and abs(h) >= 100:
+        out.append(f"Hydro output is {abs(h):.0f} MW {'higher' if h > 0 else 'lower'} than an hour ago.")
     return out
 
 

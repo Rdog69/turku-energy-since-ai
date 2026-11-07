@@ -52,6 +52,18 @@ MODELS = {
         short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True),
         long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_rt": lambda: HorizonSplit(
+        name="split_all_rt", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_rt", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, use_rt_imbalance=True),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_rt_lean": lambda: HorizonSplit(
+        name="split_all_rt_lean", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_rt_lean", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, use_rt_imbalance=True,
+                       rt_imbalance_cols=("rt_sd_mean4", "rt_plan_err", "rt_plan_err_mean4",
+                                          "rt_hydro_change_1h")),
+        long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
@@ -59,7 +71,8 @@ SUBMISSION_TS = ("forecast_origin_utc", "delivery_start_utc", "data_cutoff_utc")
 # Inputs saved next to the forecast so the dashboard can explain it.
 DASHBOARD_INPUTS = ["spot", "wind_fc", "cons_fc", "solar_fc", "spot_abs_ramp", "hour", "last_gap",
                     "last_dir", "last_imb", "rt_wind_err", "rt_freq_dev", "rt_nuclear",
-                    "rt_nuclear_change_6h", "rt_cons_err", "om_wind_rev", "om_wind_rev_mw",
+                    "rt_nuclear_change_6h", "rt_cons_err", "rt_sd_last", "rt_sd_mean4", "rt_plan_err",
+                    "rt_hydro_change_1h", "om_wind_rev", "om_wind_rev_mw",
                     "om_icing", "om_temp"]
 
 
@@ -135,7 +148,8 @@ def main(argv=None) -> int:
 
     pkg = config.package_dir()
     model = MODELS[args.model]()
-    long = load_long_all() if getattr(model, "use_fingrid", False) else load_long()
+    long = (load_long_all() if getattr(model, "use_fingrid", False)
+            or getattr(model, "use_rt_imbalance", False) else load_long())
     index = build_index(long)
     origins_csv, template = period_files(pkg, args.period)
     origins = pd.DatetimeIndex(pd.to_datetime(pd.read_csv(origins_csv)["forecast_origin_utc"], utc=True))

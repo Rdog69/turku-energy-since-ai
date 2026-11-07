@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS
+from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, RT_IMBALANCE_COLUMNS, WEATHER_COLUMNS
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -83,19 +83,27 @@ class GBMModel:
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
+    # Live imbalance features (fg198 surplus/deficit etc.); masked beyond fresh_max_step too.
+    use_rt_imbalance: bool = False
+    rt_imbalance_cols: tuple = tuple(RT_IMBALANCE_COLUMNS)   # subset to use when enabled
 
     def _mask_fresh(self, X: pd.DataFrame, steps) -> pd.DataFrame:
-        if not (self.use_fingrid and self.fresh_max_step):
+        if not self.fresh_max_step:
+            return X
+        cols = (FINGRID_RT_COLUMNS if self.use_fingrid else []) \
+            + (list(self.rt_imbalance_cols) if self.use_rt_imbalance else [])
+        if not cols:
             return X
         X = X.copy()
         late = np.asarray(steps) > self.fresh_max_step
-        X.loc[late, FINGRID_RT_COLUMNS] = np.nan
+        X.loc[late, cols] = np.nan
         return X
 
     @property
     def features(self) -> list[str]:
         return (FEATURE_COLUMNS + (WEATHER_COLUMNS if self.use_weather else [])
-                + (FINGRID_RT_COLUMNS if self.use_fingrid else []))
+                + (FINGRID_RT_COLUMNS if self.use_fingrid else [])
+                + (list(self.rt_imbalance_cols) if self.use_rt_imbalance else []))
 
     # ------------------------------------------------------------------ fitting
     def _weights(self, df, ref):
@@ -193,6 +201,6 @@ class GBMModel:
 
     def describe(self) -> str:
         bits = [f"{self.name}: tau_days={self.tau_days}, calibrate={self.calibrate}, "
-                f"spikes={self.spike_mode}, weather={self.use_weather}, fingrid_rt={self.use_fingrid}, "
+                f"spikes={self.spike_mode}, weather={self.use_weather}, fingrid_rt={self.use_fingrid}, rt_imbalance={self.use_rt_imbalance}, "
                 f"p_none={self.p_none:.4f}"]
         return "\n".join(bits + self.log)

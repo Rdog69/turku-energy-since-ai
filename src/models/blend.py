@@ -25,6 +25,10 @@ class HorizonSplit:
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
 
+    @property
+    def use_rt_imbalance(self) -> bool:
+        return getattr(self.short, "use_rt_imbalance", False) or getattr(self.long, "use_rt_imbalance", False)
+
     def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "HorizonSplit":
         # The short model trains on early steps only, so all its capacity goes there.
         self.short.fit(train.loc[train["step"] <= self.split_step].reset_index(drop=True), cutoff)
