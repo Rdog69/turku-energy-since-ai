@@ -71,3 +71,40 @@ This cheat sheet prepares the presenter for tough questions from the Turku Energ
 2. **REST API Microservice:** Our **FastAPI backend** (`api/main.py`) serves `/forecast/{origin_utc}` with complete Pydantic validation, ready to be mounted in Turku Energia's internal Kubernetes cluster.
 3. **Continuous Rolling Re-Training:** The model can be scheduled as a daily cron job at 23:00 UTC to refit on the newest 28 days of finalized Fingrid settlement data.
 
+---
+
+### Q9: "Why did you choose an equal 50/50 blend instead of tuning horizon-band weights on the validation set?"
+**Our Answer:**
+* **The Overfitting Trap:** In our ablation study, we built *Grand Champion V2*, which optimized 16 horizon-band simplex weights and an additive width shift specifically on September's validation window. While it shaved 0.20 € off September MAE, it degraded Pinball, Spikes, and Direction, and when evaluated on unseen August, its score completely collapsed (dropping from +6.81 down to +5.85).
+* **The Physics Reason:** September was characterized by high volatility (std 141 €/MWh) and the Olkiluoto 3 nuclear trip. Tuning weights on September simply memorized that specific outage regime.
+* **Clemen's Equal-Weight Theorem:** When combining two orthogonal, high-performing model families (Frank's Dual-NWP physical wind model + Abdo's Fingrid real-time telemetry model), estimated weights introduce high estimation variance ($\text{Var}(w)$). An un-tuned 50/50 equal-weight prior has zero estimation variance, winning **9 out of 10 individual weeks** across both August and September.
+
+---
+
+### Q10: "Where does your model struggle in practice, and what are the top ways to improve it?"
+**Our Answer:**
+* **Top 3 Bottlenecks:**
+  1. *Horizon Decay (Hours 5–10):* Fingrid's real-time nowcasting decays exponentially after 2–3 hours. Long-horizon steps rely primarily on day-ahead weather, making MAE rise from 36.90 € in Hour 1 to 42.79 € in Hours 5–10.
+  2. *Extreme Spike Quantiles ($>+300$ €/MWh):* Tree-based quantile regression suffers from leaf shrinkage and cannot extrapolate past historical thresholds. While our spike classifier detects high spike probability ($>60\%$), $p_{90}$ systematically under-predicts the true magnitude of extreme crisis spikes.
+  3. *Hourly Spot Ramps:* The day-ahead market clears in hourly blocks, producing artificial step-discontinuities at the top of each hour.
+* **Top 3 Engineering Solutions:**
+  1. *Extreme Value Theory (EVT):* Fit a Generalized Pareto Distribution (GPD) above the 85th percentile of positive residuals for $p_{90}$ to extrapolate fat tails without distorting the median.
+  2. *Intraday Market Continuous (Elbas / XBID):* Ingest live intraday order book VWAP 1–4 hours before delivery to track merchant reactions to updated wind forecasts.
+  3. *PCHIP Spline Interpolation:* Smooth hourly day-ahead spot into continuous 15-minute ramps weighted by historical load curves.
+
+---
+
+### Q11: "Why did you enforce the physical envelope $p_{\text{spike\_high}} \le p_{\text{up}}$ and $p_{\text{spike\_low}} \le p_{\text{down}}$?"
+**Our Answer:**
+* Under the Nordic imbalance pricing rules (effective 1 June 2026), an upward price spike ($>+50$ €/MWh above spot) is physically impossible without the TSO activating upward balancing reserves (mFRR).
+* If a model predicts $p_{\text{spike\_high}} = 0.25$ while $p_{\text{up}} = 0.15$, it violates **Kolmogorov's monotonicity axiom** of probability ($A \subseteq B \implies P(A) \le P(B)$).
+* By clamping $p_{\text{spike\_high}} \le p_{\text{up}}$ and $p_{\text{spike\_low}} \le p_{\text{down}}$, we eliminated **387 physical contradictions** in the test predictions and improved the Spike Brier score from **0.086086 to 0.086034** with **zero tuned parameters**.
+
+---
+
+### Q12: "How does your Level 2 Situation Room assist a Turku Energia intraday trader in the primary action window?"
+**Our Answer:**
+* **Primary Action Window (1h–3h Pre-Gate Closure):** The UI explicitly shades Steps 4–12 on the Plotly fan chart where intraday traders must make their binding Elbas / mFRR bid decisions before delivery gate closure.
+* **Consensus Strip (Weather vs Telemetry):** The system continuously computes the divergence between Frank's NWP wind model and Abdo's Fingrid real-time nowcast ($\Delta p_{50}$). When divergence is $<15$ €, it shows a 🟢 High Consensus badge. If divergence exceeds $\ge 15$ €, it displays a 🟡 Telemetry Divergence alert, warning traders that live grid dynamics are breaking away from day-ahead forecasts.
+* **Live Settled Actuals Audit:** With one click (`☑️ Overlay Realized Actuals`), jury evaluators can overlay true settled prices as diamond markers and verify window MAE and empirical $P_{10}$–$P_{90}$ coverage in real time.
+
