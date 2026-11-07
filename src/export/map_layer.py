@@ -89,6 +89,7 @@ def border_flows(origins: list[pd.Timestamp]) -> dict[pd.Timestamp, list[dict]]:
     out = {}
     for i, o in enumerate(origins):
         rows = []
+        # (production mix and solar are added in production_mix below)
         for name, (ts, vals, fi_end, other_end) in per.items():
             v = vals[i]
             rows.append({"border": name, "mw": None if np.isnan(v) else round(float(v)),
@@ -99,15 +100,46 @@ def border_flows(origins: list[pd.Timestamp]) -> dict[pd.Timestamp, list[dict]]:
     return out
 
 
+MIX = {  # Fingrid real-time production/consumption (MW), newest value usable at the origin
+    "nuclear": "fg_nuclear_rt", "hydro": "fg_hydro_rt", "wind": "fg_wind_rt",
+    "chp_district_heat": "fg_chp_dh_rt", "chp_industry": "fg_chp_ind_rt",
+    # dataset 194 is positive for export (consumption > production gives a negative value)
+    "electric_boilers": "fg_boilers_rt", "net_export": "fg_netimport_rt",
+    "production_total": "fg_prod_rt", "consumption": "fg_cons_rt",
+}
+
+
+def production_mix(origins: list[pd.Timestamp]) -> dict[pd.Timestamp, dict]:
+    """National production mix now (Fingrid real-time) and the day-ahead solar forecast per hour."""
+    from src.data.availability import build_index
+    from src.data.load import load_long_all
+    idx = build_index(load_long_all())
+    o_ns = to_ns(pd.DatetimeIndex(origins))
+    latest = {k: idx[s].latest(o_ns) for k, s in MIX.items() if s in idx}
+    solar = idx.get("fi_solar_fc_da")
+    out = {}
+    for i, o in enumerate(origins):
+        mix = {k: (None if np.isnan(v[1][i]) else round(float(v[1][i]))) for k, v in latest.items()}
+        ts = latest.get("wind", (np.array([-1] * len(origins)), None))[0][i]
+        hours = pd.date_range(o, periods=HOURS, freq="h")
+        sol = solar.value_at(to_ns(hours), np.full(HOURS, o_ns[i])) if solar else np.full(HOURS, np.nan)
+        out[o] = {"mix_now_mw": mix,
+                  "mix_measured_at": None if ts < 0 else pd.Timestamp(int(ts), tz="UTC").strftime("%Y-%m-%dT%H:%MZ"),
+                  "solar_fc_mw": [None if np.isnan(v) else round(float(v)) for v in sol]}
+    return out
+
+
 def annotate(root: Path) -> None:
     """Add `map` to every origin JSON under root/origins and write root/farms.json."""
     files = sorted((root / "origins").glob("*.json"))
     origins = [pd.Timestamp(f.stem, tz="UTC") for f in files]
     blocks = build_map_blocks(origins)
     flows = border_flows(origins)
+    mix = production_mix(origins)
     for o in origins:
         if blocks.get(o) is not None:
             blocks[o]["flows"] = flows.get(o, [])
+            blocks[o].update(mix.get(o, {}))
     for f, o in zip(files, origins):
         doc = json.loads(f.read_text(encoding="utf-8"))
         m = blocks.get(o)

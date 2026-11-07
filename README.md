@@ -8,10 +8,30 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 
 🧒 **Short version:** [`docs/TLDR.md`](docs/TLDR.md) explains the whole thing in two minutes.
 
+📊 **Dashboard:** VAAKA, the situation room built with Lovable. The published preview runs on demo data with a synthetic spot price; real Nord Pool data stays local.
+
+---
+
+## Results at a glance
+
+Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (lower is better):
+
+| Metric | Points | Baseline | **Our model** | Improvement |
+|---|---|---|---|---|
+| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **42.34** | **−36 %** |
+| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **12.06** | **−50 %** |
+| Exceptional prices: Brier score | 20 | 0.1132 | **0.0900** | **−20 %** |
+| Direction: three-class Brier score | 10 | 0.4509 | **0.3908** | **−13 %** |
+| P10–P90 coverage (target 80 %) | – | 0.68 | **0.81** | well calibrated |
+
+Better than the baseline in every one of the 4 validation weeks, on all four metrics. About 20 variants were compared on this same month, so expect the test period to be somewhat worse. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
+
 ---
 
 ## Contents
 
+- [Results at a glance](#results-at-a-glance)
+- [The model](#the-model)
 - [The problem](#the-problem)
 - [The challenge](#the-challenge)
 - [Data](#data)
@@ -25,6 +45,54 @@ Built at the **Since AI 2026** hackathon in Turku, 6–8 Nov 2026, for the **Tur
 - [Timeline](#timeline)
 - [Rules and licensing](#rules-and-licensing)
 - [Team](#team)
+
+---
+
+## The model
+
+**Idea in one line:** the imbalance price is the day-ahead spot price plus a jump up or down. Spot is known in advance, so we forecast **the jump** (the gap to spot), its uncertainty, and the chance that it's up, down or exceptionally large.
+
+### How it's built
+
+1. **Spot anchor.** Predicting "spot + a typical gap" alone cuts the baseline's error by a third. The baseline repeats the last known imbalance price, which is already over an hour old when it becomes usable.
+2. **Gradient-boosted trees (LightGBM).** These models predict:
+   - the gap's 10th, 50th and 90th percentiles (quantile regression)
+   - the chance of up-regulation
+   - the chance of an exceptionally high or low price, each *given* the direction (`P(up) × P(gap > 50 | up)`). That keeps the probabilities consistent with each other.
+3. **Two models by horizon.**
+   - **Hours 1–2:** a model that also sees fresh real-time grid data.
+   - **Hours 3–10:** a model without it, because fresh data turns into noise after about 2 hours.
+4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from.
+5. **5-seed averaging.** Each model is trained five times with different random seeds and averaged, for steadier forecasts.
+
+### What it looks at
+
+| Group | Inputs | Source |
+|---|---|---|
+| Known a day ahead | Spot price, spot ramps, day-ahead wind, solar and consumption forecasts, calendar | Starter package |
+| Recent state | Latest gap and regulation direction, mFRR volumes, cross-border flows, neighbour imbalance prices | Starter package |
+| Weather revision | How the newest ECMWF run's wind differs from the run the day-ahead forecast was based on, at 14 points weighted by **installed wind capacity**; temperature; icing risk | Open-Meteo Single Runs + OpenStreetMap turbines |
+| Grid right now (hours 1–2) | Measured wind vs. forecast, grid frequency, nuclear changes, hydro, electric boilers, net import, CHP, flows | Fingrid real-time API |
+
+**No data from the future.** Every row is used only after its `first_usable_origin_utc`, including our own sources. Leakage tests (`python -m pytest`) rebuild features after deleting every not-yet-published row and require identical results. The details and assumed publication delays are in [`SOURCES.md`](SOURCES.md).
+
+### What each step added (validation)
+
+| Step | MAE | Pinball | Spikes | Direction |
+|---|---|---|---|---|
+| Baseline (persistence) | 66.20 | 24.18 | 0.1132 | 0.4509 |
+| Spot + constant gap | 44.29 | 14.99 | 0.1132 | 0.4508 |
+| + LightGBM, calibration, direction-aware spikes | 43.22 | 12.44 | 0.0939 | 0.4148 |
+| + weather revision | 43.08 | 12.19 | 0.0932 | 0.4088 |
+| + Fingrid real-time for hours 1–2 (two-model split) | 42.53 | 12.09 | 0.0921 | 0.4011 |
+| + more real-time series, 5 seeds, 28-day calibration | 42.38 | 12.01 | 0.0905 | 0.3938 |
+| **+ capacity-weighted weather (final)** | **42.34** | **12.06** | **0.0900** | **0.3908** |
+
+### Around the forecast
+
+- **Drivers:** `top_drivers` comes from the model's own SHAP values.
+- **Briefings:** a short LLM briefing per hour (Qwen2.5-32B on Featherless). It's built from facts only: no spot prices are sent, every number must appear in the facts, and wind direction is checked.
+- **Alerts:** an n8n workflow relays alerts when a high-severity situation is coming in the next 3 hours.
 
 ---
 
