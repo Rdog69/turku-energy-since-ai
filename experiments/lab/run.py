@@ -41,16 +41,42 @@ def public(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=[c for c in HIDDEN if c in df.columns])
 
 
+FEAT = LAB / "_cache" / f"feat{SUFFIX}"
+
+
+def _disk_key(fn, base) -> str:
+    """Changes whenever any feature/data-layer source file, any external data file, or the row set changes."""
+    import hashlib
+    h = hashlib.md5()
+    for p in sorted(list((LAB / "features").glob("*.py")) + [LAB / "data.py"]):
+        h.update(p.read_bytes())
+    ext = LAB.parents[1] / "external_data"
+    for p in sorted(ext.glob("*/*.csv.gz")) + sorted(ext.glob("*/*/*.csv.gz")):
+        h.update(f"{p}:{p.stat().st_mtime_ns}".encode())
+    h.update(f"{len(base)}|{base['origin'].iloc[0]}|{base['origin'].iloc[-1]}|{base['step'].sum()}".encode())
+    return f"{fn.__module__}.{fn.__name__}.{h.hexdigest()[:16]}.pkl"
+
+
 def features(fns, base, data, check=True, sources=("pkg",)) -> pd.DataFrame:
+    """Feature table; each function's output is cached in memory and on disk (_cache/feat*/), and every function
+    is still leak-checked once per process (the truncated recomputations always run)."""
     base = public(base)
     parts = []
     for fn in fns:
         key = fn.__module__ + "." + fn.__name__
-        if check and key not in _checked:
-            leakcheck(fn, base, data, n=6, sources=sources)
-            _checked.add(key)
         if key not in _feat_cache:
-            _feat_cache[key] = fn(base, data)
+            FEAT.mkdir(parents=True, exist_ok=True)
+            dp = FEAT / _disk_key(fn, base)
+            if dp.exists() and os.environ.get("LAB_NO_FEAT_CACHE") != "1":
+                _feat_cache[key] = pd.read_pickle(dp)
+            else:
+                _feat_cache[key] = fn(base, data)
+                tmp = dp.with_suffix(f".tmp{os.getpid()}")
+                _feat_cache[key].to_pickle(tmp)
+                tmp.replace(dp)
+        if check and key not in _checked:
+            leakcheck(fn, base, data, n=6, sources=sources, full=_feat_cache[key])
+            _checked.add(key)
         parts.append(_feat_cache[key])
     X = pd.concat(parts, axis=1)
     return X.loc[:, ~X.columns.duplicated()]

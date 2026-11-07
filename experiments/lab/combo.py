@@ -59,6 +59,7 @@ REGISTRY = {
     "nordic": ("experiments.lab.features.nordic", "nordic_features", "Nordic/Baltic wind index per area (SE/NO/DK/EE) + revision since day-ahead + run change"),
     "nordic_rev": ("experiments.lab.features.nordic", "nordic_rev", "Nordic wind revisions only (since day-ahead, run change)"),
     "temp": ("experiments.lab.features.weather", "temp_features", "temperature features"),
+    "vol_regime": ("experiments.lab.features.regime", "vol_regime_features", "realised volatility regime over 3/7/28 days: mean |gap|, gap std, spike shares, up share, 3d/28d ratio (calm vs wild months)"),
     "regime": ("experiments.lab.features.regime", "regime_features", "market-era flags (15-min day-ahead, 1 Jun 2026 price rule) for history mode"),
 }
 
@@ -71,7 +72,7 @@ def resolve(names):
     return fns
 
 
-def band_post(fns, bands, model, target, hgb, calibrate=True, calib=None, cal_days=14, short_fns=(), short_max=8):
+def band_post(fns, bands, model, target, hgb, calibrate=True, calib=None, cal_days=14, short_fns=(), short_max=8, weight_fn=None):
     """Like structure.band_post, but with the experiment's own feature set.
     short_fns: extra feature sets used ONLY by bands ending at or before step `short_max` (Frank's finding:
     real-time data helps hours 1-2 and is noise later)."""
@@ -98,10 +99,11 @@ def band_post(fns, bands, model, target, hgb, calibrate=True, calib=None, cal_da
             mv = vrows.step.between(a, b).to_numpy()
             vab = vrows[mv]
             X = XS if (short_fns and b <= short_max) else X0
-            pb = fit_predict(X.loc[trb.index], trb, X.loc[vab.index], vab, model=model, target=target, hgb=hgb)
+            W = (lambda r: weight_fn(r) if weight_fn else None)
+            pb = fit_predict(X.loc[trb.index], trb, X.loc[vab.index], vab, model=model, target=target, hgb=hgb, w=W(trb))
             if calibrate:
                 inn, cal = inner_all[inner_all.step.between(a, b)], cal_all[cal_all.step.between(a, b)]
-                pc = fit_predict(X.loc[inn.index], inn, X.loc[cal.index], cal, model=model, target=target, hgb=hgb)
+                pc = fit_predict(X.loc[inn.index], inn, X.loc[cal.index], cal, model=model, target=target, hgb=hgb, w=W(inn))
                 pb = _cal(pc, cal, pb, vab)
             for k in KEYS:
                 out[k][mv] = pb[k]
@@ -109,7 +111,7 @@ def band_post(fns, bands, model, target, hgb, calibrate=True, calib=None, cal_da
     return post
 
 
-def pool_post(fns, model, target, hgb, cal_days):
+def pool_post(fns, model, target, hgb, cal_days, weight_fn=None):
     """EB calibration of the pooled model (replaces run_experiment's built-in calibrate step)."""
     from .data import Data, build_base
     from .calib_eb import calibrate_eb
@@ -124,7 +126,8 @@ def pool_post(fns, model, target, hgb, cal_days):
         tr = base[(base[f"fold{f}"] == "train") & base.gap.notna()]
         cut = tr.delivery.max() - pd.Timedelta(days=cal_days)
         inner, cal = tr[tr.origin < cut - pd.Timedelta(hours=10)], tr[tr.origin >= cut]
-        pc = fit_predict(X.loc[inner.index], inner, X.loc[cal.index], cal, model=model, target=target, hgb=hgb)
+        pc = fit_predict(X.loc[inner.index], inner, X.loc[cal.index], cal, model=model, target=target, hgb=hgb,
+                         w=weight_fn(inner) if weight_fn else None)
         vr = pd.DataFrame({"step": va["step"].to_numpy(), "spot": X_va["spot"].to_numpy()}, index=va.index)
         return calibrate_eb(pc, cal, pred, vr)
     return post
@@ -154,20 +157,22 @@ def run_spec(spec: dict):
     hgb, cal = spec.get("hgb") or None, spec.get("calibrate", True)
     calib, cal_days = spec.get("calib"), int(spec.get("cal_days", 14))
     posts = []
+    hl = spec.get("half_life_days")
+    wfn = recency(float(hl), float(spec.get("w_floor", 0.0))) if hl else None
     if calib == "eb50" and cal:
-        posts.append(pool_post(fns, model, target, hgb, cal_days))
+        posts.append(pool_post(fns, model, target, hgb, cal_days, weight_fn=wfn))
     if spec.get("bands"):
-        posts.append(band_post(fns, [tuple(b) for b in spec["bands"]], model, target, hgb, cal, calib, cal_days, short_fns))
+        posts.append(band_post(fns, [tuple(b) for b in spec["bands"]], model, target, hgb, cal, calib, cal_days, short_fns,
+                               weight_fn=wfn))
     if spec.get("hist_blend"):
         sys.path.insert(0, ".")
         from experiments.lab.exp_history import blend_post
         posts.append(blend_post(float(spec["hist_blend"])))
     if spec.get("causal"):
         posts.append(causal_post(ramp(float(spec["causal"]))))
-    hl = spec.get("half_life_days")
     notes = "loop spec: " + json.dumps({k: v for k, v in spec.items() if k not in ("name", "agent")}, sort_keys=True)
     return run_experiment(spec["name"], agent=spec.get("agent", "fl-loop"), feature_fns=fns, model=model, target=target,
-                          calibrate=cal and calib != "eb50", hgb=hgb, weight_fn=recency(hl) if hl else None,
+                          calibrate=cal and calib != "eb50", hgb=hgb, weight_fn=wfn, folds=spec.get("folds"),
                           post=chain(*posts) if posts else None, notes=notes[:900])
 
 

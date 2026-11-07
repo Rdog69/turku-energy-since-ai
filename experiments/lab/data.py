@@ -51,6 +51,13 @@ if HISTORY:   # fold C = 5 Oct - 1 Nov 2025 (same weeks as the test, one year ea
                       val_end=pd.Timestamp("2025-11-01T22:00Z"))
 
 
+def _atomic_pickle(df: pd.DataFrame, path: Path) -> None:
+    """Parallel jobs (LUMI arrays, the local queue) may build the same cache at once: write, then rename."""
+    tmp = path.with_suffix(f".tmp{os.getpid()}")
+    df.to_pickle(tmp)
+    tmp.replace(path)
+
+
 # ----------------------------------------------------------------------------- loading
 def _long(df: pd.DataFrame, ts="timestamp_utc", fu="first_usable_origin_utc") -> pd.DataFrame:
     out = pd.DataFrame({"series_id": df["series_id"], "ts": U(df[ts]),
@@ -75,8 +82,9 @@ class Data:
             "fg_rt": [EXT / "fingrid/rt_last_autumn.csv.gz", EXT / "fingrid/rt_main.csv.gz"]
                      + ([EXT / "fingrid/rt_history.csv.gz"] if HISTORY else []),
             "fg_extra": [EXT / "fingrid/extra_last_autumn.csv.gz", EXT / "fingrid/extra_main.csv.gz"],
-            "fg_mfrr2": [EXT / "fingrid/mfrr2_main.csv.gz"],
-            "fg_rt2": [EXT / "fingrid/rt2_last_autumn.csv.gz", EXT / "fingrid/rt2_main.csv.gz"],
+            "fg_mfrr2": [EXT / "fingrid/mfrr2_main.csv.gz"] + ([EXT / "fingrid/mfrr2_history.csv.gz"] if HISTORY else []),
+            "fg_rt2": [EXT / "fingrid/rt2_last_autumn.csv.gz", EXT / "fingrid/rt2_main.csv.gz"]
+                      + ([EXT / "fingrid/rt2_history.csv.gz"] if HISTORY else []),
             "fg_hist": [EXT / "fingrid/package_history.csv.gz"],
             "umm": [EXT / "umm/messages_last_autumn.csv.gz", EXT / "umm/messages_main.csv.gz"],
             "fmi": [EXT / "fmi/obs_last_autumn.csv.gz", EXT / "fmi/obs_main.csv.gz"],
@@ -112,7 +120,7 @@ class Data:
                     first = df.groupby("series_id").ts.min()
                     h = h[h.ts < h.series_id.map(first)]
                     df = pd.concat([h, df], ignore_index=True).sort_values(["series_id", "ts"]).reset_index(drop=True)
-                df.to_pickle(cp)
+                _atomic_pickle(df, cp)
         else:
             files = self._path(k)
             if not files:
@@ -257,7 +265,7 @@ def build_base() -> pd.DataFrame:
         role[((base.origin >= c["val_start"]) & (base.delivery < c["val_end"])).to_numpy()] = "val"
         base[f"fold{f}"] = role
     base = base[base.delivery < END].reset_index(drop=True)
-    base.to_pickle(cp)
+    _atomic_pickle(base, cp)
     return _window(base)
 
 
@@ -266,15 +274,15 @@ TARGET_COLS = {"imb", "gap", "dir"}   # never usable as features
 
 # ----------------------------------------------------------------------------- leak check
 def leakcheck(fn, base: pd.DataFrame | None = None, data: Data | None = None, n: int = 12, seed: int = 0,
-              sources: tuple = ("pkg",)) -> None:
+              sources: tuple = ("pkg",), full: pd.DataFrame | None = None) -> None:
     """Recompute fn for n random origins with every source truncated to fu <= origin.
-    Raises AssertionError on any difference."""
+    Raises AssertionError on any difference. `full`: fn(base, data) if already computed (disk cache)."""
     base = build_base() if base is None else base
     base = base.drop(columns=[c for c in ("imb", "gap", "dir", "spot") if c in base.columns])  # no targets in feature fns
     data = Data() if data is None else data
     for s in sources:
         data[s]  # load
-    full = fn(base, data)
+    full = fn(base, data) if full is None else full
     bad = set(full.columns) & TARGET_COLS
     assert not bad, f"feature names collide with targets: {bad}"
     rng = np.random.default_rng(seed)

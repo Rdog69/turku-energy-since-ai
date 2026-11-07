@@ -65,6 +65,7 @@ def main():
                                  "value": np.asarray(v, float), "unit": unit, "first_usable_origin_utc": t0}))
     out = pd.concat([h, sp, imb] + cal, ignore_index=True)
     out = out[["series_id", "source", "dataset_id", "timestamp_utc", "value", "unit", "first_usable_origin_utc"]]
+    out = out.drop_duplicates(["series_id", "timestamp_utc"], keep="first")   # Fingrid repeats ~360 quarters in Mar 2025
     (EXT / "history").mkdir(exist_ok=True)
     out.to_csv(EXT / "history/pkg_history.csv.gz", index=False, date_format="%Y-%m-%dT%H:%M:%SZ", compression="gzip")
     print(f"pkg_history: {len(out):,} rows, {out.series_id.nunique()} series, {out.timestamp_utc.min()} .. {out.timestamp_utc.max()}")

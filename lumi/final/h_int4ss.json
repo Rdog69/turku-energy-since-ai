@@ -1,0 +1,1 @@
+{"name": "H INT4ss lgb7", "features": ["package", "rt_imb", "rt_wind", "rt_misc", "runs", "dir", "wind_hat", "spot_shape", "regime"], "model": "mixture", "hgb": {"max_leaf_nodes": 15, "min_samples_leaf": 400, "max_iter": 150}, "calib": "eb50", "cal_days": 14, "bands": [[1, 4], [5, 8], [9, 16]], "causal": 0.2, "engine": "lgb", "lgb": {"num_leaves": 7, "n_estimators": 350}}

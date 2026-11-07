@@ -53,3 +53,6 @@ submissions/score_*/
 # loop console logs
 experiments/lab/_loop_run*.txt
 experiments/lab/_post_run*.txt
+
+# rebuilt locally by experiments/lab/build_package_ext.py (contains licensed spot data)
+external_data/history/package_ext/

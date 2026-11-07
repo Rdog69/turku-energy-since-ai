@@ -204,6 +204,27 @@ def fetch(group: str = "all") -> None:
             write(pd.concat(parts, ignore_index=True), "fingrid", f"{gname}_{pname}")
 
 
+def fetch_history(groups=("rt2", "mfrr2")) -> None:
+    """Mar 2025 - May 2026 for the lab's history mode (LAB_HISTORY=1): writes fingrid/<group>_history.csv.gz.
+    `rt` history (rt_history.csv.gz) is already fetched; ACE (397) is skipped until the organisers approve it."""
+    http = client()
+    rt_delay = pd.Timedelta(minutes=int(os.environ.get("FINGRID_RT_DELAY_MIN", load_env().get("FINGRID_RT_DELAY_MIN", 30))))
+    for g in groups:
+        parts = []
+        for pname in ("history_a", "last_autumn", "history_b"):
+            s, e = PERIODS[pname]
+            for ds in GROUPS[g]:
+                if ds.id == 397:
+                    continue
+                long = to_long(ds, fetch_raw(http, ds, s, e), rt_delay)
+                print(f"  fingrid {ds.id} {ds.name} {pname}: {len(long):,} quarter rows", flush=True)
+                parts.append(long)
+        write(pd.concat(parts, ignore_index=True), "fingrid", f"{g}_history")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "check"
-    check() if cmd == "check" else fetch(sys.argv[2] if len(sys.argv) > 2 else "all")
+    if cmd == "history":
+        fetch_history(tuple(sys.argv[2:]) or ("rt2", "mfrr2"))
+    else:
+        check() if cmd == "check" else fetch(sys.argv[2] if len(sys.argv) > 2 else "all")

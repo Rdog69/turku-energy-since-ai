@@ -15,6 +15,9 @@ May we train a component on Fingrid history from **March 2025 to May 2026**? Tha
 - We only use it for the **direction** of balancing, which the June change in aFRR price mixing doesn't affect.
 - The README says "train only on 1 Jun – 4 Oct". Does that just mean "not the test period", or strictly nothing earlier?
 
+> **Answered (Turku Energia, 7 Nov):** "You can also use data from before June 1. The cutoff was only due to the pricing rule. You can use aFRR and mFRR price data from before June. However, you cannot directly validate your price forecast against the realized imbalance price, as the imbalance price calculation methodology changed to a volume-based approach. When using older data, take this change into account when evaluating your model."
+> **What we do:** the pre-June imbalance price is recomputed with the June rule from mFRR/aFRR prices and volumes (reproduces the official price on 99.5 % of Jun–Oct 2026 quarters); the old-rule price is never a target. See `SOURCES.md` §11.
+
 **3. Weather-model runs (Open-Meteo Single Runs).**
 We use archived runs, which you recommended, at wind-farm locations. A run counts as usable only after Open-Meteo's measured publication delay, rounded up: ECMWF IFS init + 8 h, ICON-EU init + 5 h. Are these delays acceptable?
 
