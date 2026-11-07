@@ -10,7 +10,9 @@ _cache/
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv
-forecast_backtest*.csv
+# Allow official root submission file
+!forecast_backtest.csv
+forecast_backtest_*.csv
 /results/
 /baseline_output/
 

@@ -20,7 +20,7 @@ Rather than predicting raw prices with black-box regression, we model the physic
 3. The TSO activates **mFRR balancing reserves** in a dominating direction (up or down).
 4. Prices form along an **asymmetric merit order**: up-regulation jumps steeply along thermal generation costs (median $+25$ €/MWh), whereas down-regulation is relatively flat (median $-17$ €/MWh).
 
-By constructing an **asymmetric Direction-Mixture CDF Model**, incorporating **Fingrid real-time wind error nowcasting**, splitting step horizons (`[1-4]`, `[5-8]`, `[9-16]`), and blending with a **CatBoost outlier regularizer**, our Grand Champion solution beats the official competition baseline by **37.0% on MAE (41.71 vs 66.20 €/MWh)**, **50.2% on calibration pinball loss (12.04 vs 24.18)**, **20.5% on price spike risk (0.0900 vs 0.1132)**, and **13.7% on direction prediction (0.3893 vs 0.4509)**, while strictly complying with all data availability and anti-leakage constraints.
+By constructing a **Grand Ensemble Solution** combining dual-NWP weather spreads, learned wind power mapping, intraday spot shape dynamics, and empirical-Bayes shrunk Platt calibration, our solution beats the official competition baseline by **38.1% on MAE (40.95 vs 66.20 €/MWh)**, **51.3% on calibration pinball loss (11.77 vs 24.18)**, **23.6% on price spike risk (0.0865 vs 0.1132)**, and **15.3% on direction prediction (0.3818 vs 0.4509)**, while strictly complying with all data availability and anti-leakage constraints.
 
 ---
 
@@ -74,13 +74,14 @@ Every feature group and architectural improvement was evaluated on the official 
 | **4. Direction-Mixture Model** | 43.05 | 12.82 | 0.0965 | 0.4274 | Inverting bimodal CDF expands P10-P90 coverage. |
 | **5. Mixture + CatBoost Blend** | 42.88 | 12.80 | 0.0965 | 0.4244 | 60/40 blend captures center & dampens spikes. |
 | **6. Fingrid RT Wind Error + Step Bands + Autumn Prior** | 41.81 | 12.01 | 0.0907 | 0.3895 | Real-time plan error nowcasting + seasonal prior. |
-| **7. Grand Champion Ensemble (Full Stack + TreeSHAP)** | **`41.71`** | **`11.95`** | **`0.0898`** | **`0.3884`** | **🏆 Best Overall Score (-37.0% MAE, -50.6% Pinball).** |
+| **7. Dual-NWP + Learned Wind Curve (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread + 22-point wind map + Nordic P50. |
+| **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | **`40.95`** | **`11.77`** | **`0.0865`** | **`0.3818`** | **🏆 Best Overall Score (-38.1% MAE, -51.3% Pinball).** |
 
 ### Net Score Improvement Over Baseline:
-* **Accuracy (MAE):** Reduced by **24.49 €/MWh (-36.99%)**
-* **Calibration (Pinball):** Reduced by **12.23 (-50.58%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-20.67%**
-* **Balancing Direction (Brier):** Improved by **-13.86%**
+* **Accuracy (MAE):** Reduced by **25.25 €/MWh (-38.14%)**
+* **Calibration (Pinball):** Reduced by **12.41 (-51.32%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-23.59%**
+* **Balancing Direction (Brier):** Improved by **-15.32%**
 
 ---
 
