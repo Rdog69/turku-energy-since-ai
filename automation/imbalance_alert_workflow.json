@@ -1,0 +1,195 @@
+{
+  "name": "Turku Energia Imbalance Price Alert Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "forecast-origin-alert",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook: New Origin Forecast",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.body || $input.first().json;\n\nconst origin = data.forecast_origin_utc;\nconst summary = data.summary || {};\nconst suggestions = data.operational_suggestions || [];\nconst conflicting = data.conflicting_signals || [];\n\nconst highSpikes = summary.high_spike_periods || 0;\nconst lowSpikes = summary.low_spike_periods || 0;\n\nconst alertNeeded = highSpikes > 0 || lowSpikes > 0 || conflicting.length > 0;\n\nlet riskLevel = 'LOW';\nlet alertColor = 3066993;\nif (highSpikes > 0) {\n  riskLevel = 'HIGH UP-REGULATION SPIKE RISK';\n  alertColor = 15158332;\n} else if (lowSpikes > 0) {\n  riskLevel = 'DOWN-REGULATION / NEGATIVE PRICE RISK';\n  alertColor = 15105570;\n}\n\nreturn [{\n  json: {\n    origin,\n    riskLevel,\n    alertColor,\n    alertNeeded,\n    summary,\n    suggestions,\n    conflicting,\n    stepsSample: (data.steps || []).slice(0, 4)\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Analyze Spike & Variance Shifts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.alertNeeded }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Is Alert Triggered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.featherless.ai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.FEATHERLESS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "meta-llama/Llama-3.1-70B-Instruct"
+            },
+            {
+              "name": "messages",
+              "value": "=[{\"role\": \"system\", \"content\": \"You are an elite Nordic power trader assistant for Turku Energia. Give a concise 2-sentence operator brief on why this imbalance shift is happening and what action to take. Mention Naantali CHP or power-to-heat if relevant.\"}, {\"role\": \"user\", \"content\": \"Origin: \" + $json.origin + \", Risk: \" + $json.riskLevel + \", Summary: \" + JSON.stringify($json.summary) + \", Suggestions: \" + JSON.stringify($json.suggestions)}]"
+            },
+            {
+              "name": "max_tokens",
+              "value": 120
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4",
+      "name": "Generate Plain-Language Brief (Featherless LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [880, 240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{ $env.ELEVENLABS_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.choices[0].message.content }}"
+            },
+            {
+              "name": "model_id",
+              "value": "eleven_multilingual_v2"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5",
+      "name": "Generate Voice Briefing (ElevenLabs)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1100, 240]
+    },
+    {
+      "parameters": {
+        "webhookUri": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "text": "=⚡ **Turku Energia Imbalance Alert — {{ $('Analyze Spike & Variance Shifts').item.json.origin }}**\n\n**Risk Level:** {{ $('Analyze Spike & Variance Shifts').item.json.riskLevel }}\n\n**Operator Briefing:**\n{{ $('Generate Plain-Language Brief (Featherless LLM)').item.json.choices[0].message.content }}\n\n**Action Item:**\n{{ $('Analyze Spike & Variance Shifts').item.json.suggestions[0].message }}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Notify Discord / Operations Channel",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 1,
+      "position": [1320, 240]
+    }
+  ],
+  "connections": {
+    "Webhook: New Origin Forecast": {
+      "main": [
+        [
+          {
+            "node": "Analyze Spike & Variance Shifts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Spike & Variance Shifts": {
+      "main": [
+        [
+          {
+            "node": "Is Alert Triggered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Alert Triggered?": {
+      "main": [
+        [
+          {
+            "node": "Generate Plain-Language Brief (Featherless LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Plain-Language Brief (Featherless LLM)": {
+      "main": [
+        [
+          {
+            "node": "Generate Voice Briefing (ElevenLabs)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Voice Briefing (ElevenLabs)": {
+      "main": [
+        [
+          {
+            "node": "Notify Discord / Operations Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
+

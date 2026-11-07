@@ -1,15 +1,16 @@
 # --- Licensed / organiser data: NEVER commit (Nord Pool spot data is licensed) ---
-starter_package/
-starter_package_v1/
-TurkuEnergia_SinceAI2026/
+/Dataset/
+/starter_package/
+/starter_package_v1/
+/TurkuEnergia_SinceAI2026/
 *.zip
-data/
+/data/
 *.parquet
 spot_nordpool*.csv
 actuals_*.csv
 forecast_backtest*.csv
-results/
-baseline_output/
+/results/
+/baseline_output/
 
 # --- Python ---
 __pycache__/
@@ -20,6 +21,7 @@ venv/
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
+catboost_info/
 
 # --- Node (dashboard) ---
 node_modules/
