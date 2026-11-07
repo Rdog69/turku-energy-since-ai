@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Since AI 2026 hackathon entry for the Turku Energia challenge. From every full-hour forecast origin, the pipeline forecasts the Finnish **imbalance price** for 40 quarter-hours (10 h): P10/P50/P90, `p_up/p_down/p_none`, and `p_spike_high/p_spike_low` (more than ±50 €/MWh from spot). The submission is `forecast_backtest.csv` for 673 test origins, checked by the organisers' `validate_submission.py` and scored by `score.py` (in `starter_package/`). The product is a "situation room" dashboard for traders.
 
-`docs/PLAN.md` is the source of truth for decisions. `docs/RESULTS.md` logs every scored run and is the ablation table for the jury, so add a row for every result you report. Also log every September (`validation`) and August (`fold_b`) score on the team scoreboard (`scoreboard/README.md`, `python scoreboard/leaderboard.py`); never score or log the test month. `SOURCES.md` (data sources, delays, licences) is a required deliverable.
+Start with `docs/HANDOFF.md` if it exists (where the last session stopped); `docs/QUICKSTART.md` is the verified setup path. `docs/PLAN.md` is the source of truth for decisions. `docs/RESULTS.md` logs every scored run and is the ablation table for the jury, so add a row for every result you report. Also log every September (`validation`) and August (`fold_b`) score on the team scoreboard (`scoreboard/README.md`, `python scoreboard/leaderboard.py`); never score or log the test month. `SOURCES.md` (data sources, delays, licences) is a required deliverable.
 
 ## The rule that overrides everything
 
@@ -31,7 +31,7 @@ At forecast origin `t`, a data row may be used only if `first_usable_origin_utc 
 python -m venv .venv && .venv/bin/pip install -r requirements.txt   # works on Python 3.11-3.14
 .venv/bin/pip install -r requirements-app.txt                      # Streamlit fallback dashboard
 
-.venv/bin/python -m pytest                                          # all tests, ~3-5 min (leakage tests first)
+.venv/bin/python -m pytest                                          # all tests, ~10 min on one thread; expect 1 skip (town weather)
 .venv/bin/python -m pytest tests/test_availability.py::test_features_ignore_unpublished_rows
 
 # Backtest: train -> forecast -> write -> organisers' validator -> score.py
@@ -50,7 +50,8 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt   # works on P
 Other entry points:
 - `python -m src.export.dashboard --model <m> --period test`: per-origin JSON for the dashboard.
 - `streamlit run app/streamlit_app.py`: local fallback dashboard. Never deploy it; it shows spot.
-- `python reports/figures/make_figures.py`: slide figures.
+- `python reports/figures/make_figures.py`: slide figures. It has no `--help`: any run regenerates the committed PNGs.
+- `python tools/pick_demo_moments.py --model <m>`: demo hit/miss and alert stats from validation forecasts. `python tools/paired_bootstrap.py`: paired day-block intervals between models (`reports/uncertainty.md`).
 - `python -m src.explain.featherless` / `python -m src.automation.replay`: LLM briefings and n8n alerts.
 
 ## Architecture (data → submission)
