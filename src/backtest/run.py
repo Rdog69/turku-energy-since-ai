@@ -80,6 +80,7 @@ MODELS = {
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
+NO_CUTOFF_BEFORE = pd.Timestamp("2000-01-01", tz="UTC")   # earlier than any real data
 SUBMISSION_TS = ("forecast_origin_utc", "delivery_start_utc", "data_cutoff_utc")
 # Inputs saved next to the forecast so the dashboard can explain it.
 DASHBOARD_INPUTS = ["spot", "wind_fc", "cons_fc", "solar_fc", "spot_abs_ramp", "hour", "last_gap",
@@ -139,8 +140,14 @@ def write_submission(feats: pd.DataFrame, pred: pd.DataFrame, template: Path, pa
     scale = np.where(s > 1, 1 / s, 1.0)
     sub["p_spike_high"] *= scale
     sub["p_spike_low"] *= scale
-    sub["data_cutoff_utc"] = sub["data_cutoff_utc"].where(
-        sub["data_cutoff_utc"] <= sub["forecast_origin_utc"], sub["forecast_origin_utc"])
+    # data_cutoff must never be later than the origin: that would mean a feature used data that
+    # was not yet usable, so fail loudly instead of clipping it.
+    late = sub["data_cutoff_utc"] > sub["forecast_origin_utc"]
+    if late.any():
+        raise ValueError(f"{int(late.sum())} rows have data_cutoff_utc > forecast_origin_utc (leakage?)")
+    # "No measured data usable at this origin" is encoded by the feature builder as the int64
+    # minimum (year 1677). The validator allows an empty data_cutoff_utc, so write that explicitly.
+    sub["data_cutoff_utc"] = sub["data_cutoff_utc"].where(sub["data_cutoff_utc"] > NO_CUTOFF_BEFORE)
     for col in SUBMISSION_TS:
         sub[col] = pd.to_datetime(sub[col], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 

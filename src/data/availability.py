@@ -64,6 +64,10 @@ class SeriesIndex:
     def __init__(self, rows: pd.DataFrame):
         rows = rows.sort_values("timestamp_utc")
         self.ts = _ns(rows["timestamp_utc"])
+        if len(self.ts) > 1 and np.any(np.diff(self.ts) == 0):
+            # Two rows for one timestamp would make "the value at ts" (and its first_usable time)
+            # ambiguous, so refuse instead of silently picking one.
+            raise ValueError("duplicate timestamps in series")
         self.fu = _ns(rows["first_usable_origin_utc"])
         self.val = rows["value"].to_numpy(dtype=float)
         # For `latest`: rows sorted by first-usable time, with a running max of timestamp.
@@ -94,12 +98,15 @@ class SeriesIndex:
     def latest(self, origins) -> tuple[np.ndarray, np.ndarray]:
         """(latest usable timestamp in ns or -1, its value or NaN) for each origin."""
         o = _ns(origins)
-        k = np.searchsorted(self._fu_sorted, o, side="right") - 1
-        latest_ts = np.where(k >= 0, self._ts_cummax[np.clip(k, 0, None)], -1)
+        k = np.searchsorted(self._fu_sorted, o, side="right") - 1   # last row usable at each origin
+        usable = k >= 0                                              # k < 0: nothing usable yet
+        latest_ts = np.full(o.shape, -1, dtype=np.int64)
+        latest_ts[usable] = self._ts_cummax[k[usable]]
         vals = np.full(o.shape, np.nan)
-        found = latest_ts >= 0
-        pos = np.searchsorted(self.ts, latest_ts[found])
-        vals[found] = self.val[pos]
+        pos = np.searchsorted(self.ts, latest_ts)
+        pos_c = np.clip(pos, 0, len(self.ts) - 1)
+        exact = usable & (pos < len(self.ts)) & (self.ts[pos_c] == latest_ts)
+        vals[exact] = self.val[pos_c[exact]]
         return latest_ts, vals
 
 
