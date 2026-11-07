@@ -11,10 +11,11 @@
 * **Challenge:** Forecast Finnish 15-minute imbalance prices 1–40 steps (10h ahead), balancing direction, and tail spike risk.
 * **Core Philosophy:** Predict **deviations from spot** driven by physical grid fundamentals, not black-box price guessing.
 * **Key Achievements:**
-  * **35.0% MAE Error Reduction** vs. official baseline (43.05 vs. 66.20 €/MWh).
-  * **47.0% Calibration Loss Reduction** (Pinball: 12.82 vs. 24.18).
-  * **Validated Official Submission:** 26,920 rows verified with zero errors.
-  * **Operational Situation Room:** Interactive UI with time travel, SHAP drivers, and asset recommendations.
+  * **38.1% MAE Error Reduction** vs. official baseline (40.97 vs. 66.20 €/MWh).
+  * **51.9% Calibration Loss Reduction** (Pinball: 11.63 vs. 24.18, 80.1% coverage).
+  * **Anti-Overfit Equal-Weight Architecture:** Wins **9 out of 10 individual weeks** across both August (+6.81) and September (+6.35).
+  * **Validated Official Submission:** 26,920 rows verified with zero errors, 100% TreeSHAP physical drivers.
+  * **Operational Situation Room:** Interactive UI with time travel, SHAP drivers, revision alerts, and asset recommendations.
 
 ---
 
@@ -66,10 +67,12 @@ $$\longrightarrow \text{mFRR Balancing Activation} \longrightarrow \text{Asymmet
 | **Fingrid RT Wind Error + Step Bands** | 41.81 | 12.01 | 0.0907 | 0.3895 | -36.8% MAE, -50.3% Pinball |
 | **Dual-NWP + Learned Wind (v4_n50)** | 41.08 | 11.88 | 0.0871 | 0.3899 | -37.9% MAE, -50.9% Pinball |
 | **Grand Champion V1 (Static Fusion)** | 40.95 | 11.77 | 0.0865 | 0.3818 | -38.1% MAE, -51.3% Pinball |
-| **Grand Champion V2 (Horizon-Banded)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **🏆 Best Overall (-38.5% MAE, 80.0% Cov)** |
+| **Grand Champion V2 (Horizon-Banded)** | 40.73 | 11.76 | 0.0862 | 0.3812 | Single-month Sep tuning (overfit signature: +5.85 on Aug) |
+| **🏆 GRAND CHAMPION FINAL (Anti-Overfit 50/50)** | **`40.97`** | **`11.63`** | **`0.0861`** | **`0.3803`** | **🏆 Best Overall (+6.81 on Aug, 9/10 wks won, 100% TreeSHAP)** |
 
-* **Short Horizon (Steps 1–4):** MAE drops to **36.90 €/MWh** (powered by Fingrid real-time nowcasting).
-* **Long Horizon (Steps 37–40):** Stable at **42.79 €/MWh** anchored by day-ahead fundamentals.
+* **Anti-Overfit Generalization:** Equal weighting of orthogonal models ($\frac{1}{2}$ Frank + $\frac{1}{2}$ Abdo) eliminates estimation variance (Clemen's theorem), beating tuned weights out-of-fold.
+* **Short Horizon (Steps 1–4):** MAE drops to **36.25 €/MWh** (powered by Fingrid real-time nowcasting).
+* **Long Horizon (Steps 37–40):** Governed by dual-NWP (ECMWF + ICON-EU) 22-station wind power curve.
 
 ---
 

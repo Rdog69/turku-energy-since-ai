@@ -20,7 +20,7 @@ Rather than predicting raw prices with black-box regression, we model the physic
 3. The TSO activates **mFRR balancing reserves** in a dominating direction (up or down).
 4. Prices form along an **asymmetric merit order**: up-regulation jumps steeply along thermal generation costs (median $+25$ €/MWh), whereas down-regulation is relatively flat (median $-17$ €/MWh).
 
-By constructing a **Grand Ensemble Solution** combining dual-NWP weather spreads, learned wind power mapping, intraday spot shape dynamics, and empirical-Bayes shrunk Platt calibration, our solution beats the official competition baseline by **38.1% on MAE (40.95 vs 66.20 €/MWh)**, **51.3% on calibration pinball loss (11.77 vs 24.18)**, **23.6% on price spike risk (0.0865 vs 0.1132)**, and **15.3% on direction prediction (0.3818 vs 0.4509)**, while strictly complying with all data availability and anti-leakage constraints.
+By constructing a **Grand Ensemble Solution** combining dual-NWP weather spreads, learned wind power mapping, intraday spot shape dynamics, empirical-Bayes shrunk Platt calibration, and an **anti-overfit equal-weight prior ($\frac{1}{2}$ Frank + $\frac{1}{2}$ Abdo)** with 100% TreeSHAP feature attributions, our solution achieves **-38.1% on MAE (40.97 vs 66.20 €/MWh)**, **-51.9% on calibration pinball loss (11.63 vs 24.18)**, **-24.0% on price spike risk (0.0861 vs 0.1132)**, and **-15.7% on direction prediction (0.3803 vs 0.4509)**, while winning **9 out of 10 individual weeks** across independent August and September test windows.
 
 ---
 
@@ -75,15 +75,17 @@ Every feature group and architectural improvement was evaluated on the official 
 | **5. Mixture + CatBoost Blend** | 42.88 | 12.80 | 0.0965 | 0.4244 | 60/40 blend captures center & dampens spikes. |
 | **6. Fingrid RT Wind Error + Step Bands + Autumn Prior** | 41.81 | 12.01 | 0.0907 | 0.3895 | Real-time plan error nowcasting + seasonal prior. |
 | **7. Dual-NWP + Learned Wind Curve (`v4_n50`)** | 41.08 | 11.88 | 0.0871 | 0.3899 | ECMWF + ICON-EU spread + 22-point wind map + Nordic P50. |
-| **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | 40.95 | 11.77 | 0.0865 | 0.3818 | Static 65/35 fusion beating all teammate branches. |
-| **9. Grand Champion V2 (Horizon-Banded Ensemble)** | **`40.73`** | **`11.76`** | **`0.0862`** | **`0.3812`** | **🏆 New All-Time Best (Coverage: 80.0%, -38.5% MAE, -51.4% Pinball).** |
+| **8. Grand Champion Ensemble (v4_n50 + CAL INT4)** | 40.95 | 11.77 | 0.0865 | 0.3818 | Static 65/35 fusion beating initial teammate branches. |
+| **9. Grand Champion V2 (Horizon-Banded Ensemble)** | 40.73 | 11.76 | 0.0862 | 0.3812 | Single-month tuning on September (overfit signature: collapsed on August +5.85). |
+| **10. Grand Champion Final (Anti-Overfit 50/50 + TreeSHAP)** | **`40.97`** | **`11.63`** | **`0.0861`** | **`0.3803`** | **🏆 Winning Model (Equal-weight prior; +6.81 on Aug, 9/10 weeks won, 100% TreeSHAP drivers).** |
 
 ### Net Score Improvement Over Baseline:
-* **Accuracy (MAE):** Reduced by **25.47 €/MWh (-38.48%)**
-* **Calibration (Pinball):** Reduced by **12.42 (-51.37%)**
-* **Exceptional Price Spikes (Brier):** Improved by **-23.85%**
-* **Balancing Direction (Brier):** Improved by **-15.46%**
-* **Interval Coverage:** Calibrated to **80.01%** (exact competition target)
+* **Accuracy (MAE):** Reduced by **25.23 €/MWh (-38.11%)**
+* **Calibration (Pinball):** Reduced by **12.55 (-51.90%)**
+* **Exceptional Price Spikes (Brier):** Improved by **-23.94%**
+* **Balancing Direction (Brier):** Improved by **-15.66%**
+* **Interval Coverage:** Calibrated to **80.1%** (exact competition target 80.0%)
+* **Out-of-Sample Stability:** Highest total score on both September (+6.35) and August (+6.81) across 9/10 weeks.
 
 ---
 

@@ -423,13 +423,15 @@ st.dataframe(
 st.markdown("### 🏆 Model Track Record vs. Persistence Baseline")
 st.markdown(
     """
-| Metric (Evaluation Criteria) | Competition Baseline | Grand Champion Ensemble V2 | Operational Gain |
+| Metric (Evaluation Criteria) | Competition Baseline | Grand Champion Ensemble (Final) | Operational Gain |
 |:---|:---:|:---:|:---:|
-| **Accuracy: MAE ($p_{50}$)** | 66.20 €/MWh | **40.73 €/MWh** | **-38.5% error reduction** |
-| **Calibration: Pinball ($p_{10}/p_{90}$)** | 24.18 | **11.76** | **-51.4% interval loss** |
-| **Interval Coverage ($P_{10}$–$P_{90}$)** | 68.3% | **80.0%** | **Exact target calibration** |
-| **Exceptional Price Spikes (Brier)** | 0.1132 | **0.0862** | **-23.9% spike warning gain** |
-| **Balancing Direction (Brier)** | 0.4509 | **0.3812** | **-15.5% direction accuracy** |
+| **Accuracy: MAE ($p_{50}$)** | 66.20 €/MWh | **40.97 €/MWh** | **-38.1% error reduction** |
+| **Calibration: Pinball ($p_{10}/p_{90}$)** | 24.18 | **11.63** | **-51.9% interval loss** |
+| **Interval Coverage ($P_{10}$–$P_{90}$)** | 68.3% | **80.1%** | **Exact target calibration (80.0%)** |
+| **Exceptional Price Spikes (Brier)** | 0.1132 | **0.0861** | **-24.0% spike warning gain** |
+| **Balancing Direction (Brier)** | 0.4509 | **0.3803** | **-15.7% direction accuracy** |
+| **Out-of-Sample Score (August Holdout)** | Ref (0.0) | **+6.81 pts** | **Wins all 4 metrics out-of-fold** |
+| **Weekly Consistency** | 0 / 10 | **9 / 10 Weeks Won** | **Anti-overfit temporal stability** |
 | **Explainability (`top_drivers`)** | N/A (Empty) | **100% Populated (TreeSHAP)** | **Full physical transparency** |
 """
 )
