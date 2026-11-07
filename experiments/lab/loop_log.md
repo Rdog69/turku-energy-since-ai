@@ -21,3 +21,10 @@
 - **INT10 rt-short** [fl-DeepSeek-V4.1-] ok score=3.662 (14.4 min): Implements Frank's finding by giving real-time Fingrid sets only to bands ending at step 8, keeping the long band free of their noise while retaining runs/dir everywhere.
 - **INT11 rt-short+calib** [fl-DeepSeek-V4.1-] ok score=3.544 (13.9 min): Adds the known-good spike-calibration fix and 28-day calibration window on top of the short-band real-time feature split, targeting spike Brier without sacrificing MAE/pinball/direction.
 - leader after round: **LGB blend HGB+1seed 50/50** [lgb] score=3.981 all-better-both=True
+
+## Round 4 (03:02)
+- **INT5_calib28** [fl-DeepSeek-V4.1-] ok score=3.806 (16.0 min): Coordinator-requested eb50 spike calibration on the best INT5 base, testing whether it fixes spike Brier without hurting pinball.
+- **direct_bands_INT5** [fl-DeepSeek-V4.1-] ok score=3.275 (7.2 min): Direct model with bands is untested and provides strong ensemble diversity versus the mixture INT5 base.
+- **short_rt_histda** [fl-DeepSeek-V4.1-] ok score=4.145 (16.0 min): Priority 1 rt-only-in-short-bands plus hist_da to recover day-ahead direction/level information in longer bands.
+- **weather_bands** [fl-DeepSeek-V4.1-] ok score=4.82 (11.1 min): Weather-only feature set with bands and history blend for ensemble diversity; W6 was strong without bands and this tests a banded variant.
+- leader after round: **CAL INT2 eb50** [fl-calib] score=4.931 all-better-both=True

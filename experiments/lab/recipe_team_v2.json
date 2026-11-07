@@ -1,0 +1,5 @@
+{"p50": [["m_int4ss_lgb7", 1], ["frank_v4", 1]],
+ "p50_steps": [[1, 4, [["m_int4ss_lgb7", 1]]]],
+ "q": [["m_int4ss_lgb7", 1], ["frank_v4", 1], ["m_w6ss_lgb21", 1]],
+ "spike": [["m_int4ss_lgb7", 1], ["frank_v4", 1]],
+ "dir": [["m_int4ss_lgb7", 1], ["frank_v4", 1]]}

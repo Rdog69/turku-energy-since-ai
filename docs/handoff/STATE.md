@@ -1,4 +1,46 @@
-# State (Sat 7 Nov 2026, late morning)
+# State (Sat 7 Nov 2026, afternoon)
+
+## NEW: history mode (pre-June data, confirmed allowed by the organisers)
+
+- **What:** the lab now trains on **Mar 2025 – Oct 2026** (19 months, 556k rows instead of 119k). Set `LAB_HISTORY=1`.
+  - The pre-June imbalance price is **recomputed with the 1 June rule**; it reproduces the official price on 99.5 % of Jun–Oct 2026 quarters. Data is in `SOURCES.md` §11.
+  - The organisers' answer is in `docs/QUESTIONS_FOR_ORGANISERS.md` (question 2).
+- **New fold C** = 5 Oct – 1 Nov 2025: last year's test weeks.
+- **Results** are in `experiments/lab/leaderboard_hist.csv`; compare runs with `python -m experiments.lab.hist_compare "<ref name>"`.
+
+**Same INT4 recipe, trained on the history (lab, lower is better):**
+
+| Fold | Old INT4 (Jun–Oct 2026) | History INT4 |
+|---|---|---|
+| A (Sep) | 41.37 / 11.65 / 0.0887 / 0.3863 | **40.51 / 11.27 / 0.0866 / 0.3838** |
+| B (Aug) | 27.27 / 6.59 / 0.0667 / 0.4262 | **27.12 / 6.16 / 0.0637 / 0.4210** |
+| C (Oct 2025) | n/a | 50.74 / 15.67 / 0.1034 / 0.4601 (best of the history runs) |
+
+**Blends with Frank's v4_n50** (`python -m experiments.lab.exp_hist_blends`; gain over team5050, challenge weights):
+
+| Blend | Sep | Aug | Weeks won |
+|---|---|---|---|
+| ½ Frank + ½ history INT4 | +1.9 % | +2.1 % | 9/10 |
+| **⅓ Frank + ⅓ history INT4 + ⅓ old INT4** | +1.7 % | +2.5 % | **10/10** |
+
+**Other findings:**
+- Training on all of 2025 hurts fold C a little for the simplest features. 2025 was a much wilder market: summer 2025 had about 20 % high spikes, against 3–13 % in summer 2026.
+- Recency weights with a 240-day half-life gave a small win on all four scores on A and B; fold C is pending.
+- The regime flags (15-min day-ahead, June price rule) help on A and B.
+
+**Running / queued:**
+- `vol_regime` features (realised volatility over 3/7/28 days, for calm vs wild months).
+- Bigger trees, a weather-only history member, `cal_days` 28.
+- RT2 and balancing-market data with history (`fingrid history` command).
+- Local queue: `experiments/lab/queue.py` with `lumi/queue_hist.jsonl`. LUMI: `lumi/hist_watch.sh` submits `lumi/queue_lumi.jsonl` (40 jobs) when LUMI is back.
+
+**For Frank:** `docs/handoff/FRANK_HISTORY.md`, how to retrain v4_n50 on the history (an extended starter package his loader reads unchanged).
+
+**Submission:** `team5050` stays the safety net until a history blend has its test file and has passed all checks.
+
+---
+
+# Earlier state (Sat 7 Nov, late morning)
 
 ## Best results so far
 
