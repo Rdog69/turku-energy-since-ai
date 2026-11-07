@@ -36,6 +36,9 @@ REGISTRY = {
     "rt_imb": ("experiments.lab.features.nowcast", "rt_imb", "Fingrid real-time surplus/deficit 198/186 (newest, lags, means)"),
     "rt_wind": ("experiments.lab.features.nowcast", "rt_wind", "real-time wind 181 minus day-ahead wind forecast (wind error), lags/trend"),
     "rt_cons": ("experiments.lab.features.nowcast", "rt_cons", "real-time consumption/production-plan errors (helped fold A, hurt B)"),
+    "rt2": ("experiments.lab.features.rt2", "rt2_features", "Fingrid real-time batch 2: electric boilers, CHP, real-time border flows (Frank's RT2)"),
+    "spot_shape": ("experiments.lab.features.v2", "spot_shape", "spot curve shape: rank in day, distance to day max/min, spread, +-1h ramps (v2 agent: +4.21 with INT5)"),
+    "cal2": ("experiments.lab.features.v2", "calendar2", "weekend x hour interaction (+ DST flag)"),
     "rt_misc": ("experiments.lab.features.nowcast", "rt_misc", "frequency, nuclear drop, net import, hydro ramp, fg176"),
     "runs": ("experiments.lab.features.history", "runs_features", "mFRR direction run-length / switch features"),
     "hist_full": ("experiments.lab.features.history", "hist_full_features", "logit P(up) from a model fitted on last year's Fingrid history (as a feature)"),
@@ -118,8 +121,22 @@ def pool_post(fns, model, target, hgb, cal_days):
     return post
 
 
+def use_lgb(params: dict | None = None):
+    """Swap the learners inside models.py for LightGBM ones (bagging + seed averaging), for this process."""
+    import os
+    from . import models as M
+    from . import models_lgb as L
+    p = dict(num_leaves=15, min_child_samples=300, n_estimators=250, learning_rate=0.04, n_seeds=3)
+    p.update(params or {})
+    p.setdefault("n_jobs", int(os.environ.get("OMP_NUM_THREADS", "4")))
+    L.configure(**p)
+    M._reg, M._clf = L._reg, L._clf
+
+
 def run_spec(spec: dict):
     from .run import run_experiment
+    if spec.get("engine") == "lgb":
+        use_lgb(spec.get("lgb"))
     from .features.structure import chain, causal_post, ramp, recency
     names = list(dict.fromkeys(["package"] + list(spec["features"])))
     fns = resolve(names)

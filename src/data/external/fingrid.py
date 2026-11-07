@@ -58,6 +58,15 @@ RT = [  # real-time 3-min, verified on data.fingrid.fi dataset pages (6 Nov 2026
     DS(191, "hydro_rt", "rt3", "MW"),
     DS(209, "power_system_state_rt", "rt3", "state"),
 ]
+RT2 = [  # second real-time batch (teammate Frank found it helps spikes/direction); same 30-min rule
+    DS(371, "boilers_rt", "rt3", "MW"),          # electric boiler consumption: flexible load
+    DS(201, "chp_dh_rt", "rt3", "MW"),           # district-heating cogeneration
+    DS(202, "chp_ind_rt", "rt3", "MW"),          # industrial cogeneration
+    DS(87, "flow_se1_rt", "rt3", "MW"),          # FI-SE1 transmission, real time
+    DS(89, "flow_se3_rt", "rt3", "MW"),          # FI-SE3 transmission, real time
+    DS(180, "flow_ee_rt", "rt3", "MW"),          # FI-EE transmission, real time
+    DS(187, "flow_no_rt", "rt3", "MW"),          # FI-NO transmission, real time
+]
 PACKAGE = [  # same series as the starter package; delays as in availability.csv
     DS(319, "imbalance_price", "period", "EUR/MWh", 60),
     DS(369, "mfrr_direction", "period", "-1/0/1", 60),
@@ -86,7 +95,7 @@ EXTRA = [
     DS(251, "mfrr_last_down_bid_price", "period", "EUR/MWh", 60, verified=True),  # ☐ idem
     DS(176, "imbalance_power_fi_se", "period", "MWh/h", 60),  # ☐ delay unverified
 ]
-GROUPS = {"rt": RT, "package": PACKAGE, "extra": EXTRA}
+GROUPS = {"rt": RT, "rt2": RT2, "package": PACKAGE, "extra": EXTRA}
 # Package-series history from the Nordic mFRR market start (Mar 2025) to the package start,
 # so the direction/spike models can see last autumn and winter.
 HISTORY = ("2025-03-01", "2026-06-01")
