@@ -22,6 +22,9 @@ RAW_TABLE_READ = re.compile(r"read_csv|read_parquet|read_feather|external_data")
 ALLOWED_WINDOW_OPS = {
     # demo sample picks the busiest days of the *forecast output*; not a model input
     ("export/demo_sample.py", "by_day.rolling("): "dashboard demo-day selection, not a feature",
+    # Abdo's fetcher: gap between consecutive raw rows, to tell hourly from quarter-hourly
+    # prices; availability comes from the D-1 14:00 publication rule, not from this
+    ("data/external/elering_spot.py", "df.start.diff().shift(-1)"): "fetcher resolution check, not a feature",
 }
 ALLOWED_RAW_READS = {
     # these read templates/origins/our own forecast outputs, not input series
