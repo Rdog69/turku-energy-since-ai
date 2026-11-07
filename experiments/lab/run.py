@@ -13,6 +13,7 @@ Protocol (identical for everyone, so rows are comparable):
 from __future__ import annotations
 
 import fcntl
+import os
 import json
 import subprocess
 import time
@@ -26,7 +27,7 @@ from .models import calibrate as _calibrate
 from .models import fit_predict, metrics
 
 LAB = Path(__file__).resolve().parent
-BOARD = LAB / "leaderboard.csv"
+BOARD = Path(os.environ.get("LAB_BOARD", LAB / "leaderboard.csv"))   # LUMI tasks write their own file
 PRED = LAB / "_cache" / "preds"
 _checked: set = set()
 _feat_cache: dict = {}
