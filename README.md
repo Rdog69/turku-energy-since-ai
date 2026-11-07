@@ -104,6 +104,8 @@ Everything about the model: `model/README.md` on the [`deliverables`](https://gi
 
 ## 🖥️ The dashboard
 
+🔗 **Live:** [tasehinta.lovable.app](https://tasehinta.lovable.app), the exact app in this folder, hosted for the organisers and the jury (share the link only with them).
+
 **Tasehinta** turns the forecast into a situational view for a trader or a production shift supervisor (Level 2 of the challenge). It replays every forecast hour exactly as it was known at that hour.
 
 | | |
