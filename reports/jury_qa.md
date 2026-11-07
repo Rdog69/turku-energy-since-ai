@@ -2,7 +2,7 @@
 
 > Drafted by a Featherless worker (DeepSeek-V4.1-Flash) from our docs; checked by the coordinator. Numbers are validation-period (7 Sep – 4 Oct) for `v6_hf`, the pipeline model, unless a row names another model. TODO(team): v6_hf or team5050 — which file is submitted.
 
-Fifteen hardest questions a mixed energy-market / ML jury would ask in a 3-minute Q&A, with answers grounded in the attached documents. Confidence reflects how well our own evidence supports the answer, not how much we like it.
+Nineteen hard questions a mixed energy-market / ML jury would ask in a 3-minute Q&A, with answers grounded in the attached documents. Confidence reflects how well our own evidence supports the answer, not how much we like it.
 
 ---
 
@@ -65,6 +65,22 @@ Fifteen hardest questions a mixed energy-market / ML jury would ask in a 3-minut
 ### 15. "With more time, or with Turku Energia's internal data, what would you do?"
 
 **Answer:** Technically: Nord Pool UMM outage messages, which are fetched but used in only about 20 training quarters today, and real-time Fingrid and weather data for the pre-June history rows, which are empty there. The 15 months of pre-June history are already in `v6_hf` and help the band most. Pooled calibration was tested and rejected; the real-time imbalance series (Fingrid 198/186) and plan error (242) gave a small gain in `split_all_rt_icon`. With Turku Energia's own capacity, marginal costs, contracts and trading position, we could move the dashboard from "suggestions to review" to capacity-aware recommendations — that is the single biggest step we can't take from public data. **[confidence: high]**
+
+### 16. "You train on 15 months of history with a recomputed imbalance price. How do you know that doesn't leak or mislead?"
+
+**Answer:** Leak: the history goes through the same availability rule as everything else. `load_history` gives every measured history row a first-usable time no earlier than the package's own rule for that minute of the hour, and a truncation leak test covers history origins (`tests/test_availability.py`). Misleading: the pricing rule changed on 1 June 2026, so the older imbalance prices are recomputed with the new volume-weighted rule. That target matches the official price on 99.5 % of Jun–Oct 2026 quarters; we cannot check the match before June. A `regime_2026` flag (1 for deliveries from 1 Jun 2026) tells the model which rule a row was priced under, and `p_none` is still taken from June onwards only. Pre-June rows have no ENTSO-E neighbour series, weather runs or Fingrid real-time data, so those features are empty there. The check that it helps: the history improved both months, September (+2.26 % weighted by points) and August (+2.96 %), and most on the band (pinball −6 %). The organisers allowed pre-June data on 7 Nov (`QUESTIONS.md` Q1). **[confidence: high on the leak controls, medium on the recomputed target before June]**
+
+### 17. "What is `MedianFrom`, and isn't taking the median from a different model cherry-picking?"
+
+**Answer:** `MedianFrom` takes the P50 and its drivers from a twin model that also sees wind in Sweden, Norway, Denmark and Estonia. The band and the probabilities come from the model without that wind. It is not a pick of the best-looking output after the fact: the rule was decided from two separate months. Nordic wind improved the median in both September and August and made the band worse in both, so we use it where it helps and not where it hurts. In August the median was better in 4 of 5 weeks; the band was worse overall, mainly because of one bad day (31 Aug). The gain is small (+0.09 % weighted in September, +0.45 % in August). We still chose it among about 37 variants on the validation month, so the same optimism caveat as question 7 applies. **[confidence: high on the numbers, medium on how large the gain will be on the test month]**
+
+### 18. "Your August numbers for `team5050` come from a lab scorer. Are the two months comparable?"
+
+**Answer:** Partly. The scoreboard (`scoreboard/README.md`) sets one set of rules for both months: the same data cut-offs, the same weights (MAE 30, pinball 20, spikes 20, direction 10) and the same baseline method. Official scores come from the organisers' `score.py`; a lab score is allowed only when someone cannot run it, and when a model has both, the official one counts. `team5050` has a September entry scored officially (40.97 / 11.63 / 0.0861 / 0.3803) and an August entry from Abdo's lab scorer (27.27 / 6.57 / 0.0677 / 0.4281, no coverage column). His August forecast file is not in git, so we could not rescore it. The only check we have is that his lab scorer reproduces our official August scores for `v4_n50` exactly. So the scoreboard's lead for `team5050` (31.1 % average against 30.9 % for `v6_hf`) mixes one official and one lab month, and the 0.2 point gap is too small to call a winner from. **[confidence: high on the facts, low on who is really ahead]**
+
+### 19. "What did the live-imbalance features (Fingrid 198/186) add?"
+
+**Answer:** A little, and only close to the origin. In `split_all_rt` (live surplus/deficit, production against the BRP plan, hydro change; short model only) fold A moved from 42.53 to 42.52 MAE and direction Brier from 0.4011 to 0.4005, and fold B improved spikes (0.0750 to 0.0732) and direction (0.4491 to 0.4480) with MAE and pinball unchanged. The gain sits in hours 1–2 (hour 1 direction 0.3471 to 0.3431). It was consistent in sign across metrics and both folds but small. Together with ICON-EU (`split_all_rt_icon`) it gave MAE 42.14 and direction 0.3978 on fold A. The surplus/deficit series alone has almost no rank correlation with the next hour's gap (|rho| below 0.05); hydro change is the clearer signal. These features are not used in `v6_hf`; Frank's models took only our ICON-EU features. **[confidence: high]**
 
 ---
 
