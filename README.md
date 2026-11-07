@@ -274,7 +274,7 @@ python score.py --submission my_validation.csv --actuals data/actuals_validation
 
 ## Getting started
 
-**Requirements:** Python **3.11+**.
+**Requirements:** Python **3.11+**. For a step-by-step path that was checked on a fresh clone, see [`docs/QUICKSTART.md`](docs/QUICKSTART.md). No `.env` file is needed for the offline path below (tests, backtests, dashboard export): the starter package and all external data tables are committed, and the code reads API keys only in the fetchers and the LLM/n8n steps.
 
 ```bash
 git clone https://github.com/Rdog69/turku-energy-since-ai.git
@@ -282,17 +282,26 @@ cd turku-energy-since-ai
 python -m venv .venv
 # Windows: .venv\Scripts\activate   |   macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-app.txt   # optional: only for the Streamlit fallback dashboard
 ```
 
-The organisers' **starter package** is committed in `starter_package/` (verified against the locked SHA-256 sums). ⚠️ This repo is **private** on purpose: the package contains licensed Nord Pool spot data. **Never make the repo public** (or share it outside the team and the organisers) without first purging `starter_package/data/` from the git history, and delete the data after the event.
+Installing takes about 5 minutes. The organisers' **starter package** is committed in `starter_package/` (verified against the locked SHA-256 sums). ⚠️ This repo is **private** on purpose: the package contains licensed Nord Pool spot data. **Never make the repo public** (or share it outside the team and the organisers) without first purging `starter_package/data/` from the git history, and delete the data after the event.
 
 ### Run it
 
 ```bash
-python -m pytest
+OMP_NUM_THREADS=1 python -m pytest -q -rsf
 ```
 
-Runs the leakage tests. **If any of them fail, fix that first:** using data before it was published scores 0.
+Runs the leakage tests. It takes about 10 minutes on one thread. The expected result is 70 passed, 1 skipped (the skip is the town-weather test; those files are not downloaded). **If any test fails, fix that first:** using data before it was published scores 0.
+
+The cheap reference run is `split_all` (about 10 minutes on 4 cores):
+
+```bash
+python -m src.backtest.run --period validation --model split_all
+```
+
+It writes `results/split_all/validation/forecast_backtest.csv` and `score/score_summary.md`. The simplest model, `spot_anchor`, is the next command.
 
 ```bash
 python -m src.backtest.run --period validation --model spot_anchor
@@ -312,7 +321,7 @@ The submitted model is `v6_hf`:
 python -m src.backtest.run --period test --model v6_hf
 ```
 
-It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
+It takes much longer than `split_all`. It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
 
 It also needs the pre-June history, `external_data/history/pkg_history.csv.gz` (or a local `pkg_history.parquet`), built by `experiments/lab/build_history.py`. It is committed on this branch, and it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only), which is one more reason the repo must stay private. To refresh the tables:
 
@@ -337,7 +346,13 @@ Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbou
 python -m src.export.dashboard --model v6_hf --period test
 ```
 
-Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).
+Needs a finished backtest of the same model and period first (it reads `results/<model>/<period>/forecast_full.parquet`); `--period` is `validation` or `test`. Writes the per-hour JSON for the dashboard to `results/dashboard/<period>/` (contains spot prices, stays local).
+
+```bash
+python -m src.export.dashboard --model v6_hf --period test --demo
+```
+
+`--demo` writes the same files to `app_demo_data/<period>/` instead, with the Nord Pool spot price replaced by a synthetic curve (all prices are shifted by the same amount, so gaps and probabilities stay real). That copy has no licensed data.
 
 ```bash
 python -m src.explain.featherless --period test
@@ -377,11 +392,10 @@ starter_package/
 Local fallback for the situation-room demo (time travel, 10 h fan chart, spike risk, track record). **Local only**: it shows licensed Nord Pool spot data, never deploy it publicly.
 
 ```bash
-pip install -r requirements-app.txt
 streamlit run app/streamlit_app.py
 ```
 
-It reads `results/dashboard/test` if present, else `app_demo_sample/test` (change in the sidebar or set `DASHBOARD_DATA_DIR`).
+It needs `requirements-app.txt` (see Getting started) and serves on port 8501 by default (or pass `--server.port`). It reads `results/dashboard/test` if present, else `app_demo_sample/test` (change in the sidebar or set `DASHBOARD_DATA_DIR`).
 
 ## Repository layout
 
