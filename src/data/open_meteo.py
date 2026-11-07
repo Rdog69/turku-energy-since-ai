@@ -36,10 +36,13 @@ OUT_DIR = REPO_ROOT / "external_data" / "open_meteo"
 # Conservative publication delays after run initialisation (assumptions, see module docstring).
 PUBLICATION_DELAY = {
     "ecmwf_ifs025": pd.Timedelta(hours=8),
+    # ECMWF HRES (9 km): the only ECMWF model Open-Meteo's Single Runs API serves before Apr 2026.
+    # Used for the pre-June history rows only (src/data/weather.build_mix); same 8 h rule.
+    "ecmwf_ifs": pd.Timedelta(hours=8),
     "icon_eu": pd.Timedelta(hours=5),
     "metno_nordic": pd.Timedelta(hours=3),
 }
-RUN_HOURS = {"ecmwf_ifs025": (0, 6, 12, 18), "icon_eu": (0, 6, 12, 18), "metno_nordic": (0, 6, 12, 18)}
+RUN_HOURS = {"ecmwf_ifs025": (0, 6, 12, 18), "ecmwf_ifs": (0, 12), "icon_eu": (0, 6, 12, 18), "metno_nordic": (0, 6, 12, 18)}
 
 # Points across Finland's main wind clusters, mostly the west coast (Ostrobothnia) and the
 # Bothnian Bay. Approximate cluster centres, equal weights for now.

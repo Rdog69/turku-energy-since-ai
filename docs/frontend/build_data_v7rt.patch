@@ -1,0 +1,55 @@
+diff --git a/frontend/scripts/build_data.py b/frontend/scripts/build_data.py
+index 7fb1663..7d145a7 100644
+--- a/frontend/scripts/build_data.py
++++ b/frontend/scripts/build_data.py
+@@ -5,7 +5,8 @@
+ For each replay period it writes
+   * the quarter-hour grid: spot, realised imbalance price and mFRR direction, each with the time it was published
+     (first_usable_origin_utc), so the page can show only what was known at the review time;
+-  * every hourly forecast (40 quarter-hours): the submitted 50/50 blend of Frank's v4_n50 and our history model,
++  * every hourly forecast (40 quarter-hours): the submitted blend (1/2 Frank's v7_rt + 1/2 our h_int4ss, P90 stretched
++    x1.15 away from P50, see Frank's submissions/MANIFEST.md),
+     plus both members' median and direction, so disagreements can be flagged;
+   * alerts per forecast hour (spike risk, direction, material change, model conflict, wide uncertainty).
+ """
+@@ -34,11 +35,14 @@ def find(rel: str) -> Path | None:
+ 
+ PERIODS = {
+     "val": dict(label={"en": "Validation, 7 Sep – 4 Oct 2026", "fi": "Validointi, 7.9.–4.10.2026"},
+-                frank="external_data/_frank/v4_n50_validation.csv", ours="submissions/validation_h_int4ss.csv"),
++                frank="external_data/_frank/v7_rt_validation.csv", ours="submissions/validation_h_int4ss.csv"),
+     "test": dict(label={"en": "Test, 5 Oct – 1 Nov 2026", "fi": "Testi, 5.10.–1.11.2026"},
+-                 frank="external_data/_frank/v4_n50_test.csv", ours="submissions/forecast_backtest_h_int4ss.csv"),
++                 frank="external_data/_frank/v7_rt_test.csv", ours="submissions/forecast_backtest_h_int4ss.csv"),
+ }
+ COLS = ["p10", "p50", "p90", "p_up", "p_down", "p_none", "p_spike_high", "p_spike_low"]
++# The submitted blend stretches P90 away from P50 (too many prices landed above the blend's P90 in
++# September and August; factor cross-fitted between the two months, Frank's docs/RESULTS.md round 9).
++P90_STRETCH = 1.15
+ 
+ 
+ def load_member(path: Path) -> pd.DataFrame:
+@@ -48,12 +52,13 @@ def load_member(path: Path) -> pd.DataFrame:
+ 
+ 
+ def blend(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
+-    """The submission's 50/50 blend (same rules as experiments/lab/combine.py)."""
++    """The submission's blend: 50/50 (same rules as experiments/lab/combine.py), then P90 stretched by P90_STRETCH."""
+     out = a[["origin", "step"]].copy()
+     for c in COLS:
+         out[c] = (a[c].to_numpy(float) + b[c].to_numpy(float)) / 2
+     q = np.sort(out[["p10", "p50", "p90"]].to_numpy(), axis=1)
+     out["p10"], out["p50"], out["p90"] = q[:, 0], q[:, 1], q[:, 2]
++    out["p90"] = out["p50"] + P90_STRETCH * (out["p90"] - out["p50"])
+     s = out[["p_up", "p_down", "p_none"]].clip(0, 1)
+     s = s.div(s.sum(axis=1), axis=0)
+     out["p_up"], out["p_down"], out["p_none"] = s["p_up"], s["p_down"], s["p_none"]
+@@ -172,7 +177,7 @@ def main():
+     L = L[L.series_id.isin(["fi_spot_price", "fi_imbalance_price", "fi_mfrr_direction"])].copy()
+     L["ts"] = pd.to_datetime(L.timestamp_utc, utc=True)
+     L["fu"] = pd.to_datetime(L.first_usable_origin_utc, utc=True)
+-    payload = {"generated": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"), "model": "team_hist",
++    payload = {"generated": pd.Timestamp.now(tz="UTC").isoformat(timespec="seconds"), "model": "v7_rt + h_int4ss, P90 x1.15",
+                "periods": {}}
+     for pid, cfg in PERIODS.items():
+         p = period_payload(pid, cfg, L)
