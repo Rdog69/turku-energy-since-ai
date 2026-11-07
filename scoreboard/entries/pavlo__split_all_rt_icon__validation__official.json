@@ -3,11 +3,11 @@
   "model": "split_all_rt_icon",
   "period": "validation",
   "scorer": "official",
-  "mae": 42.139123,
-  "pinball": 12.059014,
-  "spike_brier": 0.092212,
-  "direction_brier": 0.397811,
-  "coverage": 0.80809,
+  "mae": 42.409204,
+  "pinball": 12.067102,
+  "spike_brier": 0.091639,
+  "direction_brier": 0.397674,
+  "coverage": 0.816217,
   "pre_june_data": false,
   "sources": [
     "package",
@@ -17,10 +17,10 @@
     "icon_eu"
   ],
   "description": "split_all + ICON-EU in both models + live imbalance (Fingrid 198/186, production vs BRP plan, hydro change) in the short model",
-  "notes": "Fingrid RT datasets 181, 188, 177, 193 (all steps 1-8) and 198, 186, 192, 242, 191 (live imbalance). Scored before merging Frank's rounds 3-6; August actuals from src/backtest/actuals.py (same construction as make_actuals.py).",
+  "notes": "Fingrid RT 181, 188, 177, 193 and 198, 186, 192, 242, 191. Re-scored after merging Frank's rounds 3-6.",
   "forecast_file": "",
   "branch": "femboystorming-pavlo",
-  "commit": "1c8f338",
-  "logged_by": "Claude Opus 5.5 for Pavlo",
-  "logged_at_utc": "2026-11-07T13:16:55Z"
+  "commit": "e22354b",
+  "logged_by": "Claude Sonnet (agent M2) for Pavlo",
+  "logged_at_utc": "2026-11-07T14:20:37Z"
 }
