@@ -53,3 +53,6 @@ desktop.ini
 frontend/public/payload.json
 frontend/bundle.html
 frontend/node_modules/
+
+# files prepared for the Since AI upload (zip, deck exports)
+submission_upload/
