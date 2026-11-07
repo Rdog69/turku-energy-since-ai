@@ -1,13 +1,14 @@
-import { ChartCandlestick, Factory, Gauge, Info, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Factory, Info, LayoutDashboard, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
 import { PAYLOAD, PERIOD_IDS } from "@/lib/model";
 import { Tip } from "./Bits";
 import { t } from "@/lib/i18n";
 import type { Lang } from "@/lib/time";
 
-export type View = "simple" | "trader" | "production";
-export const VIEWS: View[] = ["simple", "trader", "production"];
+// Simple and Trader were united into one Overview page (team feedback, 7 Nov); their components stay in the code.
+export type View = "overview" | "production";
+export const VIEWS: View[] = ["overview", "production"];
 const VIEW_KEYS: Record<View, [string, string, LucideIcon]> = {
-  simple: ["vSimple", "vSimpleHint", Gauge], trader: ["vTrader", "vTraderHint", ChartCandlestick], production: ["vProd", "vProdHint", Factory],
+  overview: ["vOverview", "vOverviewHint", LayoutDashboard], production: ["vProd", "vProdHint", Factory],
 };
 
 export function Rail({ period, setPeriod, lang, setLang, view, setView }: {
