@@ -18,7 +18,7 @@ At forecast origin `t`, a data row may be used only if `first_usable_origin_utc 
 
 ## Licensed data
 
-`starter_package/data/spot_nordpool.csv` (Nord Pool spot) is licensed for hackathon use only. The starter package is committed **on purpose** because the repo is private. Never make the repo public without purging `starter_package/data/` from history.
+`starter_package/data/spot_nordpool.csv` (Nord Pool spot) is licensed for hackathon use only. The starter package is committed **on purpose** because the repo is private. Never make the repo public without purging every path on the purge list in `reports/repo_hygiene.md` (starter package data, the two spot-history files, `submissions/`) from history.
 
 - Never print, log, plot or export rows or values of `fi_spot_price`. Aggregates and the gap to spot are fine.
 - Never send data to external services. `tools/kimi.py` (Featherless LLM workers) has a data guard that refuses spot data, actuals and raw data rows; LLMs only ever see code, docs and aggregates.
