@@ -19,7 +19,7 @@
 | 3 | Open-Meteo Single Runs: ECMWF IFS 0.25° (`ecmwf_ifs025`), main period | **Used** | CC BY 4.0 (Open-Meteo); ECMWF open data CC BY 4.0 ☐ |
 | 4 | Fingrid real-time, other datasets (192, 194, 198, 186, 191, 209) | Fetched, not used yet | CC BY 4.0 |
 | 5 | Fingrid "extra" series (BRP plans, wind capacity, mFRR bids, …) | Fetched, not used yet | CC BY 4.0 |
-| 6 | Open-Meteo: ICON-EU, MET Nordic runs | Fetcher exists; no data in the repo; not used | CC BY 4.0 |
+| 6 | Open-Meteo: ICON-EU, MET Nordic runs | ICON-EU single runs 25 May - 2 Nov 2026 (00/06/12/18 UTC, 647 of 648 runs; 11 Jun 06 UTC missing), first usable = init + 5 h, in `external_data/open_meteo/icon_eu.parquet`; used by `split_all_icon` (fold A gain, small). MET Nordic: no data, not used | CC BY 4.0 |
 | 7 | ERA5 reanalysis (via Open-Meteo) | Fetched, not used yet | Copernicus licence (attribution) ☐ |
 | 8 | Nord Pool UMM outage messages | Fetched, not used yet | ☐ public REMIT data; terms unconfirmed |
 | 9 | FMI 10-min observations | Fetched, not used yet | CC BY 4.0 |
@@ -104,7 +104,7 @@ Never used: Fingrid's continuously updated forecasts (245 wind, 241 production).
 | Table | `external_data/open_meteo/ecmwf_ifs025.parquet` |
 | Status | **Used by `split_all`**, for all 40 steps |
 
-Abdo's family (`src/data/external/open_meteo.py`) can also fetch IFS, ICON-EU and MET Nordic runs for seven wind clusters plus Helsinki, with 8 variables. Delays there: IFS 8 h, ICON-EU 5 h, MET Nordic 2 h (measured 7.1 / 3.9 / 0.8 h). In the repo only `runs_ecmwf_ifs_last_autumn.csv.gz` exists (pre-June: **not used until approved**); no ICON-EU or MET Nordic table is committed (**not used**). Note: Frank's `PUBLICATION_DELAY` has MET Nordic at 3 h, Abdo's at 2 h; neither is used by the model.
+Abdo's family (`src/data/external/open_meteo.py`) can also fetch IFS, ICON-EU and MET Nordic runs for seven wind clusters plus Helsinki, with 8 variables. Delays there: IFS 8 h, ICON-EU 5 h, MET Nordic 2 h (measured 7.1 / 3.9 / 0.8 h). In the repo only `runs_ecmwf_ifs_last_autumn.csv.gz` exists (pre-June: **not used until approved**); the ICON-EU table `icon_eu.parquet` is committed (5 h rule, used only by the `*_icon` models); no MET Nordic table (**not used**). Note: Frank's `PUBLICATION_DELAY` has MET Nordic at 3 h, Abdo's at 2 h; neither is used by the model.
 
 **ERA5 reanalysis** (`archive-api`, `era5_main.csv.gz`, `era5_last_autumn.csv.gz`): actual weather at the same points, available about 5 days late (`first_usable_origin_utc = valid time + 6 days`). Intended for fitting mappings only (wind speed to wind power), never as a forecast-time feature. Status: **fetched, not used yet**.
 

@@ -52,6 +52,18 @@ MODELS = {
         short=GBMModel(name="short_fingrid_weather", calibrate=True, spike_mode="product",
                        use_fingrid=True, use_weather=True),
         long=GBMModel(name="long_weather", calibrate=True, spike_mode="product", use_weather=True)),
+    "split_all_icon": lambda: HorizonSplit(
+        name="split_all_icon", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_icon", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, use_icon=True),
+        long=GBMModel(name="long_weather_icon", calibrate=True, spike_mode="product",
+                      use_weather=True, use_icon=True)),
+    "split_all_spread": lambda: HorizonSplit(
+        name="split_all_spread", split_step=8,
+        short=GBMModel(name="short_fingrid_weather_spread", calibrate=True, spike_mode="product",
+                       use_fingrid=True, use_weather=True, use_icon=True, icon_spread_only=True),
+        long=GBMModel(name="long_weather_spread", calibrate=True, spike_mode="product",
+                      use_weather=True, use_icon=True, icon_spread_only=True)),
     "gbm_weather_fingrid": lambda: GBMModel(name="gbm_weather_fingrid", calibrate=True,
                                             spike_mode="product", use_weather=True, use_fingrid=True),
 }
@@ -87,11 +99,11 @@ def period_files(pkg: Path, period: str) -> tuple[Path, Path]:
     return out / "forecast_origins.csv", out / "sample_submission.csv"
 
 
-def training_table(long, index, cutoff: pd.Timestamp, weather=None) -> pd.DataFrame:
+def training_table(long, index, cutoff: pd.Timestamp, weather=None, weather2=None) -> pd.DataFrame:
     """All (origin, step) rows with origin < cutoff whose targets were published by cutoff."""
     first = config.DATA_START.ceil("h") + pd.Timedelta(hours=6)  # leave room for a first lag
     origins = pd.date_range(first, cutoff, freq="h", inclusive="left")
-    f = build_features(long, origins, index=index, weather=weather)
+    f = build_features(long, origins, index=index, weather=weather, weather2=weather2)
     return f.loc[f["y_first_usable"] <= cutoff].reset_index(drop=True)
 
 
@@ -146,12 +158,16 @@ def main(argv=None) -> int:
     if getattr(model, "use_weather", False):
         from src.data.weather import WeatherIndex
         weather = WeatherIndex.load("ecmwf_ifs025")
-    train = training_table(long, index, cutoff, weather)
+    weather2 = None
+    if getattr(model, "use_icon", False):
+        weather2 = WeatherIndex.load("icon_eu")
+    train = training_table(long, index, cutoff, weather, weather2)
     model.fit(train, cutoff)
     print(model.describe())
     print(f"training rows: {len(train)} (targets published by {cutoff:%Y-%m-%dT%H:%MZ})")
 
-    feats = build_features(long, origins, index=index, with_targets=False, weather=weather)
+    feats = build_features(long, origins, index=index, with_targets=False, weather=weather,
+                           weather2=weather2)
     pred = model.predict(feats)
     out_dir = config.RESULTS_DIR / args.model / args.period
     sub_path = out_dir / "forecast_backtest.csv"

@@ -17,6 +17,7 @@ app_demo_data/
 # (exceptions must come after the rule they override)
 !external_data/fingrid/fingrid_rt.parquet
 !external_data/open_meteo/ecmwf_ifs025.parquet
+!external_data/open_meteo/icon_eu.parquet
 spot_nordpool*.csv
 actuals_*.csv
 forecast_backtest*.csv

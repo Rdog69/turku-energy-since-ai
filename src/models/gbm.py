@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from src.features.build import FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS
+from src.features.build import (FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS,
+                                WEATHER2_COLUMNS, WEATHER2_SPREAD_COLUMNS)
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -69,6 +70,8 @@ class GBMModel:
     spike_mode: str = "direct"           # "direct" or "product"
     holdout_days: int = 14
     use_weather: bool = False
+    use_icon: bool = False               # needs use_weather; adds ICON-EU + spread columns
+    icon_spread_only: bool = False       # only om_model_spread
     name: str = "gbm"
     params: dict = field(default_factory=lambda: dict(BASE_PARAMS))
 
@@ -95,6 +98,8 @@ class GBMModel:
     @property
     def features(self) -> list[str]:
         return (FEATURE_COLUMNS + (WEATHER_COLUMNS if self.use_weather else [])
+                + ((WEATHER2_SPREAD_COLUMNS if self.icon_spread_only else WEATHER2_COLUMNS)
+                   if self.use_icon else [])
                 + (FINGRID_RT_COLUMNS if self.use_fingrid else []))
 
     # ------------------------------------------------------------------ fitting
