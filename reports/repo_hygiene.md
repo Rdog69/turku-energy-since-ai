@@ -1,41 +1,74 @@
-# Repository hygiene scan (side job S16)
+# Repository hygiene scan (refresh, job H1)
 
-Scope: the whole git history reachable from `--all` (54 commits at the time of the scan, branch `worktree-agent-a160b6411a7ab7e4e` based on the integration branch). Secret values are never printed here: only file, commit and pattern name.
+Scope: full history of the merged branch at `bf529b9` (all commits reachable from it, including the Frank, Abdo and Vexa merges). No values are printed here, only paths, commits and pattern names. Header and `series_id` checks only for data files.
 
-## Secrets
+## 1. Secrets
 
-Patterns searched in every added line of every commit: `api_key`, `FINGRID_API_KEY=`, `FEATHERLESS*=`, `sk-` tokens, `Bearer <token>`, and `key/token/secret/password = "<24+ chars>"`.
+Every added line of every commit (`git log -p`) was tested against the patterns below. The patterns need a literal value of realistic length, so code that only mentions a key by name does not match.
 
-| Pattern | File | Commits | Verdict |
-|---|---|---|---|
-| `api_key` | `README.md`, `SOURCES.md`, `src/data/fingrid.py`, `src/data/external/fingrid.py`, `src/explain/featherless.py`, `tools/kimi.py`, `starter_package/README.md`, `starter_package/build_dataset.py` | b210caa, 48d4534, b35e68e, b4db775, a786f81, 9c84ba1 | Code and documentation that mention a key by name (reading it from the environment or `.env`). No value found. |
-| `FEATHERLESS_API_KEY=` | `src/explain/featherless.py` | b210caa | Placeholder in a docstring or error text, not a token. |
-| `FEATHERLESS_KEYS=` | `tools/README.md`, `tools/kimi.py` | a786f81 | Placeholder `key1,key2,...` (character shape of the value: `aaa9,aaa9,...`). |
-| key/token/secret = long string | `.obsidian/plugins/obsidian-git/main.js` | e27192c | Minified third-party plugin code ("vault backup" commits), not a project credential. |
-| `sk-`, `Bearer <token>` | none | none | No hits. |
+| Pattern | Hits (file, commit) |
+|---|---|
+| `rc_` + 24 or more hex characters (Featherless key shape) | none |
+| `sk-` token | none |
+| `Bearer <20+ chars>` | none |
+| `ghp_` token | none |
+| `BEGIN ... PRIVATE KEY` | none |
+| `API_KEY` / `api_key` `=` or `:` followed by a 16+ character value | none |
+| `FEATHERLESS_KEYS=` followed by a value | none |
+| `.env` file in any commit (any directory) | none |
 
-`.env` is not tracked in any commit (`git ls-files` and a history scan for `.env`, `secret`, `credential`, `*.pem`, `*.key` paths return nothing).
+The earlier scan listed files that mention `api_key` by name (fetchers, `tools/kimi.py`, docs). Those are still variable names only. The minified `.obsidian/plugins/obsidian-git/main.js` is third-party code, not a credential.
 
-## Large files
+## 2. Licensed spot data in the current tree
 
-| File | Size | Note |
+Checked: CSV and CSV.GZ headers plus the `series_id` column, parquet column names and string tables, JSON key names.
+
+| Path | What it holds | Real spot? |
 |---|---|---|
-| `starter_package/data/inputs.csv` | 39 MB | The only tracked file above 20 MB. Organisers' data (includes Nord Pool spot), committed on purpose. |
+| `starter_package/data/spot_nordpool.csv` | `fi_spot_price` series (Nord Pool) | Yes, licensed |
+| `starter_package/data/quality_report.csv` | has `fi_spot_price` rows (coverage statistics) | Name only; check whether it has values before any release |
+| `starter_package/data/actuals_validation.csv` | `spot_price` column (organisers' actuals) | Yes, licensed |
+| `external_data/elering/fi_spot_history.csv.gz` | `fi_spot_price` series, 2025 (Elering, from Nord Pool) | Yes |
+| `external_data/history/pkg_history.csv.gz` | `fi_spot_price` series, Mar 2025 - May 2026 | Yes |
+| `app_demo_sample/test/` (51 files) | `spot` key in every origin file, `p50_minus_spot`, `latest_imbalance_vs_spot`, `mae_spot_only` | No. `index.json` and the origin files carry `"demo": true`. `src/export/dashboard.py --demo` replaces spot with a synthetic curve (`55 + 20 sin(...) + 8 sin(...)`), shifts p10/p50/p90 by the same amount and drops `last_imb`. `track_record.json` holds error statistics only. |
+| `submissions/*.csv` (28 forecast and validation files) | no spot column; absolute p10/p50/p90 are spot plus a forecast gap, so they are derived from spot | Derived, not raw. Needs a licence decision |
+| `external_data/fingrid/*`, `elering/system_*`, `energinet/*`, `fmi/*`, `open_meteo/*`, `osm/*` | no spot column or series (parquet strings and headers checked) | No |
+| `starter_package/data/inputs.csv`, `inputs.parquet` | no `fi_spot_price` series (spot ships separately) | No spot, but contains Nord Pool-era package data and is the 39 MB file below |
+| `experiments/` | JSON, CSV and Python only, no spot columns or series | No |
 
-Next largest tracked files: `external_data/fingrid/package_history.csv.gz` (4.8 MB), two `submissions/*_ref_mixture.csv` (3.4 MB each), `starter_package/data/inputs.parquet` (2.6 MB).
+Note: `.gitignore` lists `external_data/history/` and `spot_nordpool*.csv`, but both are tracked (force-added), so the ignore rule does not protect them.
 
-## .gitignore coverage
+## 3. Large files
 
-`git check-ignore` confirms that `results/`, `.claude/`, `.venv/` and `.env` are ignored. Also ignored: `*.parquet` (with two explicit exceptions for open data), `actuals_*.csv`, `forecast_backtest*.csv`, `spot_nordpool*.csv`, `app_demo_data/`, `external_data/**/raw/`.
+| Where | File | Size |
+|---|---|---|
+| Current tree | `starter_package/data/inputs.csv` | 39 MB |
+| Any blob in history reachable from `bf529b9` | `starter_package/data/inputs.csv` | 39 MB (only one) |
 
-## Findings that need a decision
+No other file or blob is above 20 MB.
 
-1. **Licensed Nord Pool data is in git history.** `starter_package/data/` (`spot_nordpool.csv`, `inputs.csv`, `inputs.parquet`, `actuals_validation.csv`, quality reports) is committed. The `.gitignore` header already says this is acceptable only while the repository stays private. Before any push to a public remote or fork, purge `starter_package/data/` from history (e.g. `git filter-repo --path starter_package/data --invert-paths`) and re-check `submissions/`.
-2. **`submissions/*_ref_mixture.csv`** are forecast files with a `forecast_backtest*` name pattern that is ignored by `.gitignore`, yet two are tracked (added before the rule or force-added). They contain forecasts, which are derived from spot prices; confirm they may be published, or untrack them.
-3. **`.obsidian/` (8 tracked files, "vault backup" commits)** is editor state and a third-party plugin bundle. It is not a secret, but it does not belong in the submission repository; add `.obsidian/` to `.gitignore` and `git rm -r --cached .obsidian`.
+## 4. .gitignore coverage
 
-## Recommendations
+Verified with `git check-ignore -v`:
 
-- Keep the repository private until the history purge in finding 1 has been done and the result checked with `git log --all -- starter_package/data` (empty).
-- Add `.obsidian/` to `.gitignore`.
-- Before the final push, re-run this scan (it takes seconds) on the final branch.
+| Path | Ignored by |
+|---|---|
+| `results/` | `.gitignore:29` |
+| `.claude/` | `.gitignore:67` |
+| `.venv/` | `.gitignore:35` |
+| `.env` | `.gitignore:37` |
+| `scoreboard/_local/` | `scoreboard/.gitignore:2` |
+
+Not ignored: `.obsidian/` (still tracked, editor state and a plugin bundle; add it to `.gitignore` and `git rm -r --cached .obsidian`).
+
+## Purge list before any public release
+
+Every path below has been committed at some point and holds, or is derived from, licensed spot data. Remove all of them from history (for example `git filter-repo --invert-paths` with each `--path`), then check `git log --all -- <path>` is empty.
+
+1. `starter_package/data/` (whole directory: `spot_nordpool.csv`, `inputs.csv`, `inputs.parquet`, `actuals_validation.csv`, `quality_report.csv`, `quality_report.md`)
+2. `external_data/elering/fi_spot_history.csv.gz`
+3. `external_data/history/pkg_history.csv.gz`
+4. `submissions/` (all `forecast_backtest_*.csv`, `validation_*.csv` and `score_*/`), unless the organisers confirm forecasts may be published
+5. `.obsidian/` (not licensed, but should not ship)
+
+Also scrub mentions: nothing else in history carries spot values, and `app_demo_sample/` can stay (synthetic spot).
