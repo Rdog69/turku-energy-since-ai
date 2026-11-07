@@ -85,6 +85,8 @@ Other entry points:
 
 ## Repo quirks
 
+- Agent worktrees (`.claude/worktrees/`) have no `.venv`: use the main checkout's interpreter by absolute path. Git-ignored files (`results/`, the dashboard export) are not in a worktree either; copy what you need.
+- LightGBM seeds: `GBMModel` passes `random_state=seed` (0 with one seed). Seed noise alone moves September MAE by about 0.2, as much as many feature changes; compare variants on both folds and see `reports/uncertainty.md`.
 - Under pandas 3, timestamps may be stored in microseconds. Convert with `src.data.availability.to_ns`; never call `.asi8` directly.
 - The whole repo is an **Obsidian vault**. The obsidian-git plugin makes `vault backup` commits, `brainstorm/` holds draft notes, and `.obsidian/workspace.json` changes constantly. Stage files explicitly; don't use `git add -A`.
 - `tests/test_code_audit.py` scans `src/` for `.shift(`/`.rolling(` and raw table reads outside `src/data/`; reviewed exceptions are whitelisted there with a reason.
