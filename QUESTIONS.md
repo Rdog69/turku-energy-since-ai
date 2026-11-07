@@ -11,7 +11,7 @@ Sources: "README" is the organisers' starter-package README (section numbers as 
 | Question | Status |
 |---|---|
 | Pre-June data (Q1 below) | **Answered:** allowed (organisers' Q&A announcement). |
-| Fingrid API history = today's corrected values, not first-published ones | **Asked** by Frank. |
+| Fingrid API history = today's corrected values, not first-published ones | **Answered** (TE_Ville, Since AI Q&A, 7 Nov 2026, 17:45): if we can't verify what value was available at forecast time, we may use the values the dataset provides. He adds that in real operations only the data available at that moment can be used, so a later correction (for example the next day) couldn't have been in the original forecast. **How we handle it:** the Fingrid Open Data API serves only the current values, so we can't verify first-published ones; we keep them with the 30-minute rule. Caveat: our September and August scores may be slightly optimistic where Fingrid corrected a series afterwards. |
 | Weather-run delays (8 h ECMWF, 5 h ICON-EU) | **Decided, not asked:** both are longer than the delays actually measured (7.1 h for ECMWF by Abdo; 3.9 h for ICON-EU in Open-Meteo's metadata, 6 Nov), so they're conservative. |
 | Fingrid real-time surplus/deficit (198, 186) | **Decided, not asked:** it is measured real-time data like wind (181), so the package's own rule for measured Fingrid data applies: 30 min after the quarter, rounded up to the hour (`availability.csv`). The 60-min rule belongs to the imbalance price, which is computed after the fact. Same revision caveat as all API history. |
 | Sharing spot-based outputs | **Decided:** forecasts, scores and charts can be shown. The raw Nord Pool spot series itself stays out of public places (README §9). |
