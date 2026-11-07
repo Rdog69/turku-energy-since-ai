@@ -27,10 +27,10 @@ function FlagFI() {
 export function LangToggle({ lang, setLang }: { lang: Lang; setLang: (l: Lang) => void }) {
   const opts: [Lang, string, () => React.ReactElement, string][] = [["en", "EN", FlagUS, "English"], ["fi", "FI", FlagFI, "Suomi"]];
   return (
-    <div role="radiogroup" aria-label="Language / Kieli" className="inline-flex rounded-full border border-rule bg-sheet p-0.5 shadow-[0_1px_2px_rgba(20,34,51,0.06)]">
+    <div role="radiogroup" aria-label="Language / Kieli" className="inline-flex rounded-md border border-rule bg-sheet p-0.5 shadow-[0_1px_2px_rgba(20,34,51,0.06)]">
       {opts.map(([l, code, Flag, name]) => (
         <button key={l} type="button" role="radio" aria-checked={lang === l} title={name} onClick={() => setLang(l)}
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold transition-colors duration-150 ${lang === l ? "bg-bank text-white" : "text-ink-2 hover:text-ink"}`}>
+          className={`inline-flex items-center gap-1.5 rounded-[4px] px-2.5 py-1 text-[12.5px] font-semibold transition-colors duration-150 ${lang === l ? "bg-bank text-white" : "text-ink-2 hover:text-ink"}`}>
           <Flag />{code}
         </button>
       ))}
