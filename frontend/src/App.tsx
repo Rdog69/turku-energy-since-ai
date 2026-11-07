@@ -70,11 +70,11 @@ export default function App() {
     <Tooltip.Provider delayDuration={120} skipDelayDuration={0}>
     <div className="min-h-screen bg-paper lg:flex">
       <Rail period={periodId} setPeriod={setPeriod} lang={lang} setLang={setLang} view={view} setView={setView} />
-      <main className="min-w-0 flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-[1480px] space-y-8">
-          <TimeBar p={p} i={i} setI={setI} lang={lang} playing={playing} setPlaying={setPlaying} />
+      <main className="min-w-0 flex-1 px-4 pb-16 pt-5 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-[1480px] space-y-6">
+          {view !== "overview" && <TimeBar p={p} i={i} setI={setI} lang={lang} playing={playing} setPlaying={setPlaying} />}
 
-          {view === "overview" && <OverviewView p={p} i={i} lang={lang} periodKey={periodId} />}
+          {view === "overview" && <OverviewView p={p} i={i} setI={setI} playing={playing} setPlaying={setPlaying} lang={lang} />}
           {view === "production" && <ProductionView p={p} i={i} lang={lang} periodKey={periodId} />}
         </div>
       </main>

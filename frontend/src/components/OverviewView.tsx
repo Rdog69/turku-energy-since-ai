@@ -1,13 +1,14 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, CircleArrowDown, CircleArrowUp, CircleCheck, TrendingDown, TrendingUp, X } from "lucide-react";
 import type { Alert, Period } from "@/data/types";
-import { STEPS, driverTokens, forecastAt, hourRuns, hourSummary, known, qMs, reviewMin, sortedAlerts, windowDrivers } from "@/lib/model";
+import { STEPS, driverTokens, forecastAt, hourRuns, hourSummary, known, qMs, reviewMin, reviewMs, sortedAlerts, windowDrivers } from "@/lib/model";
 import { driverLabel, t } from "@/lib/i18n";
 import { ALERT_ICON, driverIcon } from "@/lib/icons";
 import { Q_MS, hhmm, type Lang } from "@/lib/time";
-import { ChanceDots, Tip } from "./Bits";
-import { ChartLegend, FanChart } from "./FanChart";
+import { ChanceDots } from "./Bits";
+import { BACK, H, TimeChart, TimeLegend } from "./TimeChart";
+import { TimeBar } from "./TimeBar";
 import { alertKey } from "./AlertList";
 import { QuarterTable } from "./QuarterTable";
 import { Hindsight } from "./Hindsight";
@@ -17,9 +18,35 @@ import { Hindsight } from "./Hindsight";
  * Order: worth-checking chips (open a side panel), the headline, the wide chart, the 15-minute
  * risk and balancing rows (click a quarter for its detail), the key factors, then the full tables.
  */
-export function OverviewView({ p, i, lang, periodKey }: { p: Period; i: number; lang: Lang; periodKey: string }) {
+export function OverviewView({ p, i, setI, playing, setPlaying, lang }: {
+  p: Period; i: number; setI: Dispatch<SetStateAction<number>>; playing: boolean; setPlaying: (v: boolean) => void; lang: Lang;
+}) {
   const [panel, setPanel] = useState<{ kind: "alert"; a: Alert } | { kind: "quarter"; s: number } | { kind: "all" } | null>(null);
-  const [chartDetail, setChartDetail] = useState(false);
+  const [zones, setZones] = useState(false);
+  // the graph window: "now" sits at BACK of the width; scrolling moves "now" through time hour by hour,
+  // with a sub-hour offset while the gesture lasts so the motion stays smooth
+  const [span, setSpan] = useState(16 * H);
+  const [offset, setOffset] = useState(0);
+  const iRef = useRef(i); iRef.current = i;
+  const offRef = useRef(0);
+  const n = p.origins.length;
+  const pan = useCallback((ms: number) => {
+    setPlaying(false);
+    let off = offRef.current + ms;
+    const k = Math.round(off / H);
+    if (k !== 0) {
+      const ni = Math.max(0, Math.min(n - 1, iRef.current + k));
+      off -= (ni - iRef.current) * H;
+      iRef.current = ni;
+      setI(ni);
+    }
+    if ((iRef.current === 0 && off < 0) || (iRef.current === n - 1 && off > 0)) off = 0;
+    offRef.current = off;
+    setOffset(off);
+  }, [n, setI, setPlaying]);
+  const panEnd = useCallback(() => { offRef.current = 0; setOffset(0); }, []);
+  const center = reviewMs(p, i) + offset;
+  const view: [number, number] = [center - BACK * span, center + (1 - BACK) * span];
   const [details, setDetails] = useState(false);
   const alerts = useMemo(() => sortedAlerts(p, i), [p, i]);
   const major = alerts.filter((a) => a.level === "high" || a.kind === "spike_high" || a.kind === "spike_low");
@@ -28,26 +55,31 @@ export function OverviewView({ p, i, lang, periodKey }: { p: Period; i: number; 
   const win = (a: number, b: number) => ({ a: hhmm(qMs(p, o + a), lang), b: hhmm(qMs(p, o + b) + Q_MS, lang) });
 
   return (
-    <div className="space-y-9">
+    <div className="space-y-5">
+      <Headline p={p} i={i} lang={lang} />
+
       <WorthChips lang={lang} alerts={alerts} major={major} win={win}
         onOpen={(a) => setPanel({ kind: "alert", a })} onAll={() => setPanel({ kind: "all" })} />
 
-      <Headline p={p} i={i} lang={lang} />
-
-      <section aria-label={t(lang, "chartTitle")}>
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-          <ChartLegend lang={lang} simple={!chartDetail} />
-          <button type="button" onClick={() => setChartDetail(!chartDetail)} aria-pressed={chartDetail}
-            className="rounded-md border border-rule bg-sheet px-3 py-1.5 text-[13px] font-semibold text-bank transition-transform duration-150 ease-out active:scale-[0.96]">
-            {chartDetail ? t(lang, "oChartLess") : t(lang, "oChartMore")}
+      <section aria-label={t(lang, "chartTitle")} className="rounded-xl border border-rule bg-sheet/50 px-4 pb-3 pt-4 sm:px-5">
+        <TimeBar p={p} i={i} setI={(v) => { panEnd(); setI(v); }} lang={lang} playing={playing} setPlaying={setPlaying} win={view} compact />
+        <div className="mb-1 mt-4 flex flex-wrap items-center justify-between gap-3 pr-[150px]">
+          <TimeLegend lang={lang} />
+          <button type="button" onClick={() => setZones(!zones)} aria-pressed={zones}
+            className={`rounded-md border px-3 py-1 text-[13px] font-semibold transition-colors duration-150 ${zones ? "border-bank bg-bank text-white" : "border-rule bg-sheet text-bank"}`}>
+            {t(lang, "tcZones")}
           </button>
         </div>
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          <FanChart p={p} i={i} lang={lang} focus={focus} periodKey={periodKey} simple={!chartDetail} />
+          <TimeChart p={p} i={i} win={view} lang={lang} focus={focus} zones={zones} span={span}
+            onPan={pan} onPanEnd={panEnd} onZoom={(f) => setSpan((v) => Math.max(2 * H, Math.min(96 * H, v * f)))}
+            onResetZoom={() => setSpan(16 * H)} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <BalanceSummary p={p} i={i} lang={lang} />
+          <span className="text-[12.5px] text-ink-3">{t(lang, "tcHint")}</span>
         </div>
       </section>
-
-      <NextRows p={p} i={i} lang={lang} focus={focus} onQuarter={(s) => setPanel({ kind: "quarter", s })} />
 
       <KeyFactors p={p} i={i} lang={lang} />
 
@@ -251,92 +283,35 @@ function Headline({ p, i, lang }: { p: Period; i: number; lang: Lang }) {
   const Big = !run ? CircleCheck : side === "high" ? TrendingUp : TrendingDown;
   const ring = { bank: "bg-bank/10 text-bank", verm: "bg-verm-soft text-verm", teal: "bg-teal-soft text-teal" }[tone];
   return (
-    <section aria-live="polite" className="flex flex-wrap items-center gap-6">
-      <span className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-full ${ring}`}><Big size={40} strokeWidth={2} /></span>
+    <section aria-live="polite" className="flex flex-wrap items-center gap-4">
+      <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${ring}`}><Big size={30} strokeWidth={2} /></span>
       <div className="min-w-0">
-        <p className="text-[32px] font-bold leading-tight text-ink">{!run ? t(lang, "hCalm") : t(lang, side === "high" ? "hHigh" : "hLow")}</p>
+        <p className="text-[26px] font-bold leading-tight text-ink">{!run ? t(lang, "hCalm") : t(lang, side === "high" ? "hHigh" : "hLow")}</p>
         {run ? (
-          <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 text-[18px]">
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[16px]">
             <span className={`num font-semibold ${tone === "verm" ? "text-verm" : "text-teal"}`}>{hat(run[0])}–{hat(run[1] + 1)}</span>
             <span className="inline-flex items-center gap-2 text-ink-2"><ChanceDots k={k} tone={tone} />{t(lang, "chance", { k })}</span>
           </p>
         ) : (
-          <p className="mt-1 text-[18px] text-ink-2">{t(lang, "hCalmSub")}</p>
+          <p className="mt-0.5 text-[16px] text-ink-2">{t(lang, "hCalmSub")}</p>
         )}
       </div>
     </section>
   );
 }
 
-/** 40 quarter-hours on one grid: price risk on top, balancing need as large bars (up above the line, down below) */
-function NextRows({ p, i, lang, focus, onQuarter }: { p: Period; i: number; lang: Lang; focus: Alert | null; onQuarter: (s: number) => void }) {
-  const qs = useMemo(() => hourSummary(p, i, 1), [p, i]);
+/** one sentence on the balancing direction over the next 10 hours */
+function BalanceSummary({ p, i, lang }: { p: Period; i: number; lang: Lang }) {
   const F = useMemo(() => forecastAt(p, i), [p, i]);
-  const o = p.origins[i];
-  const at = (s: number) => hhmm(qMs(p, o + s), lang);
-  const HALF = 70;
   const meanUp = F.pu.reduce((a, v) => a + v, 0) / STEPS;
   const meanDn = F.pd.reduce((a, v) => a + v, 0) / STEPS;
   const sum = meanUp >= 0.5 ? "oBalSumUp" : meanDn >= 0.6 ? "oBalSumDown" : "oBalSumMixed";
-  const SumIcon = meanUp >= 0.5 ? CircleArrowUp : CircleArrowDown;
+  const Icon = meanUp >= 0.5 ? CircleArrowUp : CircleArrowDown;
   return (
-    <section aria-labelledby="o-next">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="o-next" className="text-[18px] font-bold text-ink">{t(lang, "oNext")}</h2>
-        <span className="text-[13px] text-ink-3">{t(lang, "oBalHint")}</span>
-      </div>
-      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div className="grid min-w-[760px] grid-cols-[132px_minmax(0,1fr)] gap-x-3">
-          {/* price risk row */}
-          <span className="self-center text-[13px] font-semibold text-ink-2">{t(lang, "oRisk")}</span>
-          <ol className="grid grid-cols-[repeat(40,minmax(0,1fr))] gap-[3px]">
-            {qs.map((x, s) => {
-              const hiSide = x.side === "high";
-              const cls = x.level === "normal" ? "bg-sheet border-rule" : hiSide ? (x.level === "high" ? "bg-verm border-verm" : "bg-verm-soft border-verm") : (x.level === "high" ? "bg-teal border-teal" : "bg-teal-soft border-teal");
-              const dim = focus && (s < focus.a || s > focus.b) ? "opacity-45" : "";
-              const tip = x.level === "normal" ? `${at(s)}: ${t(lang, "sHourNormal", { v: Math.round(x.p50) })}`
-                : `${at(s)}: ${t(lang, hiSide ? "sHourHigh" : "sHourLow", { p: Math.round((hiSide ? x.hi : x.lo) * 100) })}`;
-              return (
-                <li key={s}><Tip text={tip}>
-                  <button type="button" aria-label={tip} onClick={() => onQuarter(s)} className={`block h-7 w-full rounded-[3px] border ${cls} ${dim} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank`} />
-                </Tip></li>
-              );
-            })}
-          </ol>
-
-          {/* balancing need: up above the line, down below, large and plain */}
-          <span className="mt-4 flex flex-col justify-between py-1 text-[13px] font-semibold" style={{ height: 2 * HALF }}>
-            <span className="inline-flex items-center gap-1.5 text-verm"><CircleArrowUp size={16} strokeWidth={2} />{t(lang, "oUpShort")}</span>
-            <span className="inline-flex items-center gap-1.5 text-teal"><CircleArrowDown size={16} strokeWidth={2} />{t(lang, "oDownShort")}</span>
-          </span>
-          <ol className="mt-4 grid grid-cols-[repeat(40,minmax(0,1fr))] gap-[3px]">
-            {F.pu.map((pu, s) => {
-              const dim = focus && (s < focus.a || s > focus.b) ? "opacity-45" : "";
-              const tip = `${at(s)}: ${t(lang, "up")} ${Math.round(pu * 100)} %, ${t(lang, "down")} ${Math.round(F.pd[s] * 100)} %`;
-              return (
-                <li key={s}><Tip text={tip}>
-                  <button type="button" aria-label={tip} onClick={() => onQuarter(s)}
-                    className={`group flex w-full flex-col rounded-[3px] hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bank ${dim}`} style={{ height: 2 * HALF }}>
-                    <span className="flex flex-1 items-end"><span className="w-full rounded-t-[3px] bg-verm/85 group-hover:bg-verm" style={{ height: pu * HALF }} /></span>
-                    <span className="h-px w-full bg-ink-3" />
-                    <span className="flex flex-1 items-start"><span className="w-full rounded-b-[3px] bg-teal/85 group-hover:bg-teal" style={{ height: F.pd[s] * HALF }} /></span>
-                  </button>
-                </Tip></li>
-              );
-            })}
-          </ol>
-
-          <span />
-          <ol className="grid grid-cols-[repeat(40,minmax(0,1fr))] gap-[3px]">
-            {F.pu.map((_, s) => <li key={s} className="num h-4 whitespace-nowrap pt-1 text-[11.5px] text-ink-3">{s % 4 === 0 ? at(s) : ""}</li>)}
-          </ol>
-        </div>
-      </div>
-      <p className="mt-4 inline-flex items-center gap-2 text-[15px] font-semibold text-ink">
-        <SumIcon size={18} strokeWidth={2} className={meanUp >= 0.5 ? "text-verm" : "text-teal"} />
-        {t(lang, sum, { up: Math.round(meanUp * 100), down: Math.round(meanDn * 100) })}
-      </p>
-    </section>
+    <p className="inline-flex items-center gap-2 text-[14.5px] font-semibold text-ink">
+      <Icon size={18} strokeWidth={2} className={meanUp >= 0.5 ? "text-verm" : "text-teal"} />
+      {t(lang, sum, { up: Math.round(meanUp * 100), down: Math.round(meanDn * 100) })}
+    </p>
   );
 }
 
