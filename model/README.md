@@ -6,7 +6,7 @@ The reference for the report, the slides and the demo video. All numbers are fro
 
 ## 1. In 30 seconds
 
-> Every full hour, we forecast the Finnish imbalance price for the next 10 hours, quarter by quarter. The day-ahead price is already known, so we forecast the **gap** to it: will the grid need up- or down-regulation, how far will the price move, and how sure are we? Two separately built LightGBM models, one by Frank and one by Abdo, each trained on 19 months of data with the pre-June prices rebuilt under the June 2026 pricing rule, are averaged 50/50. On the organisers' validation month the forecast misses by **40 €/MWh** on average, where the baseline misses by 66, and it is **36.7 % better than the baseline** on the challenge's points.
+> Every full hour, we forecast the Finnish imbalance price for the next 10 hours, quarter by quarter. The day-ahead price is already known, so we forecast the **gap** to it: will the grid need up- or down-regulation, how far will the price move, and how sure are we? It is one gradient-boosting (LightGBM) ensemble model: two separately built components, each trained on 19 months of data with the pre-June prices rebuilt under the June 2026 pricing rule, averaged 50/50. On the organisers' validation month the forecast misses by **40 €/MWh** on average, where the baseline misses by 66, and it is **36.7 % better than the baseline** on the challenge's points.
 
 ## 2. Key numbers
 
@@ -50,9 +50,9 @@ The reference for the report, the slides and the demo video. All numbers are fro
 ```mermaid
 flowchart LR
   A["Data published<br/>before the hour"] --> B["Features<br/>(state, real-time grid,<br/>weather revisions, spot shape)"]
-  B --> C1["Frank: v7_rt<br/>hours 1-2 + hours 3-10 models"]
-  B --> C2["Abdo: h_int4ss<br/>direction x price-gap mixture"]
-  C1 --> D["50/50 blend<br/>8 output columns"]
+  B --> C1["Component A: v7_rt<br/>hours 1-2 + hours 3-10 sub-models"]
+  B --> C2["Component B: h_int4ss<br/>direction x price-gap mixture"]
+  C1 --> D["The model: 50/50 ensemble<br/>8 output columns"]
   C2 --> D
   D --> E["forecast_backtest.csv<br/>+ situational view"]
 ```
@@ -63,26 +63,26 @@ flowchart LR
    - the newest weather-model runs (5–8 hours old);
    - the day-ahead prices for all 40 quarters (known since the afternoon before).
 2. **Build features** for each of the 40 quarters ahead (sections 6 and 7).
-3. **Each model predicts:**
+3. **Each component predicts:**
    - the gap's distribution (P10, P50, P90);
    - P(up), P(down) and P(none);
    - P(gap > +50) and P(gap < −50).
 4. **Calibrate** with the last weeks before the forecast period.
-5. **Average the two models**, add the day-ahead price back, and write the 40 rows.
+5. **Average the two components** into the model's forecast, add the day-ahead price back, and write the 40 rows.
 
 ## 5. The data
 
 | Source | What | Published | Used by |
 |---|---|---|---|
 | Starter package: Fingrid | Imbalance price (target), mFRR direction, mFRR/aFRR prices and volumes, consumption, production, cross-border flows (SE1, SE3, Norway, Estonia), day-ahead wind/solar/consumption forecasts | As given per row | Both |
-| Starter package: ENTSO-E | Neighbour imbalance prices (SE1, SE3, Estonia), transmission capacity FI–EE, neighbour load forecasts | As given per row (about 2.6 h after the quarter) | Frank (imbalance prices, FI–EE capacity) |
+| Starter package: ENTSO-E | Neighbour imbalance prices (SE1, SE3, Estonia), transmission capacity FI–EE, neighbour load forecasts | As given per row (about 2.6 h after the quarter) | Component A (imbalance prices, FI–EE capacity) |
 | Starter package: Nord Pool | Finnish day-ahead price | D-1 14:00 Finnish time | Both |
 | Starter package: calendar | Hour, weekday, holidays, daylight saving | Always | Both |
-| Fingrid Open Data, real time (3-minute data) | Surplus/deficit (198, 186), measured wind (181), frequency (177), nuclear, hydro, electric boilers, CHP, net import, cross-border flows | Quarter end + 30 min, rounded up to the hour | Both (Frank: hours 1–2 model) |
+| Fingrid Open Data, real time (3-minute data) | Surplus/deficit (198, 186), measured wind (181), frequency (177), nuclear, hydro, electric boilers, CHP, net import, cross-border flows | Quarter end + 30 min, rounded up to the hour | Both components (A: hours 1–2 sub-model) |
 | Fingrid Open Data, history | The package's series for Mar 2025 – May 2026; aFRR activated volumes (349/350) | Same rules as the package | Both (training only) |
 | Elering (Nord Pool feed) | Finnish day-ahead prices before June 2026 | D-1 14:00 | Both (training only) |
-| Open-Meteo Single Runs | ECMWF IFS and DWD ICON-EU forecast runs at wind-farm locations, Nordic points | Run time + 8 h (IFS), + 5 h (ICON), measured | Frank (both), Abdo (IFS) |
-| OpenStreetMap | Wind-turbine locations | Static | Frank (capacity weights) |
+| Open-Meteo Single Runs | ECMWF IFS and DWD ICON-EU forecast runs at wind-farm locations, Nordic points | Run time + 8 h (IFS), + 5 h (ICON), measured | Component A (both), component B (IFS) |
+| OpenStreetMap | Wind-turbine locations | Static | Component A (capacity weights) |
 
 **Not used:**
 - Swedish or Estonian **day-ahead** prices (only the Finnish one).
@@ -103,16 +103,16 @@ flowchart LR
    - **15-minute day-ahead products** from 1 Oct 2025 (hourly before);
    - the **June 2026 rule**, so the model can tell eras apart.
 
-**Result:** training on Mar 2025 – Oct 2026 improved **both** models in **both** check months, most of all the uncertainty band. Frank's pinball improved by about 6 %. Abdo's September MAE went from 41.52 to 40.55 (official scorer) and August pinball from 6.59 to 6.16.
+**Result:** training on Mar 2025 – Oct 2026 improved **both** components in **both** check months, most of all the uncertainty band. Component A's pinball improved by about 6 %. Component B's September MAE went from 41.52 to 40.55 (official scorer) and August pinball from 6.59 to 6.16.
 
-## 7. Model 1: Frank's `v7_rt`
+## 7. Component A: `v7_rt`
 
 **Architecture:**
-- **Two horizon models:**
+- **Two horizon sub-models:**
   - **hours 1–2** (steps 1–8), which also sees fresh real-time grid data;
   - **hours 3–10** (steps 9–40), without it, because real-time data turns into noise after about two hours.
-- **The median from a twin:** the P50 comes from an identical model that also sees **Nordic wind** (Sweden, Norway, Denmark, Estonia). That helped the median but not the band, so the band and the probabilities come from the model without it.
-- **What each model predicts** (LightGBM):
+- **The median from a twin:** the P50 comes from an identical sub-model that also sees **Nordic wind** (Sweden, Norway, Denmark, Estonia). That helped the median but not the band, so the band and the probabilities come from the sub-model without it.
+- **What each sub-model predicts** (LightGBM):
   - the gap's P10/P50/P90 (quantile regression);
   - P(up-regulation);
   - spike probabilities as **P(direction) × P(|gap| > 50 | direction)**, consistent with the direction by construction.
@@ -140,7 +140,7 @@ flowchart LR
 | Nordic wind (median twin only) | ECMWF wind index and revision in Sweden, Norway, Denmark and Estonia |
 | History flag | Which pricing rule a row was settled under |
 
-## 8. Model 2: Abdo's `h_int4ss`
+## 8. Component B: `h_int4ss`
 
 **Architecture: a direction × price-gap mixture.**
 1. A classifier gives **P(up)** versus P(down). P(none) is its share in training (under 1 %).
@@ -157,7 +157,7 @@ flowchart LR
   - per horizon band, a width factor for P10 and P90 (minimising pinball);
   - Platt maps for the spike probabilities, shrunk toward "no change" when those days held few spikes (m0 = 50);
   - a Platt map for the up/down probability.
-- **Smoothing:** a light blend with the previous hour's forecast for the same quarters (weight 0.2), so forecasts don't jump hour to hour.
+- **Smoothing:** a light mix with the previous hour's forecast for the same quarters (weight 0.2), so forecasts don't jump hour to hour.
 - **Training:** every hourly origin from Mar 2025 to the cutoff. Labels from the last 2 hours before the cutoff are left out, because those prices were not yet published.
 
 **Inputs (108 features):**
@@ -174,21 +174,21 @@ flowchart LR
 | Spot shape (8) | The quarter's rank in the day, distance to the day's maximum and minimum, the day's spread, ramps into and out of the quarter |
 | Market era (2) | 15-minute day-ahead products (since 1 Oct 2025); the June 2026 price rule |
 
-## 9. The blend
+## 9. The ensemble: combining the components
 
 - **Weights:** equal, **½ `v7_rt` + ½ `h_int4ss`**, on all eight columns (P10, P50, P90, P(up), P(down), P(none), P(high spike), P(low spike)).
 - **Consistency fixes:**
   - the quantiles are re-sorted;
   - the direction probabilities renormalised to sum to 1;
   - the two spike probabilities capped so they sum to at most 1.
-- **`data_cutoff_utc`:** the later of the two models' (always before the forecast hour).
-- **`top_drivers`:** from `v7_rt`'s TreeSHAP contributions.
+- **`data_cutoff_utc`:** the later of the two components' (always before the forecast hour).
+- **`top_drivers`:** from component A's TreeSHAP contributions.
 
-**Why 50/50, and why these two:**
-- The models were built independently, with different feature sets, horizon splits and calibration windows, so their errors only partly overlap.
-- In September the blend beats both members on all four scores. Over both months it is the best of the three: 32.8 % better than the baseline on average, against 32.4 % for `h_int4ss` and 30.9 % for `v7_rt`.
+**Why 50/50, and why these two components:**
+- The components were built independently, with different feature sets, horizon splits and calibration windows, so their errors only partly overlap.
+- In September the ensemble beats each component on all four scores. Over both months it is the best: 32.8 % better than the baseline on average, against 32.4 % for component B alone and 30.9 % for component A alone.
 - Fitted weights per output were tried with cross-fitting (fit on one month, check on the other). They did not beat 50/50 in both months.
-- A P90 stretch (×1.15) and a spike cap gained about 0.2 points on the same two months, but pushed band coverage to 84–85 % (target 80 %). We kept the simpler blend.
+- A P90 stretch (×1.15) and a spike cap gained about 0.2 points on the same two months, but pushed band coverage to 84–85 % (target 80 %). We kept the simpler model.
 
 ## 10. What drives the forecast
 
@@ -230,7 +230,7 @@ From the `top_drivers` column (TreeSHAP) over September:
 ## 13. How we avoided fooling ourselves
 
 - **Two check months:** every change had to improve **both** September (the organisers' validation) and August (trained on June–July only), and most of the weeks within them.
-- **About 300 experiments** are logged with their scores (`docs/EXPERIMENTS.md` on `brainstorming-abdo`, `docs/RESULTS.md` on `brainstorming-frank`). A shared team scoreboard scores every model with the organisers' script.
+- **About 300 experiments** are logged with their scores (`docs/EXPERIMENTS.md` on `brainstorming-abdo`, `docs/RESULTS.md` on `brainstorming-frank`). A shared team scoreboard scores every variant with the organisers' script.
 - **Rejected after testing on both months:**
   - recency weighting;
   - bigger trees;
@@ -239,9 +239,9 @@ From the `top_drivers` column (TreeSHAP) over September:
   - outage messages (UMM);
   - Estonian and Danish system data;
   - FMI station observations;
-  - direction-run features in Frank's model;
-  - a third blend member;
-  - per-output blend weights.
+  - direction-run features in component A;
+  - a third ensemble component;
+  - per-output component weights.
 
 ## 14. Limitations
 
@@ -259,7 +259,7 @@ From the `top_drivers` column (TreeSHAP) over September:
 1. **"Forecast the gap, not the price."** The day-ahead price is known; the uncertainty is the balancing direction and how far the price jumps.
 2. **"Direction first."** Up-regulation pushes the price above spot, down-regulation below. Our forecast is a mix of the two, so the price, band, spike risk and direction always agree.
 3. **"19 months of data, made comparable."** We rebuilt the pre-June prices with the June 2026 rule, 99.5 % exact where we can check it.
-4. **"Two independent models, averaged."** Different features and horizons; the blend beats both.
+4. **"One model, two independent components."** Different features and horizons; the ensemble beats either part on its own.
 5. **"Nothing from the future."** Every number on screen was published before the hour, and the leak tests prove it.
 
 **On screen, in order:**

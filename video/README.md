@@ -1,16 +1,16 @@
-# Demo video (at most 5 minutes)
+# Demo video
 
-**Placeholder.** Jim's script draft: `brainstorming-jim` `reports/demo_video_script.md`. Put the final file or link here.
+**The video:** [`media/tasehinta-demo.mp4`](https://github.com/Rdog69/turku-energy-since-ai/blob/master/media/tasehinta-demo.mp4) on `master` (42 MB). The same file is on `brainstorming-frank`, and the main README embeds it.
 
-The brief requires it to show the forecast for the next 10 hours in 15-minute periods, the forecast uncertainty, significant deviations, and the most important factors. For Level 2 it should also show alerts, hindsight, moving the review time into the past, and "check this" suggestions.
+**What the brief asks it to show** (challenge brief §07, at most 5 minutes):
+- the forecast for the next 10 hours in 15-minute periods;
+- the forecast uncertainty;
+- significant deviations;
+- the most important factors affecting the forecast.
 
-Outline (about 4:30):
+For Level 2, also:
+- alerts when the balancing need or the price forecast changes materially;
+- how the forecast has performed in hindsight, and moving the review point into the past;
+- reasoned suggestions of situations worth reconsidering.
 
-1. 0:00–0:30: the problem and who it is for (a Turku Energia trader).
-2. 0:30–2:00: **Trader view** at a spiky hour: the fan chart (15-min, zoom), direction and spike-risk strips, "Worth checking" with drivers.
-3. 2:00–2:45: **time travel:** drag back a day, press Play, watch an alert appear before a spike.
-4. 2:45–3:30: **Simple** and **Production** views: the plain-language status, flexibility checks.
-5. 3:30–4:15: hindsight against the day-ahead price; validation results against the baseline.
-6. 4:15–4:30: what is next.
-
-Record from the local build only: it contains licensed spot prices, so never upload it to a public host.
+**The dashboard shown in it** is live at [tasehinta.lovable.app](https://tasehinta.lovable.app).
