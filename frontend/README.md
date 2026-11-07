@@ -9,19 +9,30 @@ The situation view for the Turku Energia imbalance-price forecast (Level 2 of th
 
 ## Run it
 
+Needs Node.js 20.19 or newer (Vite 8) and pnpm 9 (`npx -y pnpm@9.15.9 ...` works without installing it).
+Install with the Node version you will build with: pnpm skips Vite's native bundler module on older Node.
+
 ```bash
-# 1. data (needs the starter package and the forecast files; writes src/data/payload.js, git-ignored)
+# 1. data (needs the starter package and the forecast files; writes public/payload.json, git-ignored)
 python frontend/scripts/build_data.py          # run from the repo root with the project's Python env
 
 # 2. app
 cd frontend
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev                                       # http://localhost:5173
 
 # 3. one offline file for the demo (bundle.html, git-ignored)
-bash ~/.claude/skills/web-artifacts-builder/scripts/bundle-artifact.sh
+pnpm bundle                                    # macOS / Linux
 ```
 
-`payload.js` and `bundle.html` contain Nord Pool spot prices, licensed to Turku Energia for the hackathon only: keep them on your machine, don't host or publish them, and delete them after the event.
+On Windows, `pnpm bundle` fails on its `rm`; run its three steps instead:
+
+```bash
+pnpm exec vite build --mode single
+rm -f dist/payload.json                        # Git Bash; PowerShell: Remove-Item dist/payload.json -ErrorAction Ignore
+node scripts/inline_payload.mjs
+```
+
+`payload.json` and `bundle.html` contain Nord Pool spot prices, licensed to Turku Energia for the hackathon only: keep them on your machine, don't host or publish them, and delete them after the event.
 
 Stack: React + TypeScript + Vite + Tailwind + shadcn/ui (Radix), d3-scale/d3-shape for the charts, Source Sans 3 (SIL OFL) embedded.
