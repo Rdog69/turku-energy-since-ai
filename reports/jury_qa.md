@@ -1,0 +1,75 @@
+# Jury Q&A preparation
+
+> Drafted by a Featherless worker (DeepSeek-V4.1-Flash) from our docs; checked by the coordinator. Numbers are validation-period (`split_all`) and marked for update once the final model is chosen.
+
+Fifteen hardest questions a mixed energy-market / ML jury would ask in a 3-minute Q&A, with answers grounded in the attached documents. Confidence reflects how well our own evidence supports the answer, not how much we like it.
+
+---
+
+### 1. "You model the gap to spot rather than the price. Why is that legitimate, and what would break it?"
+
+**Answer:** The imbalance price is the day-ahead spot price plus a jump: up-regulation prices above spot, down-regulation below, and when neither direction dominates the price follows spot; since 1 June 2026, when both mFRR and aFRR dominate, it is the volume-weighted average of their energy prices. Spot is known for all 40 steps at every hourly origin (we checked every origin 2 Jun – 1 Nov), and a constant gap on top of spot beats the persistence baseline by a third (MAE 44.29 vs 66.20). So we forecast only what the day-ahead plan missed in Finland, which is where the new information actually is. What would break it is a change to the settlement rule itself, or the "no dominating direction" case becoming common rather than the ~0.2 % we assume. **[confidence: high]**
+
+### 2. "Your model only improves MAE from 44.29 to 42.53 over a constant gap on spot. Is the machine learning doing anything?"
+
+**Answer:** Honest answer: it adds about 1.8 €/MWh of MAE, and most of that comes from calibration and the spike product form, not from sharper point forecasts. The model earns its place on the other three metrics: pinball 14.99 → 12.09, spike Brier 0.1132 → 0.0921, direction Brier 0.4509 → 0.4011. Our own conclusion is that better MAE needs new information (pre-June winter history, fresher system state, cross-border price spreads), not a fancier model. **[confidence: high]**
+
+### 3. "Why gradient boosting and not a deep or foundation time-series model?"
+
+**Answer:** We have about four months of data (roughly 12,000 training quarters for the spike analysis), one target series, and a strong deterministic anchor already explaining two-thirds of the error — that is a small-data, tabular problem, and LightGBM gives us quantiles plus calibrated probabilities and TreeSHAP drivers in one stack. 50 of the 80 automatic points (pinball 20, spike Brier 20, direction Brier 10) reward calibrated uncertainty, so variance reduction and honest uncertainty matter more than model capacity. A Chronos/TimesFM challenger was planned but not run, so we can't claim it wouldn't have helped. **[confidence: medium — the data-size and metric arguments are in our docs; the explicit "why not DL" reasoning is our reconstruction, not a measured comparison]**
+
+### 4. "How do you actually guarantee you never used data before it was published?"
+
+**Answer:** Every feature is read through one access layer (`SeriesIndex.value_at` / `latest` in `src/data/availability.py`), which returns a value only if its `first_usable_origin_utc ≤ t`; no feature uses a fixed shift. The key test is a truncation test: for sampled origins (data start, spot publication hours, the DST change, period boundaries, plus random hours) we rebuild features from the full data and again from data with every row published after `t` deleted — the two must be identical, and the weather features are covered too. A second test compares the fast lookups against the organisers' slow `rows_available_at` logic, and further tests check `data_cutoff_utc` is before the origin, that targets are never features, and that training rows were published before the training cut-off. **[confidence: high]**
+
+### 5. "Your external series use *your own* publication delays — Fingrid real-time at 30 minutes, ECMWF at 8 hours. What if the organisers reject those?"
+
+**Answer:** Those delays are assumptions, and we say so: 30 min is copied from the organisers' own delay for measured Fingrid data (Fingrid actually publishes every 1–3 min), and our measured ECMWF init-to-availability was about 7.1 h against our 8 h rule — both rounded up to the next full hour and conservative. We don't know yet whether the organisers accept externally sourced series with our documented delay, because we have not had that answer; what would settle it is an organisers' ruling. The fallback is already measured: dropping Fingrid real-time entirely costs us 0.55 €/MWh MAE (42.53 → 43.08) and 0.0077 direction Brier. **[confidence: high on the numbers, and the uncertainty is stated as uncertainty]**
+
+### 6. "50 points ride on calibrated uncertainty. How do you get coverage to 0.80, and is that number honest?"
+
+**Answer:** The raw LightGBM quantiles were far too narrow (coverage 0.527), so we hold out the last 14 days of the training window, fit on the earlier data, and learn Platt scaling for the three probabilities plus P10/P50/P90 offsets in three step bands (1–8, 9–20, 21–40); then we refit on the full window and apply those maps. That takes coverage to 0.814 on the validation window against a 0.80 target and improves the spike Brier from 0.1063 to 0.0939. The honest caveat is that the maps are learned on data before the test period, so the validation window is our only genuinely held-out evidence — see the drift question next. **[confidence: high on the mechanism, medium on generalisation]**
+
+### 7. "You picked the best of 11 variants on a single four-week window, and your calibration offsets roughly doubled into October. Isn't this overfitting?"
+
+**Answer:** Yes, that is the main threat to our numbers and we flag it in the report rather than hiding it: choosing the best of 11 variants on 7 Sep – 4 Oct makes the result optimistic. Concretely, the 14-day holdout before the test (20 Sep – 4 Oct) was volatile, so the learned P90 offset is +28 to +36 €/MWh there versus +14 to +21 for validation — either correct adaptation to the autumn regime or overfitting to two noisy weeks. We don't know yet which; an August validation fold, pooled calibration over several folds, and a week-by-week breakdown of the test period would answer it. **[confidence: high — this is our own stated limitation]**
+
+### 8. "How do you model spikes, and what about spikes that don't match the dominant direction?"
+
+**Answer:** We model them as `P(spike high) = P(up) × P(gap > 50 | up)` and symmetrically for low, which keeps them consistent with the direction forecast and sum to at most 1; the product form beat direct spike classifiers (Brier 0.0945 vs 0.0971). In about 12,000 training quarters only 7 high spikes fall outside up-regulation and 18 low spikes outside down-regulation, so tying spikes to direction is empirically the right structure. The risk we can't dismiss is that validation spike shares (12.1 % / 13.0 %) are well above training (9.0 % / 7.3 %), so this is a regime the models have seen little of. **[confidence: high on the model form, medium on the tail counts]**
+
+### 9. "Your direction Brier only improves 11 % over the baseline, and `p_none` is a constant. Are those probabilities useful?"
+
+**Answer:** `p_none` is a constant at the training share of about 0.2 % because "no dominating direction" almost never happens, and the remaining mass is split by a binary up-classifier. Direction is our weakest metric — 0.4011 vs the baseline's 0.4509 — and we'd rather say that than dress it up; on the first two hours a separate short-horizon model does much better (hour 1: 0.342 vs 0.408). The unsettled question is whether minute-level imbalance data (Fingrid 198/186, BRP plan error) would sharpen the near-term direction signal; those are fetched but not yet used. **[confidence: high]**
+
+### 10. "The clocks change on 25 October, inside your test period. How do you handle that?"
+
+**Answer:** The test period has 673 origins, exactly one more than 28 × 24, because of the 25-hour local day, and our features read the package's local calendar (`cal_hour_local`, `cal_weekday_local`, `cal_is_dst`), which the organisers computed from Finnish local time, so the hour-of-day signal should stay correct. Our leakage test deliberately includes origins around the DST change. We have not checked forecast quality on that day separately, and we honestly don't know yet whether 25 Oct is a weak spot — a per-day error breakdown over the test period would answer it. **[confidence: high on the mechanics, low on the quality claim]**
+
+### 11. "Which of your ideas failed, and which sources did you reject?"
+
+**Answer:** Recency weights (τ = 30 days) improved MAE but hurt pinball, coverage and both probability scores, so we dropped them; giving Fingrid real-time features to *every* step made things worse (MAE 43.43) because the signal is stale by hour 3, which is why we split the horizon at step 8. We never used Fingrid's continuously updated forecasts (245, 241) because only the latest version is stored and it would leak, and we avoided the Open-Meteo Historical Forecast API for the same reason. We also rejected the free spot-price mirror (licence says external use is prohibited, and pre-June spot would be needed to compute 2025 gaps) — that is why our pre-June history is fetched but parked until the organisers approve it. **[confidence: high]**
+
+### 12. "What does the dashboard actually give a shift supervisor that a price chart doesn't?"
+
+**Answer:** Level 2 is 20 % of the score and is judged on clarity for a shift supervisor or trading specialist, two time spans (now / next 10 h and past performance over a day, week and month), time travel back into the past, and inventiveness. Ours adds spike risk per hour, rule-based alerts when the balancing need or forecast changes materially, plain-language briefings, and review suggestions such as "risk of an exceptionally high price has increased for 16:00–18:00, driven by a lower wind forecast, so check the production plan". Because we have no plant or position data, these are explicitly suggestions to **review**, never instructions. Our documents record no user test with a real operator, so we don't yet know how a shift supervisor would actually use it — that would need a Turku Energia operator to try it. **[confidence: high on scope, low on measured usefulness]**
+
+### 13. "Where is the LLM used, and what stops it hallucinating a price?"
+
+**Answer:** It writes a 2–3 sentence briefing per forecast hour on the dashboard (Qwen2.5-32B-Instruct via Featherless) and nothing else — it never sees raw data, no spot prices and no absolute price forecasts, only a deterministic fact sheet of expected *gaps* to spot, probabilities, uncertainty width, rule-based alerts and feature labels. It cannot change any forecast value: the scored CSV is written by the backtest before the LLM runs, and `top_drivers` comes from LightGBM's TreeSHAP, not from the model. Every number in its output is checked against the fact sheet and degenerate text is rejected, falling back to a template briefing. **[confidence: high]**
+
+### 14. "The whole forecast is anchored on Nord Pool spot, which is licensed. Can you ship this?"
+
+**Answer:** Spot is licensed to Turku Energia for hackathon use only, so the repo stays private, `results/` (which contains spot) is git-ignored, no document or log quotes spot values, and the hosted Lovable preview uses demo data with a synthetic spot curve. Anything leaving the machine — LLM prompts, n8n alert payloads — is spot-free by code guard, and we send only gaps and probabilities. One thing we don't know yet: whether forecasts *derived* from spot may leave the machine at all — we have asked no one, and an organisers' clarification would settle it. Everyone deletes their copy after the event. **[confidence: medium — the controls are in the repo, but the derived-data question is open]**
+
+### 15. "With more time, or with Turku Energia's internal data, what would you do?"
+
+**Answer:** Technically: a second validation fold and pooled calibration, the real-time imbalance series (Fingrid 198/186) and the BRP production-plan error (242), an ECMWF-vs-ICON spread as a weather-uncertainty measure, and Nord Pool UMM outage messages, which are fetched but used in only about 20 training quarters today. Pre-June Fingrid history (last autumn and winter) is fetched and would add a season our four months barely cover, but it is parked until the organisers approve it. With Turku Energia's own capacity, marginal costs, contracts and trading position, we could move the dashboard from "suggestions to review" to capacity-aware recommendations — that is the single biggest step we can't take from public data. **[confidence: high]**
+
+---
+
+## Three things to say in every answer
+
+1. **We beat the persistence baseline on all four automatic metrics**, and we quote the numbers unprompted: MAE 66.20 → 42.53, pinball 24.18 → 12.09, spike Brier 0.1132 → 0.0921, direction Brier 0.4509 → 0.4011 (validation, 7 Sep – 4 Oct).
+2. **Nothing touches data before it was published**, enforced in one access layer and verified by a truncation test that rebuilds every feature with future rows deleted — a leak means an automatic zero, which is why we test it rather than promise it.
+3. **We separate measured from assumed.** When something is an assumption (external publication delays, calibration generalising to October, the dashboard's value in a real control room) we say "we don't know yet" and name what would settle it — that is stronger than a confident guess in front of energy-market experts.
