@@ -20,14 +20,15 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG, SUB = ROOT / "starter_package", ROOT / "submissions"
-FRANK = {"val": ROOT / "external_data/_frank/frank_foldA_val.csv", "test": ROOT / "external_data/_frank/frank_test.csv"}
+FRANK = {"frank": {"val": ROOT / "external_data/_frank/frank_foldA_val.csv", "test": ROOT / "external_data/_frank/frank_test.csv"},
+         "frank_v4": {"val": ROOT / "external_data/_frank/v4_n50_validation.csv", "test": ROOT / "external_data/_frank/v4_n50_test.csv"}}
 GROUPS = {"p50": ["p50"], "q": ["p10", "p90"], "spike": ["p_spike_high", "p_spike_low"], "dir": ["p_up", "p_down", "p_none"]}
 KEY = ["forecast_origin_utc", "step"]
 
 
 def member_file(name: str, mode: str) -> Path:
-    if name == "frank":
-        return FRANK[mode]
+    if name in FRANK:
+        return FRANK[name][mode]
     return SUB / (f"validation_{name}.csv" if mode == "val" else f"forecast_backtest_{name}.csv")
 
 

@@ -66,6 +66,7 @@ class Data:
             "pkg": None,
             "fg_rt": [EXT / "fingrid/rt_last_autumn.csv.gz", EXT / "fingrid/rt_main.csv.gz"],
             "fg_extra": [EXT / "fingrid/extra_last_autumn.csv.gz", EXT / "fingrid/extra_main.csv.gz"],
+            "fg_mfrr2": [EXT / "fingrid/mfrr2_main.csv.gz"],
             "fg_rt2": [EXT / "fingrid/rt2_last_autumn.csv.gz", EXT / "fingrid/rt2_main.csv.gz"],
             "fg_hist": [EXT / "fingrid/package_history.csv.gz"],
             "umm": [EXT / "umm/messages_last_autumn.csv.gz", EXT / "umm/messages_main.csv.gz"],
@@ -100,7 +101,7 @@ class Data:
                 raise KeyError(f"source {k!r} not downloaded yet")
             parts = [pd.read_csv(p) for p in files]
             raw = pd.concat(parts, ignore_index=True)
-            if k in ("fg_rt", "fg_rt2", "fg_extra", "fg_hist"):
+            if k in ("fg_rt", "fg_rt2", "fg_mfrr2", "fg_extra", "fg_hist"):
                 df = _long(raw)
             else:
                 df = raw
