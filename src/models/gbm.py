@@ -11,6 +11,10 @@ Options that target the season drift (PLAN finding 9):
   learn calibration maps on the holdout (Platt scaling for probabilities, conformal-style offsets for
   quantiles), then refit on the whole window and apply the maps. Only training-window data is used,
   so validation stays an honest out-of-time test.
+* calib_mode="pooled": k rolling out-of-time holdouts ending at the cutoff (calibration.py) instead of
+  one; the maps are fitted on the pooled out-of-sample predictions. spike_calib chooses how the
+  spike product P(dir) x P(tail | dir) is calibrated ("product" = Platt on the raw product,
+  "parts" = calibrated parts, "product2" = logistic map on both logits).
 """
 from __future__ import annotations
 
@@ -19,13 +23,11 @@ from dataclasses import dataclass, field
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-from sklearn.linear_model import LogisticRegression
 
 from src.features.build import (FEATURE_COLUMNS, FINGRID_RT_COLUMNS, WEATHER_COLUMNS,
                                 WEATHER2_COLUMNS, WEATHER2_SPREAD_COLUMNS)
-
-QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
-STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
+from src.models.calibration import (  # noqa: F401  (re-exported: other code imports these from here)
+    QUANTILES, STEP_BANDS, Platt as _Platt, logit as _logit, fit_maps, pooled_windows)
 
 BASE_PARAMS = dict(
     learning_rate=0.05,
@@ -38,29 +40,6 @@ BASE_PARAMS = dict(
     reg_lambda=1.0,
     verbose=-1,
 )
-
-
-def _logit(p):
-    p = np.clip(p, 1e-4, 1 - 1e-4)
-    return np.log(p / (1 - p))
-
-
-class _Platt:
-    """Monotone recalibration p -> sigmoid(a * logit(p) + b), fitted on a holdout."""
-
-    def __init__(self):
-        self.lr = None
-
-    def fit(self, p, y):
-        if len(np.unique(y)) < 2:
-            return self
-        self.lr = LogisticRegression(C=100.0).fit(_logit(p).reshape(-1, 1), y)
-        return self
-
-    def __call__(self, p):
-        if self.lr is None:
-            return p
-        return self.lr.predict_proba(_logit(p).reshape(-1, 1))[:, 1]
 
 
 @dataclass
@@ -86,6 +65,14 @@ class GBMModel:
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
+
+    # Calibration of probabilities and quantiles (needs calibrate=True).
+    calib_mode: str = "single"           # "single" (last holdout_days) or "pooled" (calib_folds holdouts)
+    calib_folds: int = 3
+    calib_decay: float = 1.0             # pooled: weight of each older holdout relative to the next one
+    spike_calib: str = "product"         # product mode only: "product", "parts" or "product2"
+    spike_cal: dict = field(default_factory=dict, repr=False)
+    pool: object = field(default=None, repr=False)   # last pool of out-of-sample predictions
 
     def _mask_fresh(self, X: pd.DataFrame, steps) -> pd.DataFrame:
         if not (self.use_fingrid and self.fresh_max_step):
@@ -135,6 +122,7 @@ class GBMModel:
         out["high"] = m["high"].predict_proba(X)[:, 1]
         out["low"] = m["low"].predict_proba(X)[:, 1]
         if self.spike_mode == "product":
+            out["high_tail"], out["low_tail"] = out["high"], out["low"]
             out["high"] = out["up"] * out["high"]
             out["low"] = (1 - out["up"]) * out["low"]
         return out
@@ -144,34 +132,71 @@ class GBMModel:
         self.p_none = float((train.drop_duplicates("delivery")["y_dir"] == 0).mean())
 
         if self.calibrate:
-            split = cutoff - pd.Timedelta(days=self.holdout_days)
-            inner = train.loc[train["y_first_usable"] <= split]
-            hold = train.loc[train["origin"] >= split]
-            m_inner = self._fit_all(inner, split)
-            raw = self._raw(m_inner, self._mask_fresh(hold[self.features], hold["step"]))
-            for col in ("up", "high", "low"):
-                y = {"up": hold["y_dir"] == 1, "high": hold["y_spike_high"] == 1,
-                     "low": hold["y_spike_low"] == 1}[col].astype(int).to_numpy()
-                self.platt[col] = _Platt().fit(raw[col], y)
-            for col, q in QUANTILES.items():
-                resid = hold["y_gap"].to_numpy() - raw[col]
-                for lo, hi in STEP_BANDS:
-                    band = hold["step"].between(lo, hi).to_numpy()
-                    if band.any():   # a short-horizon model has no rows in later bands
-                        self.offsets[(col, lo)] = float(np.quantile(resid[band], q))
-            self.log.append(f"calibration holdout: {len(hold)} rows from {split:%Y-%m-%d}; "
-                            + ", ".join(f"{c}@{lo}={v:+.1f}" for (c, lo), v in self.offsets.items()))
+            self._calibrate(train, cutoff)
 
         self.models = self._fit_all(train, cutoff)
         return self
+
+    def _windows(self, cutoff: pd.Timestamp):
+        if self.calib_mode == "single":
+            return [(cutoff - pd.Timedelta(days=self.holdout_days), cutoff)]
+        if self.calib_mode == "pooled":
+            return pooled_windows(cutoff, self.calib_folds, self.holdout_days)
+        raise ValueError(f"calib_mode {self.calib_mode!r}")
+
+    def _holdout_pool(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> pd.DataFrame:
+        """Out-of-sample predictions for every holdout window ending at the cutoff.
+
+        For window [start, end) the inner model sees only rows whose targets were published by
+        `start` (y_first_usable <= start); the holdout rows are the origins in [start, end).
+        """
+        windows = self._windows(cutoff)
+        parts = []
+        for i, (start, end) in enumerate(windows):
+            inner = train.loc[train["y_first_usable"] <= start]
+            hold = train.loc[(train["origin"] >= start) & (train["origin"] < end)]
+            if hold.empty or inner.empty:
+                self.log.append(f"calibration window {start:%Y-%m-%d}: skipped ({len(inner)} inner, {len(hold)} holdout rows)")
+                continue
+            raw = self._raw(self._fit_all(inner, start), self._mask_fresh(hold[self.features], hold["step"]))
+            part = pd.DataFrame({f"raw_{k}": v for k, v in raw.items()})
+            part["step"] = hold["step"].to_numpy()
+            part["y_gap"] = hold["y_gap"].to_numpy()
+            part["y_dir"] = hold["y_dir"].to_numpy()
+            part["y_high"] = hold["y_spike_high"].to_numpy()
+            part["y_low"] = hold["y_spike_low"].to_numpy()
+            part["fold"] = i
+            part["w"] = self.calib_decay ** (len(windows) - 1 - i)
+            parts.append(part)
+        if not parts:
+            raise ValueError("no calibration holdout rows")
+        return pd.concat(parts, ignore_index=True)
+
+    def _calibrate(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> None:
+        self.pool = self._holdout_pool(train, cutoff)
+        self.set_calibration(self.pool)
+
+    def set_calibration(self, pool: pd.DataFrame, spike_calib: str | None = None) -> None:
+        """Fit the maps on (a subset of) the pool; also lets experiments re-calibrate cheaply."""
+        self.platt, self.spike_cal, self.offsets = fit_maps(pool, self.spike_mode, spike_calib or self.spike_calib)
+        label = "holdout" if self.calib_mode == "single" else f"pooled {self.calib_folds}x{self.holdout_days}d"
+        folds = []
+        if pool["fold"].nunique() > 1:    # per-holdout P90 offsets show how stable the calibration is
+            for k, g in pool.groupby("fold"):
+                r = g["y_gap"] - g["raw_p90"]
+                folds.append(f"fold{k}:p90@1={r[g['step'].between(1, 8)].quantile(0.9):+.1f}")
+        self.log.append(f"calibration {label}: {len(pool)} rows; "
+                        + ", ".join(f"{c}@{lo}={v:+.1f}" for (c, lo), v in self.offsets.items())
+                        + (" | " + " ".join(folds) if folds else ""))
 
     # --------------------------------------------------------------- prediction
     def predict(self, feats: pd.DataFrame, with_drivers: bool = True) -> pd.DataFrame:
         X = self._mask_fresh(feats[self.features], feats["step"])
         raw = self._raw(self.models, X)
         if self.calibrate:
+            plain = dict(raw)                       # uncalibrated parts for the spike maps
             for col in ("up", "high", "low"):
-                raw[col] = self.platt[col](raw[col])
+                raw[col] = self.spike_cal[col](plain) if col in self.spike_cal else self.platt[col](raw[col])
             steps = feats["step"].to_numpy()
             for col in QUANTILES:
                 for lo, hi in STEP_BANDS:
@@ -198,6 +223,6 @@ class GBMModel:
 
     def describe(self) -> str:
         bits = [f"{self.name}: tau_days={self.tau_days}, calibrate={self.calibrate}, "
-                f"spikes={self.spike_mode}, weather={self.use_weather}, fingrid_rt={self.use_fingrid}, "
+                f"spikes={self.spike_mode}, calib={self.calib_mode}/{self.spike_calib}, weather={self.use_weather}, fingrid_rt={self.use_fingrid}, "
                 f"p_none={self.p_none:.4f}"]
         return "\n".join(bits + self.log)
