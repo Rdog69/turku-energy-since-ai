@@ -53,7 +53,13 @@ REGISTRY = {
     "ifs_now": ("experiments.lab.features.weather", "ifs_now_features", "IFS now-cast vs measured wind"),
     "wind_hat": ("experiments.lab.features.weather", "wind_hat_features", "combined estimate of the day-ahead wind error per step band"),
     "fmi": ("experiments.lab.features.weather", "fmi_features", "FMI coastal station observations"),
+    "wmap": ("experiments.lab.features.wmap", "wmap_features", "learned 22-point IFS+ICON wind map (Frank's idea): MW, revision, de-biased/scaled revision, run change, ICON-IFS disagreement"),
+    "wmap_core": ("experiments.lab.features.wmap", "wmap_core", "wmap subset: de-biased revision, run change, ICON-IFS disagreement"),
+    "wmap_s": ("experiments.lab.features.wmap", "wmap_s", "wmap subset: scaled + de-biased revision, run change, ICON-IFS disagreement"),
+    "nordic": ("experiments.lab.features.nordic", "nordic_features", "Nordic/Baltic wind index per area (SE/NO/DK/EE) + revision since day-ahead + run change"),
+    "nordic_rev": ("experiments.lab.features.nordic", "nordic_rev", "Nordic wind revisions only (since day-ahead, run change)"),
     "temp": ("experiments.lab.features.weather", "temp_features", "temperature features"),
+    "regime": ("experiments.lab.features.regime", "regime_features", "market-era flags (15-min day-ahead, 1 Jun 2026 price rule) for history mode"),
 }
 
 

@@ -33,7 +33,12 @@ def U(x):
         return (x.tz_localize("UTC") if x.tzinfo is None else x.tz_convert("UTC")).as_unit("ns")
     return pd.DatetimeIndex(pd.to_datetime(x, utc=True)).as_unit("ns")
 
-FIRST_ORIGIN = pd.Timestamp("2026-06-02T00:00Z")
+# LAB_HISTORY=1: train on Mar 2025 - Oct 2026 (package + external_data/history/pkg_history.csv.gz, built by
+# build_history.py; imbalance price recomputed with the 1 Jun 2026 rule) and add fold C = last year's test period.
+# Separate caches, prediction folder and leaderboard, so nothing mixes with the package-only lab.
+HISTORY = os.environ.get("LAB_HISTORY") == "1"
+SUFFIX = "_hist" if HISTORY else ""
+FIRST_ORIGIN = pd.Timestamp("2025-03-05T00:00Z" if HISTORY else "2026-06-02T00:00Z")
 END = pd.Timestamp("2026-10-04T21:00Z")              # training data ends (deliveries < END)
 FOLDS = {
     # fold A = the organisers' validation window; fold B = August, trained on June-July only
@@ -41,6 +46,9 @@ FOLDS = {
     "B": dict(train_end=pd.Timestamp("2026-07-31T21:00Z"), val_start=pd.Timestamp("2026-07-31T21:00Z"),
               val_end=pd.Timestamp("2026-08-31T21:00Z")),
 }
+if HISTORY:   # fold C = 5 Oct - 1 Nov 2025 (same weeks as the test, one year earlier), trained on Mar - Sep 2025
+    FOLDS["C"] = dict(train_end=pd.Timestamp("2025-10-04T21:00Z"), val_start=pd.Timestamp("2025-10-04T21:00Z"),
+                      val_end=pd.Timestamp("2025-11-01T22:00Z"))
 
 
 # ----------------------------------------------------------------------------- loading
@@ -64,15 +72,19 @@ class Data:
     def _path(self, k):
         m = {
             "pkg": None,
-            "fg_rt": [EXT / "fingrid/rt_last_autumn.csv.gz", EXT / "fingrid/rt_main.csv.gz"],
+            "fg_rt": [EXT / "fingrid/rt_last_autumn.csv.gz", EXT / "fingrid/rt_main.csv.gz"]
+                     + ([EXT / "fingrid/rt_history.csv.gz"] if HISTORY else []),
             "fg_extra": [EXT / "fingrid/extra_last_autumn.csv.gz", EXT / "fingrid/extra_main.csv.gz"],
             "fg_mfrr2": [EXT / "fingrid/mfrr2_main.csv.gz"],
             "fg_rt2": [EXT / "fingrid/rt2_last_autumn.csv.gz", EXT / "fingrid/rt2_main.csv.gz"],
             "fg_hist": [EXT / "fingrid/package_history.csv.gz"],
             "umm": [EXT / "umm/messages_last_autumn.csv.gz", EXT / "umm/messages_main.csv.gz"],
             "fmi": [EXT / "fmi/obs_last_autumn.csv.gz", EXT / "fmi/obs_main.csv.gz"],
-            "ifs": [EXT / "open_meteo/runs_ecmwf_ifs_last_autumn.csv.gz", EXT / "open_meteo/runs_ecmwf_ifs_main.csv.gz"],
+            "ifs": [EXT / "open_meteo/runs_ecmwf_ifs_last_autumn.csv.gz", EXT / "open_meteo/runs_ecmwf_ifs_main.csv.gz"]
+                   + ([EXT / f"open_meteo/runs_ecmwf_ifs_history_{x}.csv.gz" for x in "ab"] if HISTORY else []),
             "icon": [EXT / "open_meteo/runs_icon_eu_main.csv.gz"],
+            # Frank's Open-Meteo single runs (same delays: IFS +8 h, ICON +5 h): points ifs_*, icon_*, nord_*
+            "fw": [EXT / "_frank/open_meteo/runs_frank_points.csv.gz"],
             "metno": [EXT / "open_meteo/runs_metno_nordic_main.csv.gz"],
             "era5": [EXT / "open_meteo/era5_last_autumn.csv.gz", EXT / "open_meteo/era5_main.csv.gz"],
             "elering": [EXT / "elering/system_last_autumn.csv.gz", EXT / "elering/system_main.csv.gz"],
@@ -87,13 +99,19 @@ class Data:
         if k in self._f:
             return self._f[k]
         if k == "pkg":
-            cp = CACHE / "pkg_long.pkl"
+            cp = CACHE / f"pkg_long{SUFFIX}.pkl"
             if cp.exists():
                 df = pd.read_pickle(cp)
             else:
                 inp = pd.read_parquet(PKG / "data/inputs.parquet")
                 spot = pd.read_csv(PKG / "data/spot_nordpool.csv")
                 df = _long(pd.concat([inp, spot], ignore_index=True))
+                if HISTORY:     # history rows only before each series' first package quarter
+                    h = _long(pd.read_csv(EXT / "history/pkg_history.csv.gz"))
+                    h = h[h.series_id.isin(df.series_id.unique())]
+                    first = df.groupby("series_id").ts.min()
+                    h = h[h.ts < h.series_id.map(first)]
+                    df = pd.concat([h, df], ignore_index=True).sort_values(["series_id", "ts"]).reset_index(drop=True)
                 df.to_pickle(cp)
         else:
             files = self._path(k)
@@ -207,10 +225,20 @@ def nwp_latest(nwp: pd.DataFrame, base: pd.DataFrame, var: str, point: str | Non
 
 
 # ----------------------------------------------------------------------------- base table
+def _window(base: pd.DataFrame) -> pd.DataFrame:
+    """LAB_TRAIN_DAYS=N: keep only the last N days before each fold's train_end as training rows (ablation)."""
+    n = os.environ.get("LAB_TRAIN_DAYS")
+    if n:
+        for f, c in FOLDS.items():
+            old = (base[f"fold{f}"] == "train") & (base.delivery < c["train_end"] - pd.Timedelta(days=float(n)))
+            base.loc[old, f"fold{f}"] = ""
+    return base
+
+
 def build_base() -> pd.DataFrame:
-    cp = CACHE / "base.pkl"
+    cp = CACHE / f"base{SUFFIX}.pkl"
     if cp.exists():
-        return pd.read_pickle(cp)
+        return _window(pd.read_pickle(cp))
     d = Data()
     pkg = d["pkg"]
     W = pkg.pivot_table(index="ts", columns="series_id", values="value")
@@ -230,7 +258,7 @@ def build_base() -> pd.DataFrame:
         base[f"fold{f}"] = role
     base = base[base.delivery < END].reset_index(drop=True)
     base.to_pickle(cp)
-    return base
+    return _window(base)
 
 
 TARGET_COLS = {"imb", "gap", "dir"}   # never usable as features

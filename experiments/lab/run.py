@@ -22,13 +22,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .data import Data, build_base, leakcheck
+from .data import FOLDS, HISTORY, SUFFIX, Data, build_base, leakcheck
 from .models import calibrate as _calibrate
 from .models import fit_predict, metrics
 
 LAB = Path(__file__).resolve().parent
-BOARD = Path(os.environ.get("LAB_BOARD", LAB / "leaderboard.csv"))   # LUMI tasks write their own file
-PRED = LAB / "_cache" / "preds"
+BOARD = Path(os.environ.get("LAB_BOARD", LAB / f"leaderboard{SUFFIX}.csv"))   # LUMI tasks write their own file
+PRED = LAB / "_cache" / f"preds{SUFFIX}"
 _checked: set = set()
 _feat_cache: dict = {}
 
@@ -57,10 +57,11 @@ def features(fns, base, data, check=True, sources=("pkg",)) -> pd.DataFrame:
 
 
 def run_experiment(name: str, agent: str, feature_fns, model: str = "mixture", target: str = "gap",
-                   calibrate: bool = True, folds=("A", "B"), hgb: dict | None = None, weight_fn=None,
+                   calibrate: bool = True, folds=None, hgb: dict | None = None, weight_fn=None,
                    drop: list[str] | None = None, sources=("pkg",), notes: str = "", post=None) -> pd.DataFrame:
     """weight_fn(train_rows) -> sample weights; post(pred, va_rows, X_va) -> pred (optional post-processing)."""
     t0 = time.time()
+    folds = folds or tuple(FOLDS)
     base, data = build_base(), Data()
     X = features(feature_fns, base, data, sources=sources)
     if drop:

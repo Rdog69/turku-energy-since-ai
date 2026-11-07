@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 
 LAB = Path(__file__).resolve().parents[1]
-PRED = LAB / "_cache" / "preds"
+import os
+PRED = LAB / "_cache" / ("preds_hist" if os.environ.get("LAB_HISTORY") == "1" else "preds")
 KEYS = ("p10", "p50", "p90", "p_up", "p_down", "p_none", "p_hi", "p_lo")
 
 
@@ -34,8 +35,9 @@ def recency(half_life_days: float, floor: float = 0.0):
 
 # ----------------------------------------------------------------------------- helpers
 def fold_of(va: pd.DataFrame) -> str:
-    """A (Sep/Oct) or B (Aug) from the validation rows."""
-    return "A" if va["origin"].min() >= pd.Timestamp("2026-09-01T00:00Z") else "B"
+    """A (Sep/Oct 2026), B (Aug 2026) or C (Oct 2025, history mode) from the validation rows."""
+    o = va["origin"].min()
+    return "C" if o < pd.Timestamp("2026-01-01T00:00Z") else "A" if o >= pd.Timestamp("2026-09-01T00:00Z") else "B"
 
 
 def load_pred(tag: str, fold: str, va: pd.DataFrame) -> dict:

@@ -31,6 +31,7 @@ DELAY_H = {"ecmwf_ifs": 8, "icon_eu": 5, "metno_nordic": 2}
 JOBS = {
     "ifs": [("ecmwf_ifs", "last_autumn", (0, 12), 48), ("ecmwf_ifs", "main", (0, 6, 12, 18), 48)],
     "icon_eu": [("icon_eu", "main", (0, 6, 12, 18), 48)],
+    "ifs_hist": [("ecmwf_ifs", "history_a", (0, 12), 48), ("ecmwf_ifs", "history_b", (0, 12), 48)],
     "metno": [("metno_nordic", "main", (0, 6, 12, 18), 24)],
 }
 # 8 locations per call count as 8 calls on the free tier (600/min, 5000/h, 10000/day):

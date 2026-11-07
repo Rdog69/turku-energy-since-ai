@@ -133,6 +133,8 @@ def neighbour_features(base: pd.DataFrame, data: Data) -> pd.DataFrame:
 
 # ----------------------------------------------------------------------------- 3. history models
 def hist_as_pkg(data: Data) -> pd.DataFrame:
+    import os
+    assert os.environ.get("LAB_HISTORY") != "1", "history models were fitted on Mar 2025 - May 2026: they leak into fold C"
     h = data["fg_hist"]
     h = h[h.series_id.isin(HIST_MAP)].copy()
     assert h["fu"].max() <= CUTOFF, "fg_hist must end before the fitting cutoff"

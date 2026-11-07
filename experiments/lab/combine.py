@@ -5,6 +5,7 @@
 Members are the per-spec files written by submit.py (submissions/validation_<tag>.csv and
 forecast_backtest_<tag>.csv); "frank" maps to teammate Frank's final_capw files in external_data/_frank/.
 Recipe: {"p50": [[member, weight], ...], "q": [...], "spike": [...], "dir": [...]} (weights = multiplicities).
+Optional "p50_steps": [[lo, hi, [[member, weight], ...]], ...] overrides p50 for those forecast steps.
 """
 from __future__ import annotations
 
@@ -33,7 +34,9 @@ def member_file(name: str, mode: str) -> Path:
 
 
 def combine(recipe: dict, mode: str, tag: str) -> Path:
-    names = sorted({m for g in recipe.values() for m, _ in g})
+    groups = {g: recipe[g] for g in GROUPS}
+    over = recipe.get("p50_steps", [])
+    names = sorted({m for g in groups.values() for m, _ in g} | {m for _, _, mem in over for m, _ in mem})
     frames = {}
     for n in names:
         df = pd.read_csv(member_file(n, mode), dtype={"forecast_origin_utc": str, "delivery_start_utc": str})
@@ -47,6 +50,12 @@ def combine(recipe: dict, mode: str, tag: str) -> Path:
         w = np.array([float(x) for _, x in mem]); w = w / w.sum()
         for c in cols:
             out[c] = sum(wi * frames[m].loc[out.index, c].to_numpy(float) for (m, _), wi in zip(mem, w))
+    st = out.index.get_level_values("step").to_numpy()
+    for lo, hi, mem in over:
+        w = np.array([float(x) for _, x in mem]); w = w / w.sum()
+        sel = (st >= lo) & (st <= hi)
+        v = sum(wi * frames[m].loc[out.index, "p50"].to_numpy(float) for (m, _), wi in zip(mem, w))
+        out.loc[sel, "p50"] = v[sel]
     p10, p50, p90 = np.sort(np.stack([out.p10, out.p50, out.p90]), axis=0)
     out["p10"], out["p50"], out["p90"] = p10, p50, p90
     s = out.p_up + out.p_down + out.p_none
