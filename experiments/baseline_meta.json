@@ -1,0 +1,35 @@
+{
+  "baseline_name": "Grand Champion Final",
+  "branch": "exp-anti-overfit-upgrade",
+  "base_commit": "c12cdf0",
+  "architecture": {
+    "model_frank": "results/v4_n50/validation/forecast_backtest.csv",
+    "model_abdo": "origin/brainstorming-abdo:submissions/validation_team5050.csv",
+    "blend_weights": [0.5, 0.5],
+    "explainability": "100% TreeSHAP 22-station physical drivers from Frank v4_n50",
+    "physical_envelope": "Kolmogorov Direction Envelope (p_spike_high <= p_up, p_spike_low <= p_down)"
+  },
+  "submission_file_sha256": "d8216053edc0abd991801ef6db993d0465f9aae618d5128dfab626aaeeb9de8e",
+  "metrics": {
+    "september_validation": {
+      "period": "2026-09-07T00:00:00Z to 2026-10-04T23:59:59Z",
+      "origins": 672,
+      "scored_rows": 26700,
+      "mae_p50": 40.973899,
+      "pinball_mean": 11.607985,
+      "coverage_p10_p90": 81.468165,
+      "brier_spike_mean": 0.086034,
+      "brier_direction": 0.380346,
+      "score_points": 6.35
+    },
+    "august_fold_b": {
+      "period": "2026-08-01T00:00:00Z to 2026-08-31T23:59:59Z",
+      "mae_p50": 27.27,
+      "pinball_mean": 6.57,
+      "coverage_p10_p90": 0.801,
+      "brier_spike_mean": 0.0677,
+      "brier_direction": 0.4281,
+      "score_points": 6.81
+    }
+  }
+}

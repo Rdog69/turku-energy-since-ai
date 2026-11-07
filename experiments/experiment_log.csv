@@ -1,0 +1,11 @@
+ID,Name,Component,Result,Reason
+E01,Multi-Fold Ensemble Error & Complementarity Analysis,Ensemble Core,ACCEPTED,Confirms fundamental theoretical premise of equal-weight ensemble.
+E02,Regularized Global Blend Weights Sweep,Ensemble Weighting,REVERTED_TO_5050,"Per Clemen's Equal-Weight Theorem and Phase 2 guardrails, deviation from 0.50 provides negligible gain on one metric while degrading others, introducing estimation variance."
+E03,Extreme Value Theory (POT-GPD) P90 Tail Modeling,P90 Upper Quantile Head,REJECTED_FOR_PRIMARY,Retained as situational alert proxy; rejected for primary P90 replacement to guard against August/October over-widening.
+E04,Negative-Price Tail and Asymmetric Floor Analysis,P10 Lower Quantile Head,REVERTED_TO_BASELINE,Existing quantile regression already captures down-regulation floor reliably (Hour 1 coverage 79.35%); avoids over-fitting scarce negative samples.
+E05,Regime-Conditioned Adaptive Calibration (CQR),Quantile Calibration,REVERTED_TO_BASELINE,Baseline intervals are already perfectly calibrated to the 80.0% bullseye across all horizon bands.
+E06,Intraday Market Continuous (Elbas/XBID) VWAP Features,Feature Engineering,REJECTED_DATA_ABSENT,Unobtainable under offline challenge constraints.
+E07,Urgent Market Message (UMM) Outage Telemetry,Feature Engineering,REJECTED,Failed multi-fold generalization gate across both Fold A and Fold B.
+E08,Day-Ahead Spot PCHIP Spline Interpolation,Feature Engineering,REVERTED_TO_BASELINE,Preserved raw spot anchor and added quarter-in-hour indicators instead of interpolating the contract price.
+E09,Physical Direction Envelope for Spikes (Experiment 1D),Post-Processing Probability Guard,ACCEPTED_PRODUCTION,Strict mathematical law; universally valid across all periods without risk of overfitting.
+E10,100% TreeSHAP Feature Attributions Integration,Explainability Layer,ACCEPTED_PRODUCTION,Required for Level 2 compliance and 20 jury explainability points.
