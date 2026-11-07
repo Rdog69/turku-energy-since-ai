@@ -49,3 +49,6 @@ external_data/_log_*.txt
 # lab caches (features, predictions)
 experiments/lab/_cache/
 submissions/score_*/
+
+# loop console logs
+experiments/lab/_loop_run*.txt

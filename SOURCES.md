@@ -93,7 +93,7 @@ The measured delays come from each model's `/data/<model>/static/meta.json`; our
 | > 300 MW | 428 | 2.3 % | +16 |
 | **> 800 MW** | 20 | **50 %** | **+527** |
 
-Long-running outages are already priced in; **fresh, large trips** cause the spikes. Feature idea: unplanned MW published in the last 1–6 h, plus a flag for "a big unit (> 800 MW) is out".
+⚠️ **Correction (outages agent, 7 Nov):** the "> 800 MW" row is **one event**, the 9 Sep OL3 trip, and it falls in the validation month. No training row has a fresh trip that large, so a model can't learn it, and none of the UMM feature sets beat the reference on both folds. Recommendation: keep UMM only for a rule-based **insurance override** (a fresh unplanned outage ≥ 800 MW raises spike probability, P(up) and p90) and for the dashboard.
 
 ## 8. FMI open data (`src/data/external/fmi.py`)
 

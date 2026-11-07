@@ -1,0 +1,1 @@
+{"per_round": 3, "workers": 3, "stop": false, "steer": "Build on the best combined model; vary one thing at a time so results are attributable."}
