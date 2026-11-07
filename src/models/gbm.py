@@ -21,9 +21,10 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, MEMORY_COLUMNS, NORDIC_COLUMNS,
-                                TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS, WEATHER2_COLUMNS, WEATHER_COLUMNS,
-                                WINDHAT_COLUMNS)
+from src.config import DATA_START
+from src.features.build import (FEATURE_COLUMNS, FINGRID_RT2_COLUMNS, FINGRID_RT_COLUMNS, HISTORY_COLUMNS, MEMORY_COLUMNS,
+                                NORDIC_COLUMNS, TOWN_SOLAR_COLUMNS, TOWN_TEMP_COLUMNS, WEATHER2_COLUMNS,
+                                WEATHER_COLUMNS, WINDHAT_COLUMNS)
 
 QUANTILES = {"p10": 0.1, "p50": 0.5, "p90": 0.9}
 STEP_BANDS = [(1, 8), (9, 20), (21, 40)]
@@ -106,6 +107,8 @@ class GBMModel:
     use_town_solar: bool = False    # solar radiation revision since the day-ahead solar forecast
     use_town_temp: bool = False     # town temperature and its revision since the day-ahead forecast
     spike_shrink: int | None = None  # m0 for the shrunk spike Platt maps (see _Platt); None = plain
+    use_history: bool = False       # training rows also from the pre-June history (config.HISTORY_PATH)
+    history_flag: bool = False      # + the regime_2026 feature (pricing rule of the row)
     # Real-time signals decay within a few hours (PLAN finding 2). Beyond this step they're set to
     # NaN so the model can't fit noise on them at long horizons. None = use at every step.
     fresh_max_step: int | None = None
@@ -128,6 +131,7 @@ class GBMModel:
                 + (WINDHAT_COLUMNS if self.use_wind_hat else [])
                 + (TOWN_SOLAR_COLUMNS if self.use_town_solar else [])
                 + (TOWN_TEMP_COLUMNS if self.use_town_temp else [])
+                + (HISTORY_COLUMNS if self.history_flag else [])
                 + (MEMORY_COLUMNS if self.use_memory else []))
 
     # ------------------------------------------------------------------ fitting
@@ -177,7 +181,11 @@ class GBMModel:
 
     def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "GBMModel":
         train = train.dropna(subset=["y_gap", "y_dir"]).reset_index(drop=True)
-        self.p_none = float((train.drop_duplicates("delivery")["y_dir"] == 0).mean())
+        # P(none) from the package period only: "no direction" was 5-10x more common in 2025
+        # (0.5-1.1 % vs 0.1 % in summer 2026; Abdo's docs/brainstorm/swarm/history.md), so the
+        # history rows would inflate it.
+        recent = train.loc[train["delivery"] >= DATA_START] if self.use_history else train
+        self.p_none = float((recent.drop_duplicates("delivery")["y_dir"] == 0).mean())
 
         if self.calibrate:
             split = cutoff - pd.Timedelta(days=self.holdout_days)

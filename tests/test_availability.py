@@ -226,6 +226,46 @@ def test_town_features_ignore_unpublished_runs():
         pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"town features at {t}")
 
 
+def test_history_rows_follow_package_rules_and_availability():
+    """Pre-June history (config.HISTORY_PATH): rows are never usable earlier than the package's own
+    publication rule allows, and features built with them ignore rows not yet published at t."""
+    from src.config import DATA_START
+    from src.data.load import load_history, with_history
+    from src.features.build import HISTORY_COLUMNS
+    hist = load_history(LONG)
+    if hist is None:
+        pytest.skip("history not imported (external_data/history/pkg_history.parquet)")
+    assert (hist["timestamp_utc"] < DATA_START).all()
+    for sid, g in hist.groupby("series_id"):
+        p = LONG.loc[LONG["series_id"] == sid]
+        lag = p["first_usable_origin_utc"] - p["timestamp_utc"]
+        if (lag > pd.Timedelta(0)).all():   # measured series
+            need = g["timestamp_utc"].dt.minute.map(lag.groupby(p["timestamp_utc"].dt.minute).max())
+            assert ((g["first_usable_origin_utc"] - g["timestamp_utc"]) >= need).all(), sid
+
+    combined = with_history(LONG)
+    rng = np.random.default_rng(3)
+    hours = pd.date_range("2025-03-06T00:00Z", "2026-05-31T20:00Z", freq="h")
+    # history edges: 15-min day-ahead start (1 Oct 2025 CET), DST end 2025, the switch to the package
+    fixed = ["2025-09-30T21:00Z", "2025-09-30T23:00Z", "2025-10-26T01:00Z", "2026-05-31T18:00Z",
+             "2026-05-31T21:00Z", "2026-06-01T02:00Z"]
+    origins = pd.DatetimeIndex(pd.to_datetime(fixed, utc=True)
+                               .append(hours[rng.choice(len(hours), 6, replace=False)])).unique().sort_values()
+    full = build_features(combined, origins, with_targets=False)
+    assert full.loc[full["origin"] < DATA_START, "last_gap"].notna().mean() > 0.95
+    cols = (FEATURE_COLUMNS + MEMORY_COLUMNS + HISTORY_COLUMNS
+            + [c for c in FINGRID_RT_COLUMNS + FINGRID_RT2_COLUMNS if c in full] + ["data_cutoff"])
+    for t in origins:
+        truncated = combined.loc[combined["first_usable_origin_utc"] <= t]
+        part = build_features(truncated, pd.DatetimeIndex([t]), with_targets=False)
+        # Series that start in June 2026 (ENTSO-E, Fingrid real-time) have no rows yet at a history
+        # origin, so the truncated build has no columns for them: they must be all-NaN in full too.
+        part = part.reindex(columns=full.columns)
+        a = full.loc[full["origin"] == t, cols].reset_index(drop=True)
+        b = part[cols].reset_index(drop=True)
+        pd.testing.assert_frame_equal(a, b, check_dtype=False, obj=f"history features at {t}")
+
+
 def test_weather_run_used_was_published():
     from src.data.availability import to_ns
     weather = _weather()

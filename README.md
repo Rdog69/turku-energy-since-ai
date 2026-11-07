@@ -18,13 +18,13 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 
 | Metric | Points | Baseline | **Our model** | Improvement |
 |---|---|---|---|---|
-| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **41.08** | **−38 %** |
-| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.88** | **−51 %** |
-| Exceptional prices: Brier score | 20 | 0.1132 | **0.0871** | **−23 %** |
-| Direction: three-class Brier score | 10 | 0.4509 | **0.3899** | **−14 %** |
-| P10–P90 coverage (target 80 %) | – | 0.68 | **0.80** | well calibrated |
+| Accuracy: MAE of P50 (€/MWh) | 30 | 66.20 | **40.67** | **−39 %** |
+| Uncertainty: mean pinball loss P10/P90 | 20 | 24.18 | **11.19** | **−54 %** |
+| Exceptional prices: Brier score | 20 | 0.1132 | **0.0856** | **−24 %** |
+| Direction: three-class Brier score | 10 | 0.4509 | **0.3892** | **−14 %** |
+| P10–P90 coverage (target 80 %) | – | 0.68 | **0.77** | slightly narrow |
 
-**Weighted by the points (30/20/20/10), the model is 34.4 % better than the organisers' baseline** (MAE alone: 37.9 %). It's better in every one of the 4 validation weeks, on all four metrics. About 30 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July only) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
+**Weighted by the points (30/20/20/10), the model is 35.7 % better than the organisers' baseline** (MAE alone: 38.6 %). It's better in every one of the 4 validation weeks, on all four metrics. About 37 variants were compared on this same month, so expect the test period to be somewhat worse. A second check on August (trained on June–July plus the pre-June history) confirms the main gains, though by less. The full history is in [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ---
 
@@ -67,6 +67,10 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 4. **Calibration on the most recent 28 days.** Probabilities are re-scaled (Platt scaling) and the uncertainty band shifted so about 80 % of prices fall inside. This is where most of the probability-score gains came from. The spike correction is shrunk when those 28 days held few spikes, so a quiet month can't switch the spike warnings off.
 5. **5-seed averaging.** Each model is trained five times with different random seeds and averaged, for steadier forecasts.
 6. **Neighbour wind for the median only.** A twin model that also sees wind in Sweden, Norway, Denmark and Estonia supplies the median (P50). In both September and August that improved the median but made the uncertainty band worse, so the band and the probabilities come from the model without it.
+7. **15 months of history before June.** The trees also learn from March 2025 – May 2026, not just from June onwards. The organisers allow pre-June data (Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
+   - The pricing rule changed on 1 June 2026, so the older imbalance prices are recomputed with the new volume-weighted rule.
+   - A flag tells the model which rule a row was priced under.
+   - It improved both September and August, most of all the uncertainty band (pinball −6 %).
 
 ### What it looks at
 
@@ -79,6 +83,7 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 | Learned wind production | Wind production predicted from all 22 weather points, with weights fitted to Fingrid's measured output; its gap to the day-ahead forecast and its revision | Open-Meteo + Fingrid real-time (fit on training data only) |
 | Neighbouring countries (median only) | ECMWF wind and its revision at 12 points in Sweden, Norway, Denmark and Estonia | Open-Meteo Single Runs |
 | Grid right now (hours 1–2) | Measured wind vs. forecast, grid frequency, nuclear changes, hydro, electric boilers, net import, CHP, flows | Fingrid real-time API |
+| History (training only) | The package's Fingrid series and spot price for Mar 2025 – May 2026, with the imbalance price recomputed under the June 2026 rule | Fingrid Open Data + Elering; table built by Abdo's `build_history.py` |
 
 **No data from the future.** Every row is used only after its `first_usable_origin_utc`, including our own sources. Leakage tests (`python -m pytest`) rebuild features after deleting every not-yet-published row and require identical results. The details and assumed publication delays are in [`SOURCES.md`](SOURCES.md).
 
@@ -96,9 +101,10 @@ Validation period 7 Sep – 4 Oct 2026, scored with the organisers' `score.py` (
 | + smaller, slower trees and 4-hour memory | 41.68 | 11.90 | 0.0880 | 0.3888 |
 | + second weather model, ICON-EU | 41.31 | 11.88 | 0.0873 | 0.3902 |
 | + neighbour wind for the median only | 41.21 | 11.88 | 0.0873 | 0.3902 |
-| **+ steadier spike calibration, learned wind production (final)** | **41.08** | **11.88** | **0.0871** | **0.3899** |
+| + steadier spike calibration, learned wind production | 41.08 | 11.88 | 0.0871 | 0.3899 |
+| **+ 15 months of pre-June history, with a pricing-rule flag (final)** | **40.67** | **11.19** | **0.0856** | **0.3892** |
 
-On August (trained on June–July only) the final model scores 27.99 / 7.00 / 0.0710 / 0.4466, better than `final_capw` in all 5 weeks on all four metrics.
+On August (trained on June–July plus the pre-June history) the final model scores 27.74 / 6.59 / 0.0680 / 0.4388. That's 3.1 % better than the model without history, weighted by points, with the band better in all 5 weeks.
 
 Tried and left out, because they didn't win in both September and August:
 - neighbour wind for the band (it stays in the median);
@@ -168,7 +174,7 @@ Future forecasts can't be scored during the weekend, so we forecast the test per
 | ↳ Validation | 7 Sep – 4 Oct | Part of training, used for our own scoring |
 | **Test** | **5 Oct – 1 Nov** | **673 forecast origins**, scored by the organisers |
 
-The 673 origins run from `2026-10-04T21:00:00Z` to `2026-11-01T21:00:00Z`. **All timestamps are UTC.**
+The 673 origins run from `2026-10-04T21:00:00Z` to `2026-11-01T21:00:00Z`. **All timestamps are UTC.** Pre-June aFRR and mFRR data may also be used for training, but older realised imbalance prices aren't comparable because the pricing rule changed (organisers' Q&A answer, 7 Nov 2026; [`QUESTIONS.md`](QUESTIONS.md) Q1).
 
 ## Data
 
@@ -298,13 +304,15 @@ python -m src.backtest.run --period test --model spot_anchor
 
 Trains on everything up to 4 Oct and writes `results/<model>/test/forecast_backtest.csv` for the 673 test origins, checked with the validator.
 
-The submitted model is `v4_n50`:
+The submitted model is `v6_hf`:
 
 ```bash
-python -m src.backtest.run --period test --model v4_n50
+python -m src.backtest.run --period test --model v6_hf
 ```
 
-It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August. To refresh the tables:
+It needs the external data tables (Fingrid real-time, ECMWF and ICON-EU weather runs, OpenStreetMap turbines). They're committed in `external_data/`, so no download is needed. `--period fold_b` runs the second check on August.
+
+It also needs the pre-June history: `external_data/history/pkg_history.parquet` or `pkg_history.csv.gz`, built by `experiments/lab/build_history.py` on the `brainstorming-abdo` branch. It isn't committed here, because it holds 2025 spot prices (Nord Pool data via Elering, team-internal use only). To refresh the tables:
 
 ```bash
 python -m src.data.fingrid
@@ -324,7 +332,7 @@ Downloads the ECMWF runs (8 main + 6 extra points in Finland, 12 in the neighbou
 **Dashboard data, briefings and alerts:**
 
 ```bash
-python -m src.export.dashboard --model v4_n50 --period test
+python -m src.export.dashboard --model v6_hf --period test
 ```
 
 Writes the per-hour JSON for the dashboard to `results/dashboard/` (contains spot prices, stays local).

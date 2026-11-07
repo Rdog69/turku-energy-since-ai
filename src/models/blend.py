@@ -43,6 +43,10 @@ class HorizonSplit:
     def use_fingrid(self) -> bool:
         return getattr(self.short, "use_fingrid", False) or getattr(self.long, "use_fingrid", False)
 
+    @property
+    def use_history(self) -> bool:
+        return getattr(self.short, "use_history", False) or getattr(self.long, "use_history", False)
+
     def fit(self, train: pd.DataFrame, cutoff: pd.Timestamp) -> "HorizonSplit":
         # The short model trains on early steps only, so all its capacity goes there.
         self.short.fit(train.loc[train["step"] <= self.split_step].reset_index(drop=True), cutoff)
@@ -99,6 +103,14 @@ class MedianFrom:
     @property
     def use_fingrid(self) -> bool:
         return self._either("use_fingrid")
+
+    @property
+    def use_history(self) -> bool:
+        # One training table serves both models, so history rows would reach both.
+        a, b = getattr(self.base, "use_history", False), getattr(self.median, "use_history", False)
+        if a != b:
+            raise ValueError("MedianFrom: base and median must both use the history, or neither")
+        return a
 
     @property
     def capacity_weighted(self) -> bool:

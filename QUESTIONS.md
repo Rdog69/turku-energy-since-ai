@@ -18,8 +18,13 @@ Sources: "README" is the organisers' starter-package README (section numbers as 
 - (c) to fit a fixed physical mapping, such as a wind power curve from older weather data?"
 
 - **Why:** This is the biggest open edge. Last autumn behaved differently from this summer: for example, up-regulation peaked at midday in October 2025 and in the evening in summer 2026 (`brainstorming-abdo`, `docs/brainstorm/swarm/README.md`). A teammate's model that uses this history would improve our validation score by roughly 1 %.
-- **Now:** we use nothing from before 1 Jun.
 - **Follow-up:** README §5.2 says the pricing rule changed on 1 June 2026. Is that the reason for the cut-off, so that only the target before June is off-limits and not inputs such as weather?
+
+> **Answered (organisers' announcement after the first Q&A session, 7 Nov 2026):** "You can use aFRR and mFRR price data from before June." They add that older realised imbalance prices can't be used directly to validate a price forecast, because the price calculation changed to a volume-based approach; take that into account when evaluating.
+> - **How we handle the rule change:** the history's imbalance price is recomputed with the 1 June 2026 volume-weighted rule. It matches the official price on 99.5 % of Jun–Oct 2026 quarters (Abdo's `experiments/lab/build_history.py` and `SOURCES.md`, `brainstorming-abdo`). We still evaluate only on August and September 2026, against the package's prices, never on pre-June prices.
+> - **Scope:** the answer names aFRR and mFRR prices, and its last sentence covers "older data" in general. We read that as covering the other pre-June series a history-trained model needs: mFRR direction and volumes, consumption, production, flows, day-ahead forecasts and the 2025 spot price.
+> - **Licence:** the 2025 spot price comes from Elering and originates from Nord Pool. It's for team-internal use only and never committed.
+> - **Now:** our submitted model `v6_hf` trains on this history too: +2.3 % (September) and +3.1 % (August) weighted by points ([`docs/RESULTS.md`](docs/RESULTS.md), round 6).
 
 ### Q2. Fingrid data that is almost the target: which delay applies?
 
@@ -102,7 +107,7 @@ Sources: "README" is the organisers' starter-package README (section numbers as 
 
 ## D. Already clear: no need to ask
 
-- **Training window:** train only on 1 Jun – 4 Oct 2026, and the validation month 7 Sep – 4 Oct is part of it (README §3 and §4).
+- **Training window:** train on data up to 4 Oct 2026, and the validation month 7 Sep – 4 Oct is part of it (README §3 and §4). Pre-June aFRR and mFRR price data is allowed too, with the caveat in Q1.
 - **Test period:** its inputs may be used as inputs at each origin, but not for training (README §3).
 - **Availability:** a row is usable only if `first_usable_origin_utc ≤ origin`, and the row-level value is binding. Anything else scores 0 (README §4). Top solutions' code is reviewed, possibly with AI tools (README §2.5).
 - **Where to ask:** the Turku Energia channel of the Since AI Discord (README §11). Questions the Q&A doesn't cover can go there.

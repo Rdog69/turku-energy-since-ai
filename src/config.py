@@ -52,6 +52,17 @@ TRAIN_CUTOFF = TEST_FIRST_ORIGIN
 FOLD_B_FIRST_ORIGIN = pd.Timestamp("2026-07-31T21:00:00Z")     # 1 Aug 00:00
 FOLD_B_LAST_ORIGIN = pd.Timestamp("2026-08-31T20:00:00Z")      # 31 Aug 23:00
 
+# Pre-June history (package format, 1 Mar 2025 - 31 May 2026), built by Abdo's
+# experiments/lab/build_history.py on brainstorming-abdo: Fingrid package series, Elering spot and
+# the imbalance price recomputed with the 1 June 2026 rule. Local and git-ignored (it holds spot
+# prices). Only models with use_history read it. The README (section 3) says to train on
+# 1 Jun - 4 Oct 2026 only, so these models need the organisers' OK before they're submitted.
+HISTORY_PATH = REPO_ROOT / "external_data" / "history" / "pkg_history.parquet"
+# The history's mFRR activation series start on 4 Mar 2025 12:00 UTC (the Nordic mFRR energy
+# market); training origins start the next day.
+HISTORY_START = pd.Timestamp("2025-03-05T00:00:00Z")
+HISTORY_EVERY_H = 3            # use every 3rd hourly origin before June (neighbours overlap heavily)
+
 # Backtest periods as local dates (inclusive), for make_templates.py and the actuals builder.
 # "test" uses the organisers' forecast_origins.csv and sample_submission.csv instead.
 PERIODS = {

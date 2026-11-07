@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from src.config import HORIZON_STEPS, SPIKE_MARGIN, STEP
+from src.config import DATA_START, HORIZON_STEPS, SPIKE_MARGIN, STEP
 from src.data.availability import SeriesIndex, build_index, to_ns
 from src.data.load import DIRECTION, IMBALANCE, SPOT
 
@@ -208,6 +208,9 @@ def build_features(long: pd.DataFrame, origins, index: dict[str, SeriesIndex] | 
     f["wind_share"] = f["wind_fc"] / f["cons_fc"]
     f["residual_load_fc"] = f["cons_fc"] - f["wind_fc"] - f["solar_fc"]
     f["quarter"] = pd.DatetimeIndex(g["delivery"]).minute // 15
+    # 1 for deliveries under the 1 June 2026 imbalance pricing rule (the package period), 0 for the
+    # pre-June history rows. Only models trained with history use it (HISTORY_COLUMNS).
+    f["regime_2026"] = (d_ns >= DATA_START.value).astype(float)
 
     # --- newest usable realised values at the origin (same for every step of an origin) ---
     per_origin = pd.DataFrame(index=origins)
@@ -362,6 +365,9 @@ WEATHER2_COLUMNS = ["om_icon_wind_idx", "om_icon_wind_rev", "om_model_spread"]
 
 # Learned wind production (MW) from the weather points (src/models/wind_power.py).
 WINDHAT_COLUMNS = ["om_wind_hat", "om_wind_hat_err", "om_wind_hat_rev"]
+
+# Pricing-rule flag for models trained with the pre-June history (see regime_2026 above).
+HISTORY_COLUMNS = ["regime_2026"]
 
 # Town weather: solar revision and temperature (heating demand) revision since the day-ahead forecasts.
 TOWN_SOLAR_COLUMNS = ["om_rad_rev", "om_solar_rev_mw"]

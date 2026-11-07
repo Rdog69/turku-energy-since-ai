@@ -38,10 +38,19 @@ Validation period 7 Sep – 4 Oct 2026 (672 origins, 26,700 scored rows), scored
 | 7 Nov | `v5_sol`: `v4_n50` + solar revision at 8 towns (ECMWF shortwave radiation vs the run behind Fingrid's day-ahead solar forecast, also scaled to MW) | + town weather | 41.08 | 11.91 | 0.795 | 0.0872 | 0.3903 | Not kept. −0.08 % (Sep) and −0.01 % (Aug) weighted by points: no effect, even in sunny August. |
 | 7 Nov | `v5_tmp`: `v4_n50` + town temperature and its revision since the day-ahead consumption forecast (heating demand) | + town weather | 41.05 | 11.87 | 0.794 | 0.0870 | 0.3866 | Not kept. +0.20 % (Sep; direction better in 3/4 weeks) but −0.20 % (Aug). See the August section. |
 | 7 Nov | `v5_st`: both | + town weather | 41.03 | 11.90 | 0.795 | 0.0868 | 0.3865 | Not kept. +0.21 % (Sep) but −0.16 % (Aug). |
+| 7 Nov | `v6_h`: `v4_n50` also trained on 15 months before the package (5 Mar 2025 – 31 May 2026, every 3rd hourly origin; 238k training rows instead of 94k). The organisers allowed pre-June data on 7 Nov (`QUESTIONS.md` Q1) | + pre-June history | 40.74 | 11.19 | 0.770 | 0.0855 | 0.3890 | vs `v4_n50`: +2.26 % weighted by points (Sep; pinball better 4/4 weeks, MAE 3/4), +2.96 % (Aug; pinball 5/5, direction 5/5, MAE 4/5, spikes 4/5). |
+| 7 Nov | **`v6_hf`**: `v6_h` + a pricing-rule flag (`regime_2026` = 1 for deliveries from 1 Jun 2026, the package period) | + pre-June history | **40.67** | **11.19** | 0.771 | **0.0856** | **0.3892** | **Submitted model.** vs `v6_h`: +0.03 % (Sep; MAE better 4/4 weeks) and +0.15 % (Aug; spikes 5/5), with pinball slightly worse. A near tie, kept because it wins both months and encodes the rule change the organisers asked teams to account for. vs `v4_n50`: +2.29 % (Sep), +3.10 % (Aug). Coverage 0.77 is a little under the 80 % target, but the scored pinball loss is 5.8 % better. |
 
-**Final vs baseline:** MAE −38 % (66.20 → 41.08), pinball −51 % (24.18 → 11.88), spike Brier −23 % (0.1132 → 0.0871), direction Brier −14 % (0.4509 → 0.3899). **Weighted by points (30/20/20/10): 34.4 % better** (`final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
+**History rows (round 6):** a package-format table built by Abdo's `experiments/lab/build_history.py` (`brainstorming-abdo`):
+- **Inputs:** Fingrid's package series, the spot price from Elering and the calendar.
+- **Target:** the imbalance price recomputed with the 1 June 2026 volume-weighted rule. It matches the official price on 99.5 % of Jun–Oct 2026 quarters (his `SOURCES.md` §11).
+- **Leak safety:** `src/data/load.py` (`load_history`) makes every measured row usable no earlier than the package's own rule for that minute of the hour. A truncation leak test covers history origins (`tests/test_availability.py`).
+- **Missing before June:** ENTSO-E neighbour series, weather runs and Fingrid real-time data. Their features are empty on history rows.
+- **P(none)** is still taken from June onwards only.
 
-⚠ About 35 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
+**Final vs baseline:** MAE −39 % (66.20 → 40.67), pinball −54 % (24.18 → 11.19), spike Brier −24 % (0.1132 → 0.0856), direction Brier −14 % (0.4509 → 0.3892). **Weighted by points (30/20/20/10): 35.7 % better** (`v4_n50`: 34.4 %, `final_capw`: 32.8 %). Better than the baseline in all 4 weeks on all four metrics.
+
+⚠ About 37 variants were compared on this one validation month, so expect the test period to come in somewhat worse. Since round 3, every change also had to win on August (below).
 
 ## Second check: August
 
@@ -58,10 +67,12 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | `v4_eb` | 28.32 | 7.01 | 0.732 | 0.0713 | 0.4458 |
 | `v4_b4` | 28.33 | 7.02 | 0.731 | 0.0755 | **0.4450** |
 | `v4_wh` | 28.19 | **7.00** | 0.738 | 0.0744 | 0.4466 |
-| **`v4_n50` (submitted)** | **27.99** | **7.00** | 0.738 | **0.0710** | 0.4466 |
+| `v4_n50` (round 4) | 27.99 | 7.00 | 0.738 | 0.0710 | 0.4466 |
 | `v5_sol` | 27.94 | 7.01 | 0.732 | 0.0712 | 0.4464 |
 | `v5_tmp` | 28.08 | 7.03 | 0.734 | 0.0709 | 0.4473 |
 | `v5_st` | 27.98 | 7.05 | 0.736 | 0.0710 | 0.4470 |
+| `v6_h` | 27.77 | **6.57** | 0.771 | 0.0684 | 0.4390 |
+| **`v6_hf` (submitted)** | **27.74** | 6.59 | 0.770 | **0.0680** | **0.4388** |
 
 - **Same fold as the teammates:** `final_capw` reproduces Abdo's August numbers exactly (29.53 / 7.34 / 0.0882 / 0.4562), and `split_all` is within 0.02 MAE of Pavlo's (28.41).
 - **ICON holds:** `v3_bmi` vs `v3_bm` is better on all four metrics (+0.8 % weighted by points). ICON was chosen on September only, so this is a clean check.
@@ -73,6 +84,7 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
   - **Temperature revision:** helps September (+0.20 %, mostly direction; the coldest week gains most) but hurts every August week (−0.20 %), so it isn't kept.
   - **The heating mechanism isn't visible in the training data yet.** A colder-than-planned forecast doesn't line up with higher-than-planned consumption from June to September (correlation +0.10 in September, the wrong sign for heating). Only the first four days of October show the heating pattern (−0.32), too little to rely on.
   - The switch (`town_temp=True` in `make_final`) is ready if the heating season makes it worth a bet.
+- **Pre-June history (round 6) passes clearly:** +3.1 % weighted by points on August against +2.3 % on September. The band improves in all 5 August weeks, and direction does too. August gains more because its own training window is only June–July, so 15 more months matter most there.
 - ⚠ **The older `split_all` stays close on August.** Before the round-4 spike fix it was level with our model (`v3_bmi_n50`: −0.1 % weighted, worse spikes). The submitted `v4_n50` beats it by +1.5 % (better MAE, band and spikes), but that's far below September's gap. Part of the September gain since `split_all` is probably specific to September, so expect a smaller gain on the test month.
 - Every model's error is lower in August (MAE about 28 vs 41 in September): it was a calmer month.
 
@@ -89,6 +101,7 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 | → + second weather model (ICON-EU) | −0.4 | −0.02 | −0.0007 | +0.0014 |
 | → + neighbour wind for the median only | −0.1 | 0 | 0 | 0 |
 | → + steadier spike calibration and learned wind production | −0.1 | 0 | −0.0002 | −0.0003 |
+| → + 15 months of pre-June history with a pricing-rule flag | −0.4 | −0.7 | −0.0015 | −0.0007 |
 
 ## Takeaways so far
 
@@ -106,4 +119,21 @@ The same pipeline trained on June–July only (`--period fold_b`), forecasting e
 - **A calibration window with few events needs shrinking.** Platt scaling learned on a quiet month can switch spike warnings almost off for the next, busier one. Shrinking the correction by how many spike quarters the window actually held fixed August (−6 % spike Brier) and still helped September.
 - **Learned wind production helps a little, even though it's cruder than Fingrid's own day-ahead forecast.** It adds information next to that forecast rather than replacing it.
 - **Solar adds nothing beyond Fingrid's day-ahead solar forecast, and temperature is a bet on the heating season.** Solar is small next to wind (85 MW vs 3,787 MW on average in October, by Fingrid's day-ahead forecasts in the starter package), and radiation revisions didn't help even in August. Temperature revisions helped only in September.
-- **Not used: blending with a teammate's model.** A 50/50 blend of `v3_bm` with Abdo's best lab model (`brainstorming-abdo`, CAL INT4) scored about 41.2 / 11.75 / 0.0870 / 0.3800 (`weekly.py`). But that model trains part of its direction forecast on Fingrid history from Mar 2025 – May 2026, and the organisers' README says to train only on 1 Jun – 4 Oct 2026. It stays out unless the organisers approve. His history-free reference model made the blend worse in every week.
+- **History is the biggest single gain since round 3, and it lands mostly on the band.** Pinball improved about 6 % in both months; MAE, spikes and direction gained less.
+
+## Abdo's models on the same footing (7 Nov)
+
+Abdo's committed validation files (`brainstorming-abdo`, `submissions/`), scored with the organisers' `score.py` here. His model also trains on pre-June history (`hist_blend` 0.6), which the organisers now allow. August numbers are from his lab scorer; it reproduces our official August scores for `v4_n50` exactly. His August forecasts aren't in git, so we couldn't rescore them.
+
+| Model | Sep: MAE / pinball / spikes / direction | vs `v6_hf`, weighted (Sep) | vs `v6_hf`, weighted (Aug) |
+|---|---|---|---|
+| **`v6_hf` (ours)** | **40.67 / 11.19 / 0.0856 / 0.3892** | – | – |
+| His best single model `P2 INT4+ss lgb7` | 41.52 / 11.65 / 0.0888 / 0.3874 | −2.7 % | +1.5 % |
+| `team5050`: ½ `v4_n50` + ½ his model | 40.97 / 11.63 / 0.0861 / 0.3803 | −1.1 % | +1.1 % |
+| ½ `v6_h` + ½ his model | 40.72 / 11.26 / 0.0851 / 0.3797 | +0.3 % (vs `v6_h`) | not checked |
+
++ = better than `v6_hf`.
+- **Each side wins one month.**
+  - **September, ours:** better MAE, band and spikes, with the band better in all 4 weeks against both of his files.
+  - **August, his:** better MAE, spikes and direction; the band is a tie.
+- **A 50/50 blend with `v6_h` adds little on September** (+0.3 %): direction improves, the band gets worse. August is the open question. His model is stronger there, so a blend might help, but it can't be checked without his August forecasts.

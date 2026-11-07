@@ -19,6 +19,8 @@ app_demo_data/
 !external_data/open_meteo/ecmwf_ifs025_nordic.parquet
 !external_data/osm/*.parquet
 spot_nordpool*.csv
+# pre-June history: holds 2025 spot prices (Elering, from Nord Pool), team-internal only
+external_data/history/
 actuals_*.csv
 forecast_backtest*.csv
 results/
