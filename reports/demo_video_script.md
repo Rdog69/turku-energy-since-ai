@@ -47,15 +47,16 @@
 ---
 
 ### [3:45 – 4:45] Time-Travel Replay & Performance Track Record
-**Visual:** Use the sidebar dropdown to slide back to a different forecast origin (e.g. `2026-09-07T06:00:00Z`).
+**Visual:** Click the 3 Golden Bookmark buttons at the top (`🔴 High Spike Warning`, `🔵 Wind Surplus Trap`, `⚡ Sudden Revision`) and show the dashed revision line ($t - 1\text{h}$) with the revision alert banner.
 * **Speaker:**  
-  *"The brief requested a historical time-travel feature. By moving the origin selector in the sidebar, the entire situation room instantly rewinds to replay that historical decision moment.*  
-  *Notice how the data cutoff time strictly reflects the latest legally usable information, proving zero lookahead leakage.*  
-  *Over the 26,700 evaluated quarter-hours of the validation period:*  
-  *- Our MAE dropped from the official baseline's 66.20 down to **42.88 €/MWh**—a **35.2% error reduction**.*  
-  *- Mean pinball loss dropped from 24.18 down to **12.80**—a **47.1% calibration improvement**.*  
-  *- Spike Brier score improved by **14.8%**.*  
-  *Our final submission file, `forecast_backtest.csv` (26,920 rows), passes all 13 official validation checks with zero errors."*
+  *"The brief requested a historical time-travel replay feature. Above the time slider, we built three one-click Golden Scenario Bookmarks: jumping directly into an evening peak spike, a windy Sunday surplus trap, or a sharp forecast revision.*  
+  *On the fan chart, notice the grey dotted line—that is the forecast from one hour earlier ($t - 1\text{h}$). When the market revises sharply, a warning banner instantly flags the shift and highlights the root TreeSHAP driver.*  
+  *Across all 26,700 evaluated quarter-hours of the validation window:*  
+  *- Our MAE dropped from 66.20 down to **40.97 €/MWh**—a **38.1% error reduction**.*  
+  *- Mean pinball loss dropped from 24.18 down to **11.63**—a **51.9% uncertainty improvement** with **80.1% empirical coverage**.*  
+  *- Tail spike Brier dropped to **0.0861** (-24.0%) and direction Brier to **0.3803** (-15.7%).*  
+  *- On independent August holdout data, our anti-overfit architecture scores **+6.81 points**, winning **9 out of 10 individual weeks** across both months.*  
+  *Our official submission file, `forecast_backtest.csv` (26,920 rows), passes all validation checks with zero errors and 100% TreeSHAP driver coverage."*
 
 ---
 
