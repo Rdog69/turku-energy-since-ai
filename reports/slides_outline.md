@@ -21,13 +21,13 @@ Numbers are fold A (validation 7 Sep - 4 Oct, 672 origins) unless stated. Figure
 - **Notes:** Top vs bottom wind quintile mean |gap| 40.0 vs 13.6; evening 20:00 |gap| 52.6 vs about 23 at night.
 
 ## 4. Rule-proof data: the availability rule
-- **Visual status:** partly. The delays table exists in `reports/evaluation_report.md` section 2 and `SOURCES.md`, with a worked example. The diagram (row, origin t, truncation test) is missing; no script makes it, so draw it by hand.
+- **Visual status:** exists. `reports/figures/availability_timeline.png` (worked example at the 12:00 origin, made by `reports/figures/make_availability_timeline.py`); the delays table is in `reports/evaluation_report.md` section 2 and `SOURCES.md`.
 - **Message:** Every row is used only when it was actually published; this is tested, not promised.
 - **Visual:** small diagram: row with `first_usable_origin_utc`, origin t, truncation test (delete future rows, features identical). Table of delays: Fingrid RT +30 min, ECMWF +8 h, ICON-EU +5 h.
 - **Notes:** Open-Meteo Single Runs API only, never the Historical Forecast API (it leaks). Mention the DST test around 25 Oct.
 
 ## 5. The reasoning chain: what each step added
-- **Visual status:** exists as tables, no image. The step table is in `reports/evaluation_report.md` section 5 (now down to `v6_hf` and `team5050`) and `docs/RESULTS.md` ("What each step added"). A chart of it would have to be made from those tables.
+- **Visual status:** exists. `reports/figures/ladder.png` (baseline 66.20 to `v6_hf` 40.67 MAE, pinball 24.18 to 11.19); the full step table is in `reports/evaluation_report.md` section 5 and `docs/RESULTS.md`.
 - **Message:** Calibration, fresh data only where fresh, and weather each earned their place; we kept a source only if validation improved.
 - **Visual:** the step table in `reports/evaluation_report.md` section 5 (MAE, pinball, coverage, two Briers) with the `split_all` and `split_all_icon` rows highlighted, then Frank's rows down to `v6_hf` (MAE 40.67, pinball 11.19, spikes 0.0856, direction 0.3892).
 - **Notes:** Calibration took coverage 0.53 -> 0.80. Real-time data helps hour 1 (direction 0.408 -> 0.342) but is noise by hour 3, hence the horizon split. ICON-EU adds a small gain: MAE 42.53 -> 42.14, direction 0.4011 -> 0.3995 (our `split_all_icon`; Frank ported it into `v3_bmi`). Later steps: smaller, slower trees and 4-hour memory (41.68), learned wind production (41.08), 15 months of pre-June history with the `regime_2026` flag (`v6_hf`, 40.67; pinball 11.88 -> 11.19).
