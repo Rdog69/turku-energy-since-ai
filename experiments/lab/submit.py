@@ -35,6 +35,7 @@ from .run import public  # noqa: E402
 OUT = ROOT / "submissions"
 EMBARGO = pd.Timedelta(hours=2)
 VAL_CUTOFF = pd.Timestamp("2026-09-06T21:00Z")
+FOLDB_CUTOFF = pd.Timestamp("2026-07-31T21:00Z")      # mode foldb: August, trained on data before 1 Aug only
 COLS = ["p10", "p50", "p90", "p_up", "p_down", "p_none", "p_spike_high", "p_spike_low"]
 
 
@@ -107,10 +108,11 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
     if mode == "test":
         cutoff, tpl_path, origins_path = END, PKG / "sample_submission.csv", PKG / "forecast_origins.csv"
     else:
-        cutoff = VAL_CUTOFF
+        cutoff = VAL_CUTOFF if mode == "val" else FOLDB_CUTOFF
+        start, end = ("2026-09-07", "2026-10-04") if mode == "val" else ("2026-08-01", "2026-08-31")
         tmp = Path(tempfile.mkdtemp())
-        subprocess.run([sys.executable, str(PKG / "make_templates.py"), "--test-start", "2026-09-07", "--test-end",
-                        "2026-10-04", "--output-dir", str(tmp)], check=True, cwd=PKG, capture_output=True)
+        subprocess.run([sys.executable, str(PKG / "make_templates.py"), "--test-start", start, "--test-end",
+                        end, "--output-dir", str(tmp)], check=True, cwd=PKG, capture_output=True)
         tpl_path, origins_path = tmp / "sample_submission.csv", tmp / "forecast_origins.csv"
     tpl, rows = rows_from_template(tpl_path)
     print(f"{mode}: {rows.origin.nunique()} origins, {len(rows)} rows; cutoff {cutoff}, embargo {EMBARGO}, {len(specs)} spec(s)")
@@ -171,7 +173,7 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
     out["data_cutoff_utc"] = pd.DatetimeIndex(dc).strftime("%Y-%m-%dT%H:%M:%SZ")
     out["top_drivers"] = ""
     OUT.mkdir(exist_ok=True)
-    path = OUT / (f"forecast_backtest_{tag}.csv" if mode == "test" else f"validation_{tag}.csv")
+    path = OUT / {"test": f"forecast_backtest_{tag}.csv", "val": f"validation_{tag}.csv", "foldb": f"foldb_{tag}.csv"}[mode]
     out.to_csv(path, index=False, lineterminator="\n")
     print(f"wrote {path.relative_to(ROOT)}")
 
@@ -195,7 +197,7 @@ def make(mode: str, fn_specs: list[str], model: str, target: str, cal: bool, tag
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["val", "test"], required=True)
+    ap.add_argument("--mode", choices=["val", "test", "foldb"], required=True)
     ap.add_argument("--features", nargs="+", default=["experiments.lab.features.package:package_features"])
     ap.add_argument("--model", default="mixture")
     ap.add_argument("--target", default="gap")
