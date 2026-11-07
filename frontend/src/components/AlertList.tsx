@@ -1,16 +1,18 @@
 import { useState } from "react";
 import type { Alert, Period } from "@/data/types";
 import { qMs, reviewMs, windowDrivers } from "@/lib/model";
-import { driverLabel, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
+import { ALERT_ICON } from "@/lib/icons";
+import { DriverChip } from "./Bits";
 import { Q_MS, hhmm, type Lang } from "@/lib/time";
 
 const MARK: Record<Alert["kind"], string> = {
-  spike_high: "bg-verm",
-  spike_low: "bg-teal",
-  dir_up: "bg-verm/45",
-  changed: "bg-ochre",
-  conflict: "bg-ochre",
-  review: "bg-ink-2",
+  spike_high: "bg-verm-soft text-verm",
+  spike_low: "bg-teal-soft text-teal",
+  dir_up: "bg-verm-soft text-verm",
+  changed: "bg-accent text-ochre",
+  conflict: "bg-accent text-ochre",
+  review: "bg-accent text-ink-2",
 };
 
 export function alertKey(a: Alert) {
@@ -61,12 +63,15 @@ export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
             const detail = t(lang, `d.${a.kind}`, { p: pv, v, prev });
             const rise = a.rise !== null && a.rise !== undefined && Math.abs(a.rise) >= 0.05
               ? t(lang, a.rise > 0 ? "rise" : "fall", { d: Math.round(Math.abs(a.rise) * 100), prev }) : null;
-            const drivers = windowDrivers(p, i, a.a, a.b).map((d) => driverLabel(d, lang));
+            const drivers = windowDrivers(p, i, a.a, a.b);
             return (
               <li key={k} className={`transition-opacity duration-150 ease-out ${dim ? "opacity-50" : "opacity-100"}`}>
                 <button type="button" aria-expanded={open} onClick={() => onFocus(open ? null : a)}
                   className="group flex w-full items-start gap-3 py-3 text-left">
-                  <span className={`mt-[7px] h-2.5 w-2.5 shrink-0 rounded-[2px] ${major.includes(a) ? MARK[a.kind] : "bg-ink-3/50"}`} aria-hidden />
+                  {(() => { const Icon = ALERT_ICON[a.kind]; return (
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${major.includes(a) ? MARK[a.kind] : "bg-accent text-ink-3"}`} aria-hidden>
+                      <Icon size={17} strokeWidth={2} />
+                    </span>); })()}
                   <span className="min-w-0 flex-1">
                     <span className="flex items-baseline justify-between gap-3">
                       <span className="num text-[15px] font-semibold leading-snug text-ink group-hover:text-bank">{title}</span>
@@ -83,7 +88,7 @@ export function AlertList({ p, i, alerts, lang, focus, onFocus }: {
                       <span className="mt-2 block space-y-2 text-[14px] text-ink-2">
                         <span className="block">{detail}</span>
                         {drivers.length > 0 && (
-                          <span className="block"><span className="font-semibold text-ink">{t(lang, "drivers")}: </span>{drivers.join(", ")}</span>
+                          <span className="flex flex-wrap gap-1.5">{drivers.map((d) => <DriverChip key={d} token={d} lang={lang} />)}</span>
                         )}
                         <span className="block rounded-[4px] bg-paper px-2.5 py-2 font-semibold text-ink">
                           {t(lang, `s.${a.kind}`, w)}
