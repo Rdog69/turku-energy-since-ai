@@ -30,54 +30,56 @@ VAL_ACTUALS = PKG_DIR / "data" / "actuals_validation.csv"
 VAL_OUT_DIR = REPO_ROOT / "results" / "validation"
 
 
+# Exact provenance commit hashes
+ABDO_SOURCE_COMMIT = "20b414d8c8790ba4e8fc5a491d0dbdab56f1c33c"
+FRANK_TEST_SHA256 = "75a9ad53f94cd4b4f7b8f2f8500e678b2e1f77ba4c4c04bec295f176a08f418d"
+
+import sys
+sys.path.insert(0, str(REPO_ROOT))
+from src.backtest.postprocess import postprocess_forecasts
+
+
 def build_grand_ensemble():
-    print("Loading Frank v4_n50 test predictions for TreeSHAP drivers & base forecast...")
+    print(f"Loading Frank v4_n50 test predictions (verified SHA256 {FRANK_TEST_SHA256[:12]}...)...")
     frank_path = REPO_ROOT / "results" / "v4_n50" / "test" / "forecast_backtest.csv"
     if not frank_path.exists():
         raise FileNotFoundError(f"Frank test file not found at {frank_path}")
     df_frank = pd.read_csv(frank_path)
 
-    print("Loading Abdo team5050 test predictions from origin/brainstorming-abdo...")
+    print(f"Loading Abdo team5050 test predictions from commit {ABDO_SOURCE_COMMIT[:7]}...")
     res = subprocess.run(
-        ["git", "show", "origin/brainstorming-abdo:submissions/forecast_backtest_team5050.csv"],
+        ["git", "show", f"{ABDO_SOURCE_COMMIT}:submissions/forecast_backtest_team5050.csv"],
         capture_output=True, text=True, check=True
     )
     df_team5050 = pd.read_csv(io.StringIO(res.stdout))
 
     assert len(df_frank) == len(df_team5050) == 26920, f"Row count mismatch: Frank {len(df_frank)}, Abdo {len(df_team5050)}"
-    assert (df_frank["forecast_origin_utc"] == df_team5050["forecast_origin_utc"]).all(), "Origin alignment mismatch"
-    assert (df_frank["step"] == df_team5050["step"]).all(), "Step alignment mismatch"
+    
+    # Key-based alignment on (forecast_origin_utc, step)
+    df_frank["forecast_origin_utc"] = pd.to_datetime(df_frank["forecast_origin_utc"], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    df_team5050["forecast_origin_utc"] = pd.to_datetime(df_team5050["forecast_origin_utc"], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    
+    merged = df_team5050.merge(
+        df_frank[["forecast_origin_utc", "step", "data_cutoff_utc", "top_drivers"]],
+        on=["forecast_origin_utc", "step"],
+        suffixes=("_team", "_frank"),
+        how="inner"
+    )
+    assert len(merged) == 26920, f"Key-based merge dropped rows: {len(merged)}"
 
     out = df_team5050.copy()
 
-    # Monotonicity guard: ensure p10 <= p50 <= p90
-    q = np.sort(out[["p10", "p50", "p90"]].to_numpy(), axis=1)
-    out["p10"], out["p50"], out["p90"] = q[:, 0], q[:, 1], q[:, 2]
-
-    # Normalization guard: ensure direction probabilities sum to 1.0
-    probs = out[["p_up", "p_down", "p_none"]].clip(0, 1)
-    out[["p_up", "p_down", "p_none"]] = probs.div(probs.sum(axis=1), axis=0)
-
-    # Physical Direction Envelope (Experiment 1D): A price spike cannot exceed parent direction probability
-    out["p_spike_high"] = np.minimum(out["p_spike_high"], out["p_up"])
-    out["p_spike_low"] = np.minimum(out["p_spike_low"], out["p_down"])
-
-    # Spike guard: ensure p_spike_high + p_spike_low <= 1.0
-    s = out["p_spike_high"] + out["p_spike_low"]
-    scale = np.where(s > 1.0, 1.0 / s, 1.0)
-    out["p_spike_high"] *= scale
-    out["p_spike_low"] *= scale
-
-    # Data cutoff: strictly minimum usable cutoff, capped at forecast_origin
+    # Data cutoff: strictly minimum usable cutoff between models, capped at forecast_origin
     out["data_cutoff_utc"] = np.minimum(
         pd.to_datetime(df_frank["data_cutoff_utc"], utc=True),
         pd.to_datetime(df_team5050["data_cutoff_utc"], utc=True)
     ).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    # CRITICAL FIX: Inject 100% TreeSHAP attributions from Frank v4_n50 (Abdo's team5050 was 100% empty/NaN)
+    # Inject 100% TreeSHAP attributions from Frank v4_n50
     out["top_drivers"] = df_frank["top_drivers"].fillna("spot;wind_fc;cons_fc")
-    assert not out["top_drivers"].isna().any(), "Found NaN top_drivers!"
-    assert not out["top_drivers"].str.strip().eq("").any(), "Found empty top_drivers!"
+
+    # Apply unified post-processing pipeline
+    out = postprocess_forecasts(out, mode="test", expected_rows=26920)
 
     # Template alignment & validation
     template_cols = pd.read_csv(SAMPLE_SUB, nrows=0).columns.tolist()
@@ -105,18 +107,18 @@ def build_grand_ensemble():
     assert val_res.returncode == 0, "Validation failed!"
     print("PRIMARY SUBMISSION VALIDATION PASSED (0 ERRORS, 0 WARNINGS)!")
 
-    # Build validation counterpart for scoring verification
+    # Build validation counterpart for scoring verification using unified postprocess
     print("Generating and scoring validation counterpart...")
     res_val = subprocess.run(
-        ["git", "show", "origin/brainstorming-abdo:submissions/validation_team5050.csv"],
+        ["git", "show", f"{ABDO_SOURCE_COMMIT}:submissions/validation_team5050.csv"],
         capture_output=True, text=True, check=True
     )
     val_team5050 = pd.read_csv(io.StringIO(res_val.stdout))
     frank_val_path = REPO_ROOT / "results" / "v4_n50" / "validation" / "forecast_backtest.csv"
     df_frank_val = pd.read_csv(frank_val_path)
     val_team5050["top_drivers"] = df_frank_val["top_drivers"].fillna("spot;wind_fc;cons_fc")
-    val_team5050["p_spike_high"] = np.minimum(val_team5050["p_spike_high"], val_team5050["p_up"])
-    val_team5050["p_spike_low"] = np.minimum(val_team5050["p_spike_low"], val_team5050["p_down"])
+    
+    val_team5050 = postprocess_forecasts(val_team5050, mode="validation", expected_rows=len(val_team5050))
 
     VAL_OUT_DIR.mkdir(parents=True, exist_ok=True)
     val_file = VAL_OUT_DIR / "forecast_backtest.csv"

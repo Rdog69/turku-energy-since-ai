@@ -9,3 +9,5 @@ E07,Urgent Market Message (UMM) Outage Telemetry,Feature Engineering,REJECTED,Fa
 E08,Day-Ahead Spot PCHIP Spline Interpolation,Feature Engineering,REVERTED_TO_BASELINE,Preserved raw spot anchor and added quarter-in-hour indicators instead of interpolating the contract price.
 E09,Physical Direction Envelope for Spikes (Experiment 1D),Post-Processing Probability Guard,ACCEPTED_PRODUCTION,Strict mathematical law; universally valid across all periods without risk of overfitting.
 E10,100% TreeSHAP Feature Attributions Integration,Explainability Layer,ACCEPTED_PRODUCTION,Required for Level 2 compliance and 20 jury explainability points.
+E11,Chronological Cross-Fitted Ridge Residual Corrector,Post-Hoc Residual Layer,REJECTED,"Every alpha and shrinkage lambda > 0 degraded out-of-fold MAE; paired block bootstrap showed only 13.3% win probability."
+E12,Smooth Horizon-Aware Blending Parameter Sweep,Horizon Blending,REVERTED_TO_5050,"Tilted weight toward Abdo in Hour 1 yields negligible gain on Sep while risking August generalization; 50/50 equal blend remains minimax optimal."

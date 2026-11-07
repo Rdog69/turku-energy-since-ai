@@ -223,6 +223,76 @@ def evaluate_predictions(
     return result
 
 
+def paired_block_bootstrap(
+    df_base: pd.DataFrame,
+    df_cand: pd.DataFrame,
+    actuals_path: Path,
+    n_boot: int = 1000,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Perform paired contiguous block bootstrap resampling calendar days.
+
+    Accounts for cross-origin and intra-horizon temporal correlation to produce
+    honest 95% confidence intervals on MAE and Pinball improvements.
+    """
+    actuals = pd.read_csv(actuals_path)
+    actuals["delivery_start_utc"] = pd.to_datetime(actuals["delivery_start_utc"], utc=True).dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    m_base = df_base.merge(actuals, on="delivery_start_utc", how="inner").dropna(subset=["imbalance_price", "p50", "p10", "p90"])
+    m_cand = df_cand.merge(actuals, on="delivery_start_utc", how="inner").dropna(subset=["imbalance_price", "p50", "p10", "p90"])
+
+    assert len(m_base) == len(m_cand), "Row count mismatch between baseline and candidate"
+
+    # Extract calendar days (delivery date)
+    m_base["delivery_date"] = pd.to_datetime(m_base["delivery_start_utc"]).dt.date
+    unique_dates = np.array(sorted(m_base["delivery_date"].unique()))
+    n_days = len(unique_dates)
+
+    # Pre-index rows by date for fast bootstrap resampling
+    date_to_indices = {d: np.where(m_base["delivery_date"].values == d)[0] for d in unique_dates}
+
+    y = m_base["imbalance_price"].values
+    p50_b = m_base["p50"].values
+    p10_b = m_base["p10"].values
+    p90_b = m_base["p90"].values
+
+    p50_c = m_cand["p50"].values
+    p10_c = m_cand["p10"].values
+    p90_c = m_cand["p90"].values
+
+    # Precalculate pointwise errors
+    abs_err_b = np.abs(y - p50_b)
+    abs_err_c = np.abs(y - p50_c)
+
+    pb_b = 0.5 * (np.maximum(0.1 * (y - p10_b), -0.9 * (y - p10_b)) + np.maximum(0.9 * (y - p90_b), -0.1 * (y - p90_b)))
+    pb_c = 0.5 * (np.maximum(0.1 * (y - p10_c), -0.9 * (y - p10_c)) + np.maximum(0.9 * (y - p90_c), -0.1 * (y - p90_c)))
+
+    rng = np.random.RandomState(seed)
+    delta_mae_boot = np.empty(n_boot)
+    delta_pb_boot = np.empty(n_boot)
+
+    for i in range(n_boot):
+        sample_dates = rng.choice(unique_dates, size=n_days, replace=True)
+        idx = np.concatenate([date_to_indices[d] for d in sample_dates])
+        # Delta: positive means candidate improves over baseline (lower error)
+        delta_mae_boot[i] = np.mean(abs_err_b[idx]) - np.mean(abs_err_c[idx])
+        delta_pb_boot[i] = np.mean(pb_b[idx]) - np.mean(pb_c[idx])
+
+    mae_ci_lo, mae_ci_hi = np.percentile(delta_mae_boot, [2.5, 97.5])
+    pb_ci_lo, pb_ci_hi = np.percentile(delta_pb_boot, [2.5, 97.5])
+
+    return {
+        "n_blocks": n_days,
+        "n_bootstraps": n_boot,
+        "delta_mae_mean": float(np.mean(delta_mae_boot)),
+        "delta_mae_95ci": (float(mae_ci_lo), float(mae_ci_hi)),
+        "prob_mae_improves": float(np.mean(delta_mae_boot > 0)),
+        "delta_pinball_mean": float(np.mean(delta_pb_boot)),
+        "delta_pinball_95ci": (float(pb_ci_lo), float(pb_ci_hi)),
+        "prob_pinball_improves": float(np.mean(delta_pb_boot > 0)),
+    }
+
+
 def print_evaluation_summary(res: dict[str, Any], title: str = "Evaluation Summary"):
     print(f"\n{'='*25} {title} ({res['period']}) {'='*25}")
     ov = res["overall"]

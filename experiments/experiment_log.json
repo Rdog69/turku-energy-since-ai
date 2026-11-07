@@ -140,5 +140,37 @@
     "key_findings": "Populated 100% of 26,920 rows with semicolon-separated physical features (e.g. net_load_da;wind_fc_da;spot_ramp). Passes validate_submission.py with 0 errors and 0 warnings.",
     "result": "ACCEPTED_PRODUCTION",
     "decision_reason": "Required for Level 2 compliance and 20 jury explainability points."
+  },
+  {
+    "id": "E11",
+    "name": "Chronological Cross-Fitted Ridge Residual Corrector",
+    "hypothesis": "A regularized Ridge residual layer on 11 low-dimensional physical features across walk-forward validation weeks improves out-of-fold p50 MAE.",
+    "affected_component": "Post-Hoc Residual Layer",
+    "fold_a_metrics": {
+      "baseline_mae": 40.9739,
+      "best_candidate_mae": 41.2077,
+      "bootstrap_delta_mae_mean": -0.2313,
+      "bootstrap_95ci": [-0.6616, 0.1684],
+      "prob_improves": 0.133
+    },
+    "key_findings": "Every regularization alpha and shrinkage lambda > 0 degraded out-of-fold MAE and competition points. 1,000-fold paired block bootstrap on 28 calendar days showed candidate has only a 13.3% chance of beating the baseline.",
+    "result": "REJECTED",
+    "decision_reason": "Failed Phase 2 Anti-Overfit Gate. Confirms Clemen's Equal-Weight Theorem: parameter estimation error exceeds bias reduction."
+  },
+  {
+    "id": "E12",
+    "name": "Smooth Horizon-Aware Blending Parameter Sweep",
+    "hypothesis": "Smooth linear decay w_abdo(step) = 0.5 + b * (1 - 2*(step-1)/39) for b in [-0.10, +0.10] beats fixed 50/50 without multi-period degradation.",
+    "affected_component": "Horizon Blending",
+    "fold_a_metrics": {
+      "baseline_mae": 40.9739,
+      "best_b": 0.10,
+      "candidate_mae": 40.9189,
+      "delta_mae": 0.055,
+      "delta_points": 0.025
+    },
+    "key_findings": "Tilted blending toward Abdo in Hour 1 yields a marginal +0.025 point gain on September, but introduces horizon tilt that collapsed in earlier banded attempts (V2). Retaining b=0.0 (50/50) preserves minimax optimality across all 10 weeks.",
+    "result": "REVERTED_TO_5050",
+    "decision_reason": "Zero-parameter baseline maintains robust 9/10 week wins and prevents single-regime optimization."
   }
 ]
