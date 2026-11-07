@@ -10,7 +10,7 @@ export async function loadPayload(): Promise<void> {
   const el = document.getElementById("payload");
   const p: Payload = el?.textContent ? JSON.parse(el.textContent) : await (await fetch("payload.json")).json();
   PAYLOAD = p;
-  PERIOD_IDS = ["val", "test"].filter((k) => k in p.periods);
+  PERIOD_IDS = ["val", "aug", "test"].filter((k) => k in p.periods);
 }
 
 export const qMs = (p: Period, gi: number) => p.t0 + gi * Q_MS;
