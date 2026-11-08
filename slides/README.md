@@ -2,7 +2,7 @@
 
 **The pitch deck:** [`tasehinta_pitch_deck.pdf`](tasehinta_pitch_deck.pdf) (8 slides), with the editable [`tasehinta_pitch_deck.pptx`](tasehinta_pitch_deck.pptx). Speaker notes are in the PowerPoint file.
 
-Built in Turku Energia's own presentation template, following its graphic guidelines (Graafinen ohjeisto, September 2024): Century Schoolbook headings ending in a full stop, Franklin Gothic Book text and the brand palette.
+Built in Turku Energia's own presentation template, following its graphic guidelines (Graafinen ohjeisto, September 2024): Century Schoolbook headings ending in a full stop and the brand palette, with Aptos for body text.
 
 1. **Tasehinta:** the one-line promise
 2. **The problem:** a missed plan is settled at a price nobody knows yet
