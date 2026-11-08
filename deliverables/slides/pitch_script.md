@@ -1,72 +1,85 @@
 # Tasehinta: 4-minute final pitch
 
-About 520 spoken words, or 4:00 at a calm pace. **Bold** = say it with weight. [Brackets] = what to do on screen.
+**Deck:** open [`tasehinta_pitch_live.html`](tasehinta_pitch_live.html) in Chrome and press **F** for full screen. `tasehinta_demo_clip.mp4` must sit in the same folder. **→ / space / click** = next build, **←** = back. Every number on screen is real (validation month).
 
-**Setup before you go on:** two windows ready. (1) The dashboard at tasehinta.lovable.app, set to *Validation*, scrolled to **Tue 9 Sep, 19:00**, paused. (2) The pitch deck (PDF) on slide 2. Start on the dashboard.
+**▶** = press → at that word. About 530 words, roughly 3:50.
 
 ---
 
-## 0:00–0:30 · Hook (dashboard, live)
+**01 · One evening in September** (0:00–0:30)
 
-[Dashboard at 9 Sep 19:00. Point at the spike-risk flag on the 20:30 quarter.]
+> Monday, 21st of September. Seven in the evening. *(the spot line and the past draw in)*
+> Spot price for eight o'clock: **thirty-six euros**.
+> ▶ Tasehinta says: **seventy percent chance of a spike.** *(the range and the risk bars rise, 70 % counts up)*
+> ▶ At eight, the price was **seven hundred and thirty**. *(the pink line shoots up)*
+> Twenty times spot. And we saw it coming.
 
-> 9 September, seven in the evening. The spot price for 20:30 is 200 euros.
-> **Tasehinta raises a flag: spike risk.**
+*(one-second pause)*
 
-[Press Play / scroll forward past 20:30. The real price line shoots up.]
+**02 · The imbalance price** (0:30–0:55)
 
-> At 20:30 the imbalance price hit **4,000 euros**. Twenty times spot, and we saw it coming 90 minutes before.
+> ▶ That's the imbalance price. Every fifteen minutes, whatever misses Turku Energia's plan is settled at it.
+> On the ninth of September: spot two hundred, imbalance **four thousand**.
+> ▶ And it's not rare. *(the September barcode fills in, day by day)* **One quarter-hour in four** landed more than fifty euros off spot.
 
-*(pause one beat)*
+**03 · Today** (0:55–1:10)
 
-## 0:30–1:00 · Problem (slide 2)
+> ▶ Today you buy this forecast from a vendor, and you told us yourselves: you can't see *why* it says what it says.
+> ▶ **So we built one you can see inside.**
 
-[Switch to the deck, slide 2]
+**04 · Four answers** (1:10–1:45)
 
-> Every quarter-hour, any part of Turku Energia's plan that misses is settled at the imbalance price. It follows spot, until the grid runs short or into a surplus. Then it jumps. In September, **one quarter-hour in four** ended more than 50 euros from spot.
-> Today Turku Energia buys this forecast from a vendor, and as you told us, you can't see *why* it says what it says.
+> ▶ Every hour, Tasehinta looks ten hours ahead, forty quarter-hours, and answers four questions. Same quarter, same evening:
+> **What will it cost?** Seventy-seven euros, with an honest range.
+> ▶ **Which way is the grid going?** Seventy-nine percent: short of power.
+> ▶ **Will it spike?** Seventy percent.
+> ▶ **And why?** Grid frequency, the latest gap, hydro output.
+> ▶ And it **stays quiet** unless something matters. It tells you what to *check*, never what to *trade*.
 
-## 1:00–1:40 · Solution (slide 3)
+**05 · How it works** (1:45–2:20)
 
-> Tasehinta means "imbalance price". Every hour it forecasts the next 40 quarter-hours, and for each one it answers four questions:
-> **What will it cost?** A price with an honest range.
-> **Which way is the grid going?** Up-regulation, down, or none.
-> **Will it spike?** In either direction.
-> **And why?** The few factors that moved the forecast.
-> Then it shows only what's worth checking, and says what to check, never what to trade, because only you know your own position.
+> ▶ Rule number one: **no peeking.** Every number enters only from the moment it was published. Automated tests enforce it.
+> ▶ We forecast the **gap to spot**, not the price, because spot is already known.
+> ▶ We predict the **direction first**. Short: above spot. Surplus: below.
+> ▶ And the price rule changed in June, so we rebuilt **nineteen months** of history under it, a 99.5 % exact match.
 
-## 1:40–2:20 · How it works (slide 4)
+**06 · Results** (2:20–2:55)
 
-> One model, built only from what was known at the time. Every input is used only from the moment it was published. We test for leaks automatically.
-> Three ideas make it work. We forecast the **gap to spot**, not the price, because spot is already known. We predict the **direction first**, so price, range and spike risk tell one story. And we rebuilt 19 months of history under the June 2026 price rule, so the model learns from data that means the same thing.
+> ▶ Scored with **your own script**: **thirty-six point seven percent better** than the baseline.
+> ▶ Less error on every score: median error, uncertainty, spikes, direction.
+> ▶ August, a month it never saw: **twenty-nine percent**. And better in every single week.
+> A model tuned to one month is **a model tuned to luck**. Every idea had to win both.
 
-## 2:20–2:55 · Results (slide 5)
+**07 · One screen** (2:55–3:25) *(the demo clip starts by itself)*
 
-> Scored with your own script on the validation month: **36.7 % better than the baseline**. The median error is 40 euros instead of 66, the uncertainty loss is halved, and it's better in **every single week**.
-> On August, a month it never saw, it's still 29 % better. Every change we kept had to win both months.
+> ▶ This is the real dashboard, on that same evening. Hover the eight o'clock quarter: seventy-seven euros, seventy percent spike risk.
+> ▶ **What's worth checking**, on top. ▶ Price, direction and spike risk on **one timeline**.
+> ▶ And you can **rewind** to any past hour, exactly as it looked then. Step forward, and there's the spike.
 
-## 2:55–3:30 · Dashboard (slide 6)
+**08 · Next** (3:25–3:45)
 
-> For a trader or a shift supervisor, it's one screen. On top: what's worth checking right now. Below: price, direction and spike risk on one 15-minute time axis.
-> And you can rewind to any past hour and see exactly what was known then. That's how we just replayed the 9th of September. It's live, in English and Finnish.
+> ▶ On open data, Tasehinta says **"check this."**
+> ▶ Give it your plant capacity, your costs, your position, and it says **"offer this."**
 
-## 3:30–4:00 · Next and close (slides 7 → 8)
+**09 · Close** (3:45–4:00)
 
-> Built on open data, Tasehinta can say **"check this."** With your own plant capacity, costs and position, the same forecast can say **"offer this."**
-> [Slide 8] An in-house forecast you can actually see inside: 36.7 % better, and it saw the 4,000-euro quarter coming.
-> **Kiitos.**
+> ▶ Two hundred euros planned. Four thousand paid.
+> ▶ **Next time, you'll see it coming.** Tasehinta. **Kiitos!**
 
 ---
 
 ## Likely questions: short answers
 
 - **"How did you get 36.7 %?"** The organisers' score.py on the validation month (7 Sep – 4 Oct): MAE 40.2 vs 66.2, pinball halved, better spike and direction scores, weighted by the challenge's points.
-- **"Did it catch every spike?"** No. Spikes are rare and noisy. Its spike score beats the baseline by about 26 % in September, and the 80 % range held 81 % of real prices. For 9 Sep 20:30 the spike risk went 12 % → 45 % → 65 % as the quarter got closer.
-- **"Why only 90 minutes of warning?"** The real-time grid signals (frequency, wind against forecast) arrive late. Most spikes can't be seen 8 hours out from open data. The range widens instead.
+- **"Did it catch every spike?"** No. Spikes are rare and noisy. The spike score beats the baseline by about 26 % in September, and the 80 % range held 81 % of real prices. On 21 Sep the risk for 20:00 was already 45 % at noon, 8 hours ahead.
 - **"Can you run it live?"** The same pipeline runs from Fingrid and weather APIs. Next step: schedule it hourly behind an API.
 - **"Why one model if it's two components?"** It's one ensemble: two gradient-boosting parts averaged 50/50. Their errors partly cancel, so it beats either part alone.
 - **"What would you need from us?"** Plant capacities, marginal costs and your position. That turns warnings into concrete capacity suggestions.
 
-## Source of the hook numbers
+## Sources of the on-screen numbers
 
-`submissions/blend_v7_rt_h_int4ss_validation.csv`, delivery 2026-09-09 17:30 UTC (20:30 Finnish time): `p_spike_high` = 0.123 at the 08:00 UTC origin, 0.181 at 15:00, **0.446 at 16:00 (19:00 local, step 7)** and 0.652 at 17:00. The dashboard's spike-alert threshold is 40 %. Realised price 4,000 €/MWh against a spot price of 200 (organisers' validation data).
+- **21 Sep, 20:00 quarter (17:00 UTC):** spot 36.4, realised 730.4 (dashboard payload, validation actuals). Forecast at 19:00: p50 77, 80 % range −0.8…164, up-regulation 79 %, spike-high 70 % (0.695), drivers `rt_freq_dev_last4; last_gap; rt_hydro`. Spike-high was 45 % at the 12:00 origin. Source: `submissions/blend_v7_rt_h_int4ss_validation.csv`.
+- **9 Sep, 20:30 quarter:** spot 200, realised 4,000.
+- **1 in 4:** 24 % of validation quarter-hours were more than 50 € from spot.
+- **Score bars:** improvement vs baseline per score, Sep 39/54/26/16 %, Aug 30/47/18/12 %.
+- **Demo clip:** recorded from the real offline dashboard (`frontend/bundle.html`), validation period, 21 Sep 19:00 → 22:00.
