@@ -1,0 +1,47 @@
+TASEHINTA - PITCH (4 min)
+▶ = press the right arrow
+
+1
+21st of September, seven in the evening. Spot price for eight o'clock: 36 euros.
+▶ Tasehinta says: 70% chance of a spike.
+▶ At eight, the price was 730 euros. Twenty times spot. And we saw it coming.
+
+2
+▶ That's the imbalance price. Every 15 minutes, whatever misses your plan is settled at it. On the 9th of September: spot 200, imbalance 4,000.
+▶ And it's not rare. One quarter-hour in four is more than 50 euros off spot.
+
+3
+▶ Today you buy this forecast from a vendor, and you can't see why it says what it says.
+▶ So we built one you can see inside.
+
+4
+▶ Every hour, Tasehinta forecasts the next 40 quarter-hours. For that same evening: what will it cost? 77 euros, with a range.
+▶ Which way is the grid going? 79% short of power.
+▶ Will it spike? 70%.
+▶ And why? Grid frequency, the latest gap, hydro.
+▶ It stays quiet unless something matters, and it says what to check, never what to trade.
+
+5
+▶ Rule number one: no peeking. We only use data that was already published at that moment.
+▶ We forecast the gap to spot, not the price.
+▶ We predict the direction first: short means above spot, surplus means below.
+▶ And we rebuilt 19 months of history under the new June price rule.
+
+6
+▶ With your own scoring script: 36.7% better than the baseline.
+▶ Better on all four scores.
+▶ And on August, a month it never saw: 29% better, and better every single week. A model tuned to one month is a model tuned to luck.
+
+7
+▶ This is the real dashboard, that same evening.
+▶ What's worth checking, on top.
+▶ Price, direction and spike risk on one timeline.
+▶ And you can rewind to any past hour. Step forward, and there's the spike.
+
+8
+▶ Today, on open data, it says "check this."
+▶ With your plant capacity, costs and position, it says "offer this."
+
+9
+▶ Two hundred euros planned. Four thousand paid.
+▶ Next time, you'll see it coming. Tasehinta. Kiitos!
