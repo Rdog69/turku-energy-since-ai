@@ -8,6 +8,9 @@
 
 **Since AI 2026 · Turku Energia challenge** · Turku, 6–8 November 2026
 
+<img src="https://img.shields.io/badge/%F0%9F%8F%86%20Winner-Turku%20Energia%20challenge-F59B00?style=for-the-badge" alt="Winner of the Turku Energia challenge"/>
+<img src="https://img.shields.io/badge/Top%205%20finalist-Since%20AI%202026-0B3C6A?style=for-the-badge" alt="Top 5 finalist at Since AI 2026"/>
+<br/>
 <a href="https://tasehinta.lovable.app"><img src="https://img.shields.io/badge/%E2%96%B6%20Open%20the%20live%20dashboard-tasehinta.lovable.app-0B3C6A?style=for-the-badge" alt="Open the live dashboard"/></a>
 <a href="#-demo-video"><img src="https://img.shields.io/badge/%E2%96%B6%20Demo%20video-5%20min-0E7F7A?style=for-the-badge" alt="Demo video"/></a>
 
