@@ -194,7 +194,7 @@ Component B and the full run order: [`code/README.md`](https://github.com/Rdog69
 
 | Branch | What's there |
 |---|---|
-| `master` | This page, the screenshots, the team scoreboard |
+| `master` | This page, the screenshots and the demo video |
 | [`deliverables`](https://github.com/Rdog69/turku-energy-since-ai/tree/deliverables) | Everything we submit: forecast, report, model description, sources, code guide |
 | [`brainstorming-frank`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-frank) | Component A (`src/`), the final forecast files and ensemble tools (`submissions/`), the dashboard (`frontend/`), the results log (`docs/RESULTS.md`) |
 | [`brainstorming-abdo`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-abdo) | Component B (`experiments/lab/`) and the history dataset |
