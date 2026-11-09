@@ -24,6 +24,7 @@
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-06B6D4?logo=tailwindcss&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-7D7D7D)](LICENSE)
 
 [**The problem**](#-the-problem) · [**Dashboard**](#%EF%B8%8F-the-dashboard) · [**Results**](#-results) · [**How it works**](#-how-it-works) · [**Deliverables**](#-deliverables) · [**Run it**](#-run-it) · [**Team**](#-team)
 
@@ -207,6 +208,10 @@ Component B and the full run order: [`code/README.md`](https://github.com/Rdog69
 - **Data:** the organisers' starter package (Fingrid, ENTSO-E, Nord Pool, calendar); Fingrid's open real-time API; ECMWF and DWD ICON-EU forecast runs via [Open-Meteo](https://open-meteo.com) (CC BY 4.0); OpenStreetMap wind turbines (ODbL); Elering's 2025 day-ahead prices. Full list with licences: [sources and licences](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/sources/SOURCES_AND_LICENCES.md).
 - **Software:** Python, pandas, LightGBM, React, Vite, Tailwind, shadcn/ui, d3, lucide icons, Source Sans 3.
 - **AI tools:** Claude Code for coding and analysis; open LLMs on Featherless for written briefings in an earlier dashboard.
+
+## 📄 License
+
+The code is released under the [MIT License](LICENSE). The licence covers the code only, **not the data**: the organisers' starter package (including Nord Pool spot prices) belongs to its providers and is not included here, and third-party data keeps its own licence ([sources and licences](https://github.com/Rdog69/turku-energy-since-ai/blob/deliverables/sources/SOURCES_AND_LICENCES.md)). Under the Since AI challenge terms, Turku Energia may also use this work in its business.
 
 ## 👥 Team
 

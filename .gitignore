@@ -1,7 +1,6 @@
 # --- Organiser data ---
-# starter_package/ was committed during the event (private repo) and removed from master on 9 Nov.
-# It is still in the git history and on some working branches: purge it from the history
-# before this repo is ever made public (Nord Pool spot data is licensed).
+# starter_package/ (the organisers' data) was committed during the event and removed from
+# every branch tip on 9 Nov 2026. Never add it back: get the starter package locally instead.
 starter_package/
 external_data/
 starter_package_v1/
