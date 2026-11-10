@@ -200,6 +200,8 @@ Component B and the full run order: [`code/README.md`](https://github.com/Rdog69
 | [`brainstorming-frank`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-frank) | Component A (`src/`), the final forecast files and ensemble tools (`submissions/`), the dashboard (`frontend/`), the results log (`docs/RESULTS.md`) |
 | [`brainstorming-abdo`](https://github.com/Rdog69/turku-energy-since-ai/tree/brainstorming-abdo) | Component B (`experiments/lab/`) and the history dataset |
 | [`front-end`](https://github.com/Rdog69/turku-energy-since-ai/tree/front-end) | The dashboard's first version |
+| [`pavel/forecast-experiments`](https://github.com/Rdog69/turku-energy-since-ai/tree/pavel/forecast-experiments) | Pavel's historical tuning trials; experimental results, not the final submitted model |
+| [`pavel/milestone-audit`](https://github.com/Rdog69/turku-energy-since-ai/tree/pavel/milestone-audit) | Historical milestone audit, provider questions and roadmap; a dated research snapshot, not the final results |
 
 </details>
 
@@ -221,7 +223,7 @@ The code is released under the [MIT License](LICENSE). The licence covers the co
 <td align="center"><b>Abdo</b><br/><sub>Model component B · history dataset · dashboard · deliverables & report</sub></td>
 <td align="center"><b>Jim</b><br/><sub>Evaluation framework · alerts · API · slides & video</sub></td>
 <td align="center"><b>Pavlo</b><br/><sub>Data map · ICON-EU weather · leakage review · sources</sub></td>
-<td align="center"><b>Pavel</b><br/><sub>Model audits · tuning trials · provider questions</sub></td>
+<td align="center"><b><a href="https://github.com/Pavel10110">Pavel</a></b><br/><sub>Model audits · tuning trials · provider questions</sub></td>
 </tr>
 </table>
 
